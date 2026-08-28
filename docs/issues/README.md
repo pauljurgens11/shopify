@@ -167,6 +167,7 @@ graph LR
   H1 --> H2
   H2 --> H3[H3 polish+README]
   A5[A5 prod stack · day 2] --> H3
+  H3 --> H4[H4 UX/motion parity]
 ```
 
 Full index with one-line summaries: [INDEX.md](INDEX.md).

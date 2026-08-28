@@ -52,6 +52,7 @@ eight interpretations. Read your page's section before writing JSX.
 | [H1](H1-seed-demo-data.md) | Seed: the full Aurora Supply Co. demo dataset | H | L | F1 |
 | [H2](H2-e2e-smoke.md) | Playwright smoke: the 5 mandatory flows | H | M | B5, C5, E4, F4, H1 |
 | [H3](H3-polish-readme-demo.md) | Polish sweep, README, demo script | H | M | H2 |
+| [H4](H4-ux-motion-parity.md) | UX/motion parity audit: animations & interaction polish | H | M | H3 |
 
 Deferred hardening (explicitly NOT issues — do not build unless promoted via
 `DECISIONS.md`): per-app env sub-schemas so each app parses only its own vars
