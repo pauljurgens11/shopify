@@ -55,6 +55,7 @@ Demo login: `owner@demo.dev` / `password123`.
 - **Read the database.** `pnpm db:query` runs SQL against whichever database this checkout's `.env` points at (main's stack uses `merchant_main`, worktrees the shared `merchant`). Postgres enforces read-only on the connection, so writes fail at the server — schema changes still go through a migration.
 - **Guards.** `.claude/settings.json` denies `npm`/`yarn` (§9: a stray lockfile breaks every other agent) and force-pushes, and a `PreToolUse` hook blocks `git commit` while HEAD is `main`. The `.githooks` hooks still run at commit/push time; these just fail earlier and louder.
 - Ports 3000/3001/3002 are shared across worktrees. If a dev server will not bind, the main stack owns them — `pnpm stack status`.
+  - **If the admin logs you out mid-test, suspect the ports before you suspect auth.** Every worktree shares one `SESSION_SECRET` but gets its own Redis slot (`pnpm worktree:env`), and sessions live in Redis. So when another worktree takes :3001, your cookie still passes its signature check against *their* API — and then the session id is not in *their* Redis, so you get `401 unauthorized: "Your session has expired. Sign in again."` and the shell bounces you to /login. Nothing is wrong with your code or your session; you are talking to someone else's stack. `pnpm stack status` names the worktree that holds each port, and `pnpm stack up` takes them back.
 
 ---
 
