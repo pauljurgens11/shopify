@@ -274,6 +274,10 @@ item below is something this pass actually caught, after the tests were green.
   trains you to ignore the next one. The linter will tell you.
 - **Rendered controls for cut features.** A button that cannot work must not
   exist.
+- **Is it reachable?** A page nothing links to is not shipped. I built a
+  settings sub-page whose only entry point was a hub another issue had not
+  built yet — it worked perfectly and no one could get to it. Follow the nav
+  registry or an existing link to your screen before calling it done.
 - **Anything branded or external that PARITY forbids** — a CDN asset, a logo, a
   vendor name in copy.
 - **Scope creep and leftovers** — debug logging, a temporary `.env` or
