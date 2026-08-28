@@ -13,6 +13,12 @@ cost real time when ignored.
 **The bar:** a merged PR whose behaviour you have *seen work*, not one that
 compiles and has green tests.
 
+**The tiebreaker, for every judgement call below:** the KPI — a Shopify user
+opens our admin and cannot tell it isn't Shopify. Resolve trade-offs in
+CLAUDE.md §0's order — appearance parity → functionality → performance →
+everything else. When two defensible options exist, take the one that serves
+that, log a line in `DECISIONS.md`, and keep moving.
+
 ---
 
 ## 1. Pick and claim
@@ -35,6 +41,24 @@ git checkout -B ws-{x}/{slug} origin/main
 
 Prefer the issue that **unblocks the most others** — read the INDEX dependency
 graph, not the ID order.
+
+**Confirm the choice with whoever asked before you start**, with the state you
+found: what is landed, what is in flight, and why this one. Picking is the one
+decision worth a round trip — it commits hours and it is the easiest to get
+wrong when three agents are moving. Everything after it is yours to decide.
+
+### Decide alone; escalate almost never
+
+You have the repo, the contracts and `DECISIONS.md`. That is enough for
+essentially every question the work raises. Ambiguity is resolved by picking the
+option that serves the KPI, logging one line in `DECISIONS.md`, and continuing —
+never by stopping.
+
+Escalate only when proceeding under *any* assumption would be unsafe or would
+waste the work if wrong. "Which of these two layouts?" is not that. "This issue
+contradicts a landed decision" might be. When you do ask, do the parts that do
+not depend on the answer first, and ask with a recommendation rather than a
+menu.
 
 ---
 
@@ -59,11 +83,51 @@ DECISIONS.md in the same PR**.
 
 ---
 
-## 3. Tests that would actually catch something
+## 3. Test-driven — and only tests that earn their place
+
+`docs/issues/README.md` calls this **test-driven, feedback-based**. The feedback
+half is not optional: running the real thing and reading your own diff are
+*inside* the loop, not gates at the end of it.
+
+**The loop, in this order, every time:**
+
+1. **Write the test first**, from the issue's own Test plan.
+2. **Run it and watch it fail — and check the failure is the RIGHT one.** A
+   missing endpoint fails `404 Endpoint not found`; a missing DTO field fails on
+   `undefined`; a missing rule fails the assertion, not the setup. A red bar for
+   the wrong reason is not a red bar.
+3. Implement until green.
+4. **Mutation-check** the assertions that carry the weight (below).
+5. **Run the real thing and look at it** (§4). What you see here feeds straight
+   back to step 1 — every bug found by hand gets a test before it gets a fix.
+6. **Review your own diff** (§5), fix what it turns up, and go round again.
+
+Steps 5 and 6 are where most of the real bugs came from. Treat a green suite as
+permission to start looking, not as the finish line.
+
+Step 2 is the one that gets skipped, and skipping it is how a test that asserts
+nothing ends up in the suite. **If a test passes the first time you run it, stop
+and find out why** — either the behaviour already existed (so the test is
+documentation, not verification), or the assertion is vacuous, or you are not
+sending the input you think you are.
+
+That last case is the one that got me. A suite I wrote test-first passed
+entirely on its first run. I noticed, mutation-checked it, satisfied myself it
+was not vacuous — and it still shipped three bugs, because an all-green first
+run also means nothing has told you which inputs you never sent. Test-first is
+necessary and not sufficient; a suite that has never been red is a suite you
+have not interrogated.
+
+Writing tests after the fact is a fallback, not the plan. When you do it — a
+refactor, a bug found by hand — make the test fail against the *old* behaviour
+before you keep it.
+
+### Which tests earn their place
 
 SPEC §14 lists what not to write. This is the other half. Before writing a test,
 answer: **what does it fail on, and would that bug otherwise ship silently?** If
-there is no answer, skip it.
+there is no answer, do not write it — an invented test is a maintenance cost and
+a false signal, not a safety net.
 
 Worth testing wherever they appear:
 
@@ -87,12 +151,6 @@ Worth testing wherever they appear:
 - **The one tenancy hole your own query opens.** General isolation is A2's suite;
   an `OR` clause you added to a list query is yours. A search that reaches a
   neighbouring shop is the unforgivable bug.
-
-### Red first, and for the right reason
-
-Watch the failure before implementing. A new endpoint should fail
-`404 Endpoint not found`; a new DTO field, `undefined`. A test that passes on
-its first run taught you nothing.
 
 ### Mutation-check the load-bearing assertions
 
@@ -166,7 +224,41 @@ Do not report "done" for work nobody has looked at.
 
 ---
 
-## 5. Scope: finish it, and stop
+## 5. Review your own diff before pushing
+
+Read the whole diff as if someone else wrote it. This is not a formality — every
+item below is something this pass actually caught, after the tests were green.
+
+- **Comments that lie.** A comment asserting behaviour the code does not have is
+  worse than none: mine claimed a variant update "is an update, not a reset"
+  while the code reset every row the payload did not name. If a comment makes a
+  promise, check the code keeps it.
+- **Unsafe casts hiding a real case.** `as never`, `as any`, `!` — each one is a
+  possibility you told the compiler to ignore. Replace with a guard that throws a
+  named error, or handle the case.
+- **Dead state.** A field written everywhere and read nowhere. If nothing
+  consumes it, delete it (CLAUDE.md §8 — no dead code).
+- **Suppressions that suppress nothing.** A stale `biome-ignore` is noise that
+  trains you to ignore the next one. The linter will tell you.
+- **Rendered controls for cut features.** A button that cannot work must not
+  exist.
+- **Anything branded or external that PARITY forbids** — a CDN asset, a logo, a
+  vendor name in copy.
+- **Scope creep and leftovers** — debug logging, a temporary `.env` or
+  `launch.json` edit, test data you created by hand.
+
+Then run the repo's own reviewer over it before you push:
+
+```bash
+pnpm verify      # lint + typecheck + unit
+```
+
+If a finding is real, fix it and re-run the loop. If it is not, say why rather
+than silently ignoring it.
+
+---
+
+## 6. Scope: finish it, and stop
 
 - **A cut feature's button is not rendered.** No control for a field the contract
   cannot save.
@@ -183,7 +275,7 @@ Do not report "done" for work nobody has looked at.
 
 ---
 
-## 6. Land it
+## 7. Land it
 
 ```bash
 pnpm verify                      # lint + typecheck + unit — before every push
@@ -209,7 +301,7 @@ notes to the specific issue that will consume them.
 
 ---
 
-## 7. Environment traps, all of which have bitten
+## 8. Environment traps, all of which have bitten
 
 | Symptom | Cause |
 |---|---|
@@ -228,14 +320,20 @@ every suite creates its own shop.
 
 ## Checklist
 
-- [ ] Deps `DONE`, nothing in flight, claimed in AGENT-LOG
+- [ ] Deps `DONE`, nothing in flight, choice confirmed, claimed in AGENT-LOG
 - [ ] Contracts / registries / DECISIONS / PARITY read; divergences logged
-- [ ] Tests written first, seen red for the right reason
+- [ ] Every test written BEFORE its implementation, and seen to fail for the
+      right reason — no test passed on its first run unexplained
 - [ ] Load-bearing assertions mutation-checked
+- [ ] No test written that cannot name the bug it catches
 - [ ] Asked which input shapes were never tested
 - [ ] **Actually ran it** on the right surface; writes confirmed in the DB
+- [ ] Every bug found by hand got a test BEFORE it got a fix
+- [ ] Read the whole diff back: no lying comments, unsafe casts, dead state,
+      stale suppressions, or controls for cut features
 - [ ] Cut features not rendered; UI rules enforced server-side too
 - [ ] `pnpm verify` green *after* merging main, installing and migrating
 - [ ] DECISIONS.md + AGENT-LOG handoffs addressed to named downstream issues
 - [ ] Temporary `.env` / `launch.json` edits reverted; test data cleaned up
 - [ ] PR title flags `[contracts]` / `[schema]`; auto-merge armed
+- [ ] Merged — an issue is not done until its PR is on `main`
