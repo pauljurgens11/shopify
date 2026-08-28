@@ -688,3 +688,49 @@ export async function updateVariant(
   });
   return toVariantDto(row, currencyCode);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Reads for collection membership (B3)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A page of products for an arbitrary `where`, mapped through the same DTO as
+ * `listProducts`. Collections resolve membership as a Prisma query rather than
+ * an in-memory filter, so they need to hand their clause in — and a collection
+ * page must return exactly what the products index returns.
+ */
+export async function productsMatching(
+  db: TenantClient,
+  currencyCode: string,
+  args: {
+    where: Prisma.ProductWhereInput;
+    orderBy: Prisma.ProductOrderByWithRelationInput[];
+    skip: number;
+    take: number;
+  },
+): Promise<Product[]> {
+  const rows = await db.product.findMany({ ...args, include: PRODUCT_INCLUDE });
+  return rows.map((row) => toProductDto(row, currencyCode));
+}
+
+/**
+ * Products for a caller-computed id list, in that order. Used where the order
+ * comes from something Prisma cannot sort a product query by — the cheapest
+ * variant, units sold, a manual position.
+ */
+export async function productsByIds(
+  db: TenantClient,
+  currencyCode: string,
+  ids: readonly string[],
+): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  const rows = await db.product.findMany({
+    where: { id: { in: [...ids] } },
+    include: PRODUCT_INCLUDE,
+  });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is ProductRow => row !== undefined)
+    .map((row) => toProductDto(row, currencyCode));
+}
