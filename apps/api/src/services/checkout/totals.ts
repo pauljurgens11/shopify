@@ -33,6 +33,7 @@ import type { MoneyDto } from '@merchant/contracts/common';
 import type {
   AppliedDiscount,
   Discount,
+  DiscountPriorUsage,
   DiscountRejectionReason,
 } from '@merchant/contracts/discounts';
 import { applyDiscounts } from '../discounts/engine.ts';
@@ -58,6 +59,11 @@ export interface PricingInput {
   /** Automatics plus the row for the entered code, loaded by the caller. */
   discounts: Discount[];
   enteredCode: string | null;
+  /**
+   * This customer's past redemption count per discount id, so the engine can
+   * enforce `oncePerCustomer`. Omitted for guests — enforcement is skipped.
+   */
+  priorUsage?: DiscountPriorUsage;
   now: Date;
 }
 
@@ -118,6 +124,7 @@ export function computeCheckoutTotals(input: PricingInput): PricingResult {
     shippingPrice: money(0, currency),
     discounts: input.discounts,
     enteredCode: input.enteredCode,
+    priorUsage: input.priorUsage,
     now: input.now,
   });
 
@@ -133,6 +140,7 @@ export function computeCheckoutTotals(input: PricingInput): PricingResult {
     shippingPrice: money(shippingPrice, currency),
     discounts: input.discounts,
     enteredCode: input.enteredCode,
+    priorUsage: input.priorUsage,
     now: input.now,
   });
 
