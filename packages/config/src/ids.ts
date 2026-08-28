@@ -26,6 +26,7 @@ export const ID_PREFIXES = {
   payment: 'pay',
   cardToken: 'card_tok',
   processor: 'proc',
+  routingRule: 'rule',
   app: 'app',
   webhook: 'wh',
   theme: 'thm',
