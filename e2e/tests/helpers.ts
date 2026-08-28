@@ -23,6 +23,30 @@ export function storefrontUrlFor(slug: string): string {
   return `${base.protocol}//${slug}.${domain}${port}`;
 }
 
+/**
+ * Sign up a brand-new shop through the UI and land on its admin home, logged
+ * in as its owner. Flows that mutate shop-wide state (the published theme) run
+ * on a shop of their own so a local `pnpm e2e` never restyles the seeded demo
+ * store (§8: seed data IS the demo). Returns the server-derived slug.
+ */
+export async function signupFreshShop(
+  page: Page,
+  shopName: string,
+  email: string,
+): Promise<string> {
+  await page.goto(`${ADMIN_URL}/signup`);
+  await page.locator('input[name="shopName"]').fill(shopName);
+  await page.locator('input[name="firstName"]').fill('Smoke');
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill('password123');
+  await page.getByRole('button', { name: 'Create store' }).click();
+  // The slug is derived (and de-duplicated) server-side — read it back.
+  await page.waitForURL(/\/store\/[^/]+$/);
+  const slug = new URL(page.url()).pathname.split('/')[2] ?? '';
+  expect(slug).not.toBe('');
+  return slug;
+}
+
 /** The `name` attributes are pinned by A3 for exactly this helper. */
 export async function loginAsOwner(page: Page): Promise<void> {
   await page.goto(`${ADMIN_URL}/login`);
