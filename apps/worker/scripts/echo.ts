@@ -34,7 +34,7 @@ async function secretFor(shopId: string, path: string): Promise<string | null> {
   if (explicitSecret) return explicitSecret;
   const key = `${shopId}:${path}`;
   const cached = secrets.get(key);
-  if (cached !== undefined) return cached;
+  if (cached) return cached;
 
   const subscription = await dbForShop(shopId)
     .webhookSubscription.findFirst({
@@ -43,9 +43,10 @@ async function secretFor(shopId: string, path: string): Promise<string | null> {
     })
     .catch(() => null);
 
-  const secret = subscription?.secret ?? null;
-  secrets.set(key, secret);
-  return secret;
+  // Only a hit is cached: the usual demo order is to start this, then create the
+  // subscription, and a cached miss would make it say "unverified" forever.
+  if (subscription) secrets.set(key, subscription.secret);
+  return subscription?.secret ?? null;
 }
 
 const server = createServer((req, res) => {

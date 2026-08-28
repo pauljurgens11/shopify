@@ -65,6 +65,9 @@ function producerConnection(): Promise<Redis> {
     });
     return client;
   })();
+  connection.catch(() => {
+    connection = undefined;
+  });
   return connection;
 }
 
@@ -79,6 +82,9 @@ export function getQueue(name: QueueName): Promise<Queue> {
       });
       return created;
     })();
+    // Drop a rejected promise, or every later enqueue in this process would
+    // replay the same failure long after the cause is gone.
+    queue.catch(() => queues.delete(name));
     queues.set(name, queue);
   }
   return queue;

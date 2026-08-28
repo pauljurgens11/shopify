@@ -31,7 +31,8 @@ async function handler(raw: unknown, ctx: JobContext): Promise<void> {
   const order = await db.order.findUnique({
     where: { id: job.orderId },
     include: {
-      lineItems: { orderBy: { createdAt: 'asc' } },
+      // ULIDs sort chronologically; createdAt ties within one transaction.
+      lineItems: { orderBy: { id: 'asc' } },
       customer: { select: { firstName: true } },
     },
   });
