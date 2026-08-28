@@ -21,6 +21,8 @@ registry). A3 gives the shell + API client; B3/B4 give the endpoints. These
 pages are simpler than B5 — match Shopify layout, keep scope tight.
 
 ## Build (SPEC §9)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Collections index**: `IndexTable` (image, title, type badge
    manual/smart, product count), search, pagination, empty state.
 2. **Collection form**: title/description/handle; type chooser at creation

@@ -23,6 +23,8 @@ tokens (SPEC §3) — if you fall back, one `DECISIONS.md` line. The seed (H1)
 gives 60 days of history, so charts must look alive by default.
 
 ## Build (SPEC §9, §13)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Analytics page**: Shopify's dashboard grid —
    - Date-range picker (Today / 7d / 30d / 90d presets + comparison toggle).
    - Metric cards: Total sales, Orders, Conversion rate, AOV — value +
@@ -30,6 +32,8 @@ gives 60 days of history, so charts must look alive by default.
    - Sales-over-time line/area chart (the hero chart).
    - Conversion funnel card (sessions → … → purchase, dropoff %).
    - Top products list (name, units, revenue).
+   - Sales-by-channel card — static single row "Online Store" with the total
+     (SPEC §13; render it, don't architect channels).
    - Live view-lite card ("Right now": visitors last 30 min, orders today)
      polling `GET /live` every 30s.
 2. **Home page**: Shopify's Home —

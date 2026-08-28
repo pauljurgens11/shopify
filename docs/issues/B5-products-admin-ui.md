@@ -22,6 +22,8 @@ v13 has every component you need; the SPEC §9 rule is: if Polaris has the
 pattern, use exactly that pattern.
 
 ## Build (SPEC §9)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Products index** (`…/products`):
    - Polaris `IndexTable`: checkbox column, product image thumb, title,
      status badge, inventory summary ("12 in stock for 3 variants"), vendor.

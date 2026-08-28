@@ -23,6 +23,8 @@ preview/builder surface to be Tailwind-flavored, but the page frame stays
 Polaris so it feels native to the admin.
 
 ## Build (SPEC §12)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Split screen** (full-height page): left ~380px chat panel, right
    preview.
 2. **Chat panel**: message history from F3's conversation (user right,

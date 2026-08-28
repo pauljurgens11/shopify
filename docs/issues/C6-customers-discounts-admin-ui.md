@@ -23,6 +23,8 @@ contract, `requirePermission('discounts')`, pagination + `?query=`). C4
 shipped customers. A3 supplies the shell.
 
 ## Build (SPEC §9)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Customers index**: `IndexTable` — name, email subscription state, orders
    count, amount spent; segment tabs from C4 (`All/New/Returning/Abandoned
    checkouts`); search; pagination.

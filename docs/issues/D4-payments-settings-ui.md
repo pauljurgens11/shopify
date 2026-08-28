@@ -21,6 +21,8 @@ D3 exposes processor-config CRUD, routing rules, and `chargeSavedCard`. A4
 owns the settings hub grid; your page hangs off its "Payments" card.
 
 ## Build (SPEC §11)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Payments settings page**:
    - Connected processors list (Polaris resource list): name, status badge
      (Connected / Error), test-mode tag for mock; Connect button per

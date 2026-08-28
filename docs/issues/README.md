@@ -3,9 +3,10 @@
 This directory is the development plan, broken into parallel-safe issues.
 Each `NN-ws{x}-*.md` file is one unit of work an agent picks up, finishes, and
 lands as **one PR**. Everything an agent needs is in the issue file plus the
-three canon documents: [SPEC.md](../../SPEC.md) (what to build),
+canon documents: [SPEC.md](../../SPEC.md) (what to build),
 [CLAUDE.md](../../CLAUDE.md) (how to work), [WORKSTREAMS.md](../WORKSTREAMS.md)
-(what you own).
+(what you own), and for anything with a screen, [PARITY.md](PARITY.md)
+(what Shopify actually looks like — binding for UI issues).
 
 **KPI reminder: a Shopify user opens the admin and cannot tell it isn't
 Shopify.** Every issue exists to serve that. Trade-offs resolve: appearance
@@ -161,6 +162,7 @@ graph LR
   F4 --> H2
   H1 --> H2
   H2 --> H3[H3 polish+README]
+  A5[A5 prod stack · day 2] --> H3
 ```
 
 Full index with one-line summaries: [INDEX.md](INDEX.md).

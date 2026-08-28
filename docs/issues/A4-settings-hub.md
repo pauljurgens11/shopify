@@ -28,6 +28,8 @@ rates likely need their own small model (additive migration
 `NNN_wsa_shipping_rates` — `git pull` first).
 
 ## Build (SPEC §9 settings list, §10 shipping/taxes)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **API**: `GET/PUT /admin/api/settings/general` (shop name, email, currency,
    timezone — currency is single per shop, SPEC §2), `…/taxes` (flat %,
    default 0), `…/checkout` (minimal toggles per contract), shipping rate CRUD
@@ -44,6 +46,10 @@ rates likely need their own small model (additive migration
      price condition).
    - Staff: index table + add/edit with role select and permission checkboxes.
    - Plan: static page ("Trial" card) — render, don't build billing.
+   - Notifications (notifications-lite, SPEC §2): a read-mostly page listing
+     the customer notifications ("Order confirmation — On") with the sender
+     email field; only the order-confirmation toggle needs to be live (it
+     gates E3's email enqueue via checkout settings).
 
 ## Test plan (write first)
 - Vitest (service level, real Postgres): tax % and shipping-rate conditions

@@ -33,7 +33,10 @@ screen-shares the admin and nothing looks off.**
 3. **docs/DEMO.md**: a timed presenter script (what to click, what to say,
    which numbers to point at), including the second-shop signup beat and the
    decline-card beat (`4000…0002`).
-4. **Polish sweep** (the licence): visit every page in admin + storefront —
+4. **Parity audit, then polish sweep** (the licence): walk every admin page
+   against its [PARITY.md](PARITY.md) section line by line — wording, badge
+   tones, card order, save-bar behavior; fix drift or file it to the owner.
+   Then the sweep: visit every page in admin + storefront —
    - every list has a real empty state (no blank tables), every page a
      skeleton, every mutation a toast;
    - dead buttons/links removed (not disabled — removed, per SPEC §5);

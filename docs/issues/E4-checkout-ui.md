@@ -20,6 +20,8 @@ D1's `/vault/tokenize` receives the PAN directly from the browser — the
 checkout server never sees a card number (SPEC §11, CLAUDE.md §9).
 
 ## Build (SPEC §10 Checkout)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **`/checkouts/[token]`** — Shopify's two-column layout:
    - Left: express-checkout placeholder row (grey "Express checkout"
      divider — placeholder only), **Contact** (email), **Delivery** (address

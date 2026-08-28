@@ -26,6 +26,8 @@ Scopes: reuse the permission areas
 `constants.PERMISSION_AREAS`).
 
 ## Build (SPEC §2 app surface, §13)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Apps management API** (`/admin/api/apps`, `requirePermission('apps')`):
    CRUD; on create generate `shpat_…`, store SHA-256 hash, **return the
    plaintext once**; rotate endpoint (new token, old dead); webhook

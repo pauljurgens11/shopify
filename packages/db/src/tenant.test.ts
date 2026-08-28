@@ -38,13 +38,18 @@ describe('stampWriteData', () => {
         images: { create: { url: 'https://x/1.jpg' } },
       },
       SHOP,
-    ) as Record<string, any>;
-    expect(out.shopId).toBe(SHOP);
-    expect(out.variants.create).toEqual([
-      { title: 'S', shopId: SHOP },
-      { title: 'M', shopId: SHOP },
-    ]);
-    expect(out.images.create).toEqual({ url: 'https://x/1.jpg', shopId: SHOP });
+    );
+    expect(out).toEqual({
+      title: 'Trail Jacket',
+      shopId: SHOP,
+      variants: {
+        create: [
+          { title: 'S', shopId: SHOP },
+          { title: 'M', shopId: SHOP },
+        ],
+      },
+      images: { create: { url: 'https://x/1.jpg', shopId: SHOP } },
+    });
   });
 
   it('stamps nested createMany.data and connectOrCreate.create', () => {
@@ -60,18 +65,21 @@ describe('stampWriteData', () => {
         },
       },
       SHOP,
-    ) as Record<string, any>;
-    expect(out.variants.createMany).toEqual({
-      data: [{ title: 'S', shopId: SHOP }],
-      skipDuplicates: true,
-    });
-    expect(out.collections.connectOrCreate[0].create).toEqual({
-      position: 1,
-      collectionId: 'col_1',
+    );
+    expect(out).toEqual({
+      title: 'x',
       shopId: SHOP,
+      variants: { createMany: { data: [{ title: 'S', shopId: SHOP }], skipDuplicates: true } },
+      collections: {
+        connectOrCreate: [
+          {
+            // `where` untouched — it is a unique lookup, not an insert payload.
+            where: { id: 'colprod_1' },
+            create: { position: 1, collectionId: 'col_1', shopId: SHOP },
+          },
+        ],
+      },
     });
-    // connectOrCreate.where must be untouched — it is a unique lookup.
-    expect(out.collections.connectOrCreate[0].where).toEqual({ id: 'colprod_1' });
   });
 
   it('recurses two levels deep', () => {
@@ -79,17 +87,20 @@ describe('stampWriteData', () => {
       'Order',
       { email: 'x@y.z', lineItems: { create: [{ title: 'A', quantity: 1 }] } },
       SHOP,
-    ) as Record<string, any>;
-    expect(out.lineItems.create[0].shopId).toBe(SHOP);
+    );
+    expect(out).toEqual({
+      email: 'x@y.z',
+      shopId: SHOP,
+      lineItems: { create: [{ title: 'A', quantity: 1, shopId: SHOP }] },
+    });
   });
 
   it('does NOT descend into JSON columns that merely look like nested writes', () => {
     // `shippingAddress` is a Json column on Order, not a relation — a payload
     // containing a `create` key inside it must pass through byte-identical.
     const json = { create: { sneaky: true }, city: 'Berlin' };
-    const out = stampWriteData('Order', { shippingAddress: json }, SHOP) as Record<string, any>;
-    expect(out.shippingAddress).toEqual(json);
-    expect(out.shippingAddress.create.shopId).toBeUndefined();
+    const out = stampWriteData('Order', { shippingAddress: json }, SHOP);
+    expect(out).toEqual({ shippingAddress: json, shopId: SHOP });
   });
 
   it('leaves nested connect untouched (documented residual vector)', () => {
@@ -97,8 +108,12 @@ describe('stampWriteData', () => {
       'CollectionProduct',
       { position: 1, collection: { connect: { id: 'col_1' } } },
       SHOP,
-    ) as Record<string, any>;
-    expect(out.collection).toEqual({ connect: { id: 'col_1' } });
+    );
+    expect(out).toEqual({
+      position: 1,
+      shopId: SHOP,
+      collection: { connect: { id: 'col_1' } },
+    });
   });
 });
 

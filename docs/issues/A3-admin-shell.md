@@ -25,15 +25,24 @@ Settings — and currently has zero consumers. Admin pages are Client Components
 workstream's foundation: the shell is the first thing a Shopify user sees.**
 
 ## Build (SPEC §8, §9)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Login page** at `/login`: replicate Shopify's login look with Polaris —
    centered card, "Merchant" wordmark (never the Shopify name/logo), email +
    password, error banner on 401. Posts to api `/auth/login` with
    `credentials: 'include'` and the `x-requested-with` CSRF header.
+   **Signup page** at `/signup` (linked "Get started" from login): shop
+   name + email + password → `POST /auth/signup` → redirect into the new
+   shop's Home (onboarding guide waiting). Smoke flow (e) signs up a second
+   shop through THIS page — it is not optional.
 2. **Route group** `/store/[slug]/…` mirroring `admin.shopify.com/store/{slug}`
    (SPEC §6). Its layout renders the Polaris **Frame**:
-   - **TopBar**: dark bar, global search field (Cmd+K opens a search modal —
-     stub results are fine), notifications bell, shop avatar menu with shop
-     name + logout.
+   - **TopBar**: dark bar, global search field (Cmd+K opens the search
+     modal), notifications bell, shop avatar menu with shop name + logout.
+     The search modal is REAL, not a stub: fan out `?query=` to the
+     products/orders/customers list endpoints (they exist per contract even
+     if B1/C2/C4 land later — degrade to "No results" per group until then),
+     grouped results, keyboard navigation (PARITY.md).
    - **Navigation**: render from `NAVIGATION`/`MAIN_NAV`/`BOTTOM_NAV` in
      `src/navigation/index.ts`; selected state from the pathname; hide items
      the session's permissions lack (Shopify behavior, SPEC §8).

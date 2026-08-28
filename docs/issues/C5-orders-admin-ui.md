@@ -20,6 +20,8 @@ Shopify — parity here carries the KPI. A3 supplies shell/API-client/skeletons;
 C2/C3 supply everything server-side including `refunds/calculate`.
 
 ## Build (SPEC §9)
+**Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
+
 1. **Index**: `IndexTable` — order number (`#1001`), date, customer, channel
    ("Online Store"), total, payment status badge (Polaris `Badge` with the
    exact Shopify tone mapping: paid=success subtle, pending=attention…),
