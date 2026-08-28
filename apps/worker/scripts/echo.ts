@@ -5,8 +5,14 @@
  *
  * Prints every webhook it receives and verifies the signature, so the app
  * detail page's delivery log (G4) and the demo script (H3) have something real
- * to point at. The secret is read from the subscription row that names this
- * URL; pass `--secret` to skip the lookup.
+ * to point at. Secrets are read from the subscription rows that name this URL;
+ * pass `--secret` to skip the lookup.
+ *
+ * Several subscriptions legitimately share one endpoint — an app may want two
+ * topics on the same URL, and G4's UI makes that a couple of clicks — so the
+ * body is checked against EVERY candidate secret and counts as verified if any
+ * of them matches. Checking only the first is how a correctly signed delivery
+ * gets reported as a forgery.
  *
  * Development tool — not wired into the running stack.
  */
@@ -27,26 +33,21 @@ function arg(name: string): string | undefined {
 
 const port = Number(arg('port') ?? 4100);
 const explicitSecret = arg('secret');
-const secrets = new Map<string, string | null>();
 
-/** The subscription that points at this receiver knows the secret; ask it. */
-async function secretFor(shopId: string, path: string): Promise<string | null> {
-  if (explicitSecret) return explicitSecret;
-  const key = `${shopId}:${path}`;
-  const cached = secrets.get(key);
-  if (cached) return cached;
+/** Every subscription pointing at this path — any of them may have signed. */
+async function secretsFor(shopId: string, path: string): Promise<string[]> {
+  if (explicitSecret) return [explicitSecret];
 
-  const subscription = await dbForShop(shopId)
-    .webhookSubscription.findFirst({
+  // Deliberately not cached: the usual demo order is to start this receiver and
+  // then add subscriptions, so a cached answer goes stale within a minute.
+  const rows = await dbForShop(shopId)
+    .webhookSubscription.findMany({
       where: { url: { endsWith: path } },
       select: { secret: true },
     })
-    .catch(() => null);
+    .catch(() => []);
 
-  // Only a hit is cached: the usual demo order is to start this, then create the
-  // subscription, and a cached miss would make it say "unverified" forever.
-  if (subscription) secrets.set(key, subscription.secret);
-  return subscription?.secret ?? null;
+  return rows.map((row) => row.secret);
 }
 
 const server = createServer((req, res) => {
@@ -60,12 +61,13 @@ const server = createServer((req, res) => {
       const eventId = req.headers[WEBHOOK_EVENT_HEADER] ?? '(none)';
       const signature = String(req.headers[WEBHOOK_HMAC_HEADER] ?? '');
 
-      const secret = shopId ? await secretFor(shopId, req.url ?? '/') : null;
-      const verdict = !secret
-        ? '? no secret found — pass --secret to verify'
-        : verifyWebhookSignature(body, secret, signature)
-          ? '✓ signature verified'
-          : '✗ SIGNATURE MISMATCH';
+      const secrets = shopId ? await secretsFor(shopId, req.url ?? '/') : [];
+      const verdict =
+        secrets.length === 0
+          ? '? no secret found — pass --secret to verify'
+          : secrets.some((secret) => verifyWebhookSignature(body, secret, signature))
+            ? '✓ signature verified'
+            : '✗ SIGNATURE MISMATCH';
 
       console.log(`\n${topic}  ${eventId}  ${verdict}`);
       try {
