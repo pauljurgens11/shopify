@@ -115,6 +115,8 @@ const asAddress = (value: Prisma.JsonValue): AddressDto | null =>
 /** Everything a response needs: the row, its snapshot, and freshly-priced totals. */
 export interface PricedCheckout {
   row: CheckoutRow;
+  /** Set only once completed — the thank-you page renders it. */
+  completedOrderNumber: number | null;
   /** Derived from the shop — `Checkout` stores no currency of its own. */
   currencyCode: string;
   lines: CartLine[];
@@ -147,7 +149,22 @@ export async function priceCheckout(db: TenantClient, row: CheckoutRow): Promise
     now: new Date(),
   });
 
-  return { row, lines, pricing, settings, currencyCode: settings.currencyCode };
+  // One extra read, and only for a checkout that has already been paid.
+  const completedOrder = row.completedOrderId
+    ? await db.order.findFirst({
+        where: { id: row.completedOrderId },
+        select: { orderNumber: true },
+      })
+    : null;
+
+  return {
+    row,
+    lines,
+    pricing,
+    settings,
+    currencyCode: settings.currencyCode,
+    completedOrderNumber: completedOrder?.orderNumber ?? null,
+  };
 }
 
 export function serializeCheckout(priced: PricedCheckout): Checkout {
@@ -171,6 +188,7 @@ export function serializeCheckout(priced: PricedCheckout): Checkout {
     rejectedDiscount: pricing.rejectedDiscount,
     totals: pricing.totals,
     completedOrderId: row.completedOrderId,
+    completedOrderNumber: priced.completedOrderNumber,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   });
