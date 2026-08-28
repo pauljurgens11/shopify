@@ -27,13 +27,33 @@ export type SessionData = {
 
 const key = (id: string) => `sess:${id}`;
 
+/**
+ * Reverse index: which sessions belong to a staff user. Without it, revoking
+ * someone's access could not reach the tab they already have open, because a
+ * session is only findable by its own opaque id.
+ */
+const userKey = (staffUserId: string) => `sess:user:${staffUserId}`;
+
 const ttlSeconds = () => env().SESSION_TTL_DAYS * 24 * 60 * 60;
+
+/**
+ * The index outlives a session on purpose. Reads slide a session's expiry but
+ * not the index's, so an index pinned to the same TTL could lapse under an
+ * active user and leave their session unrevokable. Double the window costs a
+ * few bytes and avoids touching Redis on every authenticated request.
+ */
+const indexTtlSeconds = () => ttlSeconds() * 2;
 
 export async function createSession(data: SessionData): Promise<string> {
   // 256 bits of entropy: the cookie signature stops tampering, but the id is
   // the only thing standing between a guess and someone's store.
   const id = newSecret(32);
-  await redis().set(key(id), JSON.stringify(data), 'EX', ttlSeconds());
+  await redis()
+    .multi()
+    .set(key(id), JSON.stringify(data), 'EX', ttlSeconds())
+    .sadd(userKey(data.staffUserId), id)
+    .expire(userKey(data.staffUserId), indexTtlSeconds())
+    .exec();
   return id;
 }
 
@@ -51,7 +71,23 @@ export async function getSession(id: string): Promise<SessionData | null> {
 }
 
 export async function destroySession(id: string): Promise<void> {
+  // Read first, so the reverse index does not keep a dangling member.
+  const data = await getSession(id);
   await redis().del(key(id));
+  if (data) await redis().srem(userKey(data.staffUserId), id);
+}
+
+/**
+ * End every session a staff user has (A4).
+ *
+ * Sessions snapshot role and permissions at login, so editing or removing a
+ * staff member is only enforced once their existing sessions are gone —
+ * otherwise the tab they already have open keeps the access just revoked.
+ */
+export async function destroySessionsForUser(staffUserId: string): Promise<void> {
+  const ids = await redis().smembers(userKey(staffUserId));
+  if (ids.length > 0) await redis().del(...ids.map(key));
+  await redis().del(userKey(staffUserId));
 }
 
 /** Remaining lifetime in seconds, or -2 when the session is gone. Used by tests. */

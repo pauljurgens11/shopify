@@ -39,6 +39,7 @@ export const ID_PREFIXES = {
   fulfillment: 'ful',
   refund: 'ref',
   image: 'img',
+  shippingRate: 'ship',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
