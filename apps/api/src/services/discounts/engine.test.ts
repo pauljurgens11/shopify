@@ -111,6 +111,17 @@ describe('eligibility', () => {
     expect(disabled.rejected).toEqual([{ code: 'OFF', reason: 'invalid' }]);
   });
 
+  it('never applies a code discount when the shopper typed nothing', () => {
+    // The caller may hand over code rows it happens to have loaded; without an
+    // enteredCode none of them may apply — and none may be "rejected" either.
+    for (const enteredCode of [null, '', '   '] as const) {
+      const result = run([line()], [discount({ code: 'FREE10' })], { enteredCode });
+      expect(result.applied).toEqual([]);
+      expect(result.rejected).toEqual([]);
+      expect(result.discountTotal).toEqual(usd(0));
+    }
+  });
+
   it('rejects a code whose usage limit is spent', () => {
     const spent = run([line()], [discount({ code: 'MAX', usageLimit: 5, usedCount: 5 })], {
       enteredCode: 'MAX',

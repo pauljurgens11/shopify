@@ -159,9 +159,11 @@ export function applyDiscounts(input: DiscountEngineInput): DiscountEngineResult
   const codes = input.discounts.filter((d) => d.code !== null);
   const typed = input.enteredCode?.trim();
 
+  // No code typed → no code discount. Falling back to codes[0] here would apply
+  // a code-gated discount the shopper never entered.
   const entered = typed
     ? codes.find((d) => d.code?.toLowerCase() === typed.toLowerCase())
-    : codes[0];
+    : undefined;
 
   if (typed && entered === undefined) {
     rejected.push({ code: typed, reason: 'invalid' });
