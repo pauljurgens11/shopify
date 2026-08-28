@@ -41,7 +41,9 @@ jobs:
       DATABASE_URL: postgresql://merchant:merchant@localhost:5432/merchant_test?schema=public
       REDIS_URL: redis://localhost:6379
       SESSION_SECRET: ci_session_secret_0000000000000000000000
-      VAULT_MASTER_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      # Quoted: unquoted, YAML reads 64 zeros as the NUMBER 0 and the job gets
+      # VAULT_MASTER_KEY="0", which fails the 64-hex check in packages/config.
+      VAULT_MASTER_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
       NODE_ENV: test
 
     steps:

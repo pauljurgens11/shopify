@@ -21,14 +21,26 @@ export const tokenizeCardInput = z.object({
   number: z.string().regex(/^\d{12,19}$/, 'Card number must be 12–19 digits'),
   expMonth: z.number().int().min(1).max(12),
   expYear: z.number().int().min(2000).max(2100),
-  cvc: z.string().regex(/^\d{3,4}$/),
+  cvc: z.string().regex(/^\d{3,4}$/, 'Security code must be 3 or 4 digits'),
   cardholderName: z.string().max(255).optional(),
 });
+export type TokenizeCardInput = z.infer<typeof tokenizeCardInput>;
+
+export const cardBrandSchema = z.enum([
+  'visa',
+  'mastercard',
+  'amex',
+  'discover',
+  'jcb',
+  'diners',
+  'unknown',
+]);
+export type CardBrand = z.infer<typeof cardBrandSchema>;
 
 /** Everything the rest of the system is allowed to know about a card. */
 export const cardTokenSchema = z.object({
   cardTokenId: z.string().startsWith('card_tok_'),
-  brand: z.enum(['visa', 'mastercard', 'amex', 'discover', 'jcb', 'diners', 'unknown']),
+  brand: cardBrandSchema,
   last4: z.string().length(4),
   expMonth: z.number().int().min(1).max(12),
   expYear: z.number().int(),
