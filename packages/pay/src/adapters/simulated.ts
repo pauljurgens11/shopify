@@ -9,8 +9,17 @@
  * the admin's refund UI would look correct while quietly permitting a merchant
  * to refund $200 against a $100 order.
  *
- * In memory and per-process on purpose — there is nothing here worth
- * persisting, and a restart between demo runs is a feature.
+ * In memory on purpose — there is nothing here worth persisting, and a restart
+ * between demo runs is a feature. Two consequences of that, both handled below:
+ *
+ *   - The ledger is keyed on `globalThis`, not on module scope. `@fastify/
+ *     autoload` pulls route files in with a plain dynamic import, so under
+ *     vitest the route tree and a test file can hold two copies of this module;
+ *     with two ledgers, a charge made in the test is an unknown transaction to
+ *     the route. Same fix, and same reason, as the `Symbol.for` brand on
+ *     ApiError.
+ *   - A transaction id this process has never seen belongs to a previous run or
+ *     to `pnpm seed`. It is ADOPTED rather than rejected — see `adopt()`.
  */
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { AuthResult, ProcessorKey, ProcessorResult } from '@merchant/contracts/pay';
@@ -23,6 +32,39 @@ interface SimulatedTxn {
   captured: number;
   refunded: number;
   voided: boolean;
+  /**
+   * Adopted from outside this process, so its real ceiling is unknown and the
+   * refund cap below cannot be enforced against it. The authoritative cap is
+   * the one in `refundPayment`, which sums PaymentRefund rows against the
+   * Payment row before the adapter is ever called.
+   */
+  unbounded?: boolean;
+}
+
+/**
+ * One ledger per processor per PROCESS, not per module instance.
+ *
+ * `Symbol.for` is a cross-realm key: if this module is evaluated twice — which
+ * it is under vitest, because autoload imports route files outside Vite's
+ * transform — both copies find the same registry and therefore the same
+ * transactions. Without it a charge made on one side is unknown on the other,
+ * and every test that crosses that boundary has to be written around it.
+ */
+const REGISTRY = Symbol.for('merchant.pay.simulated-ledgers');
+
+export function simulatedLedger(processor: ProcessorKey, txnPrefix: string): SimulatedProcessor {
+  const globals = globalThis as unknown as Record<symbol, Map<string, SimulatedProcessor>>;
+  let registry = globals[REGISTRY];
+  if (!registry) {
+    registry = new Map<string, SimulatedProcessor>();
+    globals[REGISTRY] = registry;
+  }
+  let ledger = registry.get(processor);
+  if (!ledger) {
+    ledger = new SimulatedProcessor(processor, txnPrefix);
+    registry.set(processor, ledger);
+  }
+  return ledger;
 }
 
 export class SimulatedProcessor {
@@ -87,6 +129,33 @@ export class SimulatedProcessor {
     ].join('|');
   }
 
+  /**
+   * Take ownership of a transaction this process never created.
+   *
+   * REFUND ONLY, deliberately. The seed writes captured Payment rows carrying
+   * `processorTxnId`s this process never issued, so without this, clicking
+   * Refund on any seeded order fails with "Unknown transaction" — a broken
+   * demo, not safety. The Payment row is the authority on what was charged, and
+   * `refundPayment` has already capped the amount against it before we are
+   * called.
+   *
+   * `capture` and `voidAuth` stay strict: they act on an AUTHORIZATION this
+   * process is supposed to have made, the seed never writes one, and adapters
+   * asserting that is worth keeping.
+   */
+  private adopt(txnId: string, amount: MoneyDto): SimulatedTxn {
+    const txn: SimulatedTxn = {
+      authorized: amount.amount,
+      currencyCode: amount.currencyCode,
+      captured: amount.amount,
+      refunded: 0,
+      voided: false,
+      unbounded: true,
+    };
+    this.txns.set(txnId, txn);
+    return txn;
+  }
+
   capture(txnId: string, amount: MoneyDto): ProcessorResult {
     const txn = this.txns.get(txnId);
     if (!txn) return this.failure(`Unknown transaction ${txnId}`);
@@ -103,14 +172,13 @@ export class SimulatedProcessor {
   }
 
   refund(txnId: string, amount: MoneyDto): ProcessorResult {
-    const txn = this.txns.get(txnId);
-    if (!txn) return this.failure(`Unknown transaction ${txnId}`);
+    const txn = this.txns.get(txnId) ?? this.adopt(txnId, amount);
     if (txn.captured === 0) {
       return this.failure('Cannot refund an authorization that was never captured — void it');
     }
     const invalid = this.checkAmount(amount, txn.currencyCode);
     if (invalid) return invalid;
-    if (txn.refunded + amount.amount > txn.captured) {
+    if (!txn.unbounded && txn.refunded + amount.amount > txn.captured) {
       return this.failure('Refund exceeds the captured amount');
     }
 
