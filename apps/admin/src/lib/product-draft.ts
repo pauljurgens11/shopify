@@ -37,11 +37,61 @@ export type VariantDraft = {
   available: string;
 };
 
+/* -------------------------------------------------------------------------- */
+/* Description                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A rich-text editor is out of scope (B5), so the description is a plain
+ * multiline field. Showing `<p>Four pockets…</p>` in it is a tell, so simple
+ * markup is unwrapped for editing and re-wrapped on save.
+ *
+ * "Simple" means paragraphs and line breaks and nothing else. Anything richer
+ * is left as raw HTML in the field rather than silently flattened — losing a
+ * merchant's list or bold text on an unrelated edit would be worse than showing
+ * them the tags.
+ */
+export function isSimpleHtml(html: string): boolean {
+  return (html.match(/<[^>]*>/g) ?? []).every((tag) => /^<\/?(p|br)\s*\/?>$/i.test(tag));
+}
+
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&nbsp;': ' ',
+};
+
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    .replace(/<\/?p[^>]*>/gi, '')
+    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/gi, (m) => ENTITIES[m.toLowerCase()] ?? m)
+    .trim();
+}
+
+export function textToHtml(text: string): string {
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph !== '')
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
 export type ImageDraft = { id?: string; url: string; altText: string };
 
 export type ProductDraft = {
   title: string;
-  descriptionHtml: string;
+  /** What the textarea holds: plain text normally, raw HTML when too rich to unwrap. */
+  description: string;
+  /** True when `description` IS the HTML, so saving must not re-wrap it. */
+  descriptionIsRich: boolean;
   status: 'active' | 'draft' | 'archived';
   vendor: string;
   productType: string;
@@ -54,7 +104,8 @@ export type ProductDraft = {
 export function emptyDraft(): ProductDraft {
   return {
     title: '',
-    descriptionHtml: '',
+    description: '',
+    descriptionIsRich: false,
     status: 'active',
     vendor: '',
     productType: '',
@@ -77,7 +128,10 @@ export function emptyDraft(): ProductDraft {
 export function draftFromProduct(product: Product): ProductDraft {
   return {
     title: product.title,
-    descriptionHtml: product.descriptionHtml,
+    description: isSimpleHtml(product.descriptionHtml)
+      ? htmlToText(product.descriptionHtml)
+      : product.descriptionHtml,
+    descriptionIsRich: !isSimpleHtml(product.descriptionHtml),
     status: product.status,
     vendor: product.vendor ?? '',
     productType: product.productType ?? '',
@@ -164,6 +218,25 @@ export function reconcileVariants(options: OptionDraft[], current: VariantDraft[
   });
 }
 
+/**
+ * Merge typed or pasted option values into the existing list, case-insensitively
+ * de-duplicated.
+ *
+ * Takes them ALL AT ONCE on purpose. A paste of "S, M, L" reaches the field as a
+ * single change event, so adding them one at a time would start each from the
+ * same stale `values` prop and only the last would survive.
+ */
+export function addOptionValues(values: string[], incoming: string[]): string[] {
+  const next = [...values];
+  for (const raw of incoming) {
+    const value = raw.trim();
+    if (value !== '' && !next.some((v) => v.toLowerCase() === value.toLowerCase())) {
+      next.push(value);
+    }
+  }
+  return next;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Validation                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -207,7 +280,7 @@ const priceOf = (value: string, currencyCode: string) =>
 export function draftToInput(draft: ProductDraft, currencyCode: string) {
   return {
     title: draft.title.trim(),
-    descriptionHtml: draft.descriptionHtml,
+    descriptionHtml: draft.descriptionIsRich ? draft.description : textToHtml(draft.description),
     status: draft.status,
     vendor: draft.vendor.trim() === '' ? null : draft.vendor.trim(),
     productType: draft.productType.trim() === '' ? null : draft.productType.trim(),

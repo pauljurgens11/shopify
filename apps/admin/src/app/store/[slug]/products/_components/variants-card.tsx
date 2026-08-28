@@ -24,6 +24,7 @@ import {
 } from '@shopify/polaris';
 import { useState } from 'react';
 import {
+  addOptionValues,
   MAX_OPTIONS,
   type OptionDraft,
   PRICE_PATTERN,
@@ -42,14 +43,14 @@ function OptionValues({
 }) {
   const [pending, setPending] = useState('');
 
-  const commit = (raw: string) => {
-    const value = raw.trim();
-    if (value === '' || values.some((v) => v.toLowerCase() === value.toLowerCase())) {
-      setPending('');
-      return;
-    }
-    onChange([...values, value]);
-    setPending('');
+  /**
+   * Adds every value in one call. A paste of "S, M, L" arrives as ONE change
+   * event, so committing them one at a time would start each from the same
+   * stale `values` prop and only the last would survive.
+   */
+  const commit = (raws: string[]) => {
+    const next = addOptionValues(values, raws);
+    if (next.length !== values.length) onChange(next);
   };
 
   return (
@@ -61,7 +62,8 @@ function OptionValues({
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            commit(pending);
+            commit([pending]);
+            setPending('');
           }
           if (event.key === 'Backspace' && pending === '' && values.length > 0) {
             onChange(values.slice(0, -1));
@@ -78,13 +80,16 @@ function OptionValues({
             if (next.includes(',')) {
               const parts = next.split(',');
               const last = parts.pop() ?? '';
-              for (const part of parts) commit(part);
+              commit(parts);
               setPending(last);
               return;
             }
             setPending(next);
           }}
-          onBlur={() => commit(pending)}
+          onBlur={() => {
+            commit([pending]);
+            setPending('');
+          }}
         />
       </div>
       {values.length > 0 ? (

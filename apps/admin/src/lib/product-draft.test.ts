@@ -12,12 +12,16 @@
 import type { Product } from '@merchant/contracts/products';
 import { describe, expect, it } from 'vitest';
 import {
+  addOptionValues,
   draftFromProduct,
   draftToInput,
   emptyDraft,
+  htmlToText,
+  isSimpleHtml,
   matrixOf,
   reconcileVariants,
   stockChanges,
+  textToHtml,
   validate,
   variantTitleOf,
 } from './product-draft.ts';
@@ -73,6 +77,21 @@ describe('the option matrix', () => {
   });
 });
 
+describe('addOptionValues', () => {
+  // Found by driving the real form: typing "S,M," produced only the M chip.
+  // A multi-character change is ONE event, so adding values one at a time made
+  // each start from the same stale list and only the last survived.
+  it('adds every value from a single paste, not just the last', () => {
+    expect(addOptionValues([], ['S', 'M', 'L'])).toEqual(['S', 'M', 'L']);
+    expect(addOptionValues(['S'], ['M', 'L'])).toEqual(['S', 'M', 'L']);
+  });
+
+  it('ignores blanks and case-insensitive duplicates', () => {
+    expect(addOptionValues(['S'], ['  ', 's', 'M', 'm'])).toEqual(['S', 'M']);
+    expect(addOptionValues(['S'], [' M '])).toEqual(['S', 'M']);
+  });
+});
+
 describe('reconcileVariants', () => {
   it('keeps the price, sku and id of a combination that survives an option edit', () => {
     const before = reconcileVariants([option('Size', ['S', 'M'])], emptyDraft().variants).map(
@@ -93,6 +112,46 @@ describe('reconcileVariants', () => {
   it('drops the rows whose option value went away', () => {
     const before = reconcileVariants([option('Size', ['S', 'M'])], emptyDraft().variants);
     expect(reconcileVariants([option('Size', ['M'])], before).map((v) => v.title)).toEqual(['M']);
+  });
+});
+
+describe('description', () => {
+  it('unwraps simple paragraphs for editing and puts them back on save', () => {
+    const product = { ...baseProduct, descriptionHtml: '<p>First line.</p><p>Second line.</p>' };
+    const draft = draftFromProduct(product);
+
+    expect(draft.description).toBe('First line.\n\nSecond line.');
+    expect(draft.descriptionIsRich).toBe(false);
+    expect(draftToInput(draft, 'USD').descriptionHtml).toBe(
+      '<p>First line.</p><p>Second line.</p>',
+    );
+  });
+
+  it('leaves richer markup alone rather than flattening a merchant’s formatting', () => {
+    const rich = '<p>Made with <strong>wool</strong>.</p><ul><li>Warm</li></ul>';
+    const draft = draftFromProduct({ ...baseProduct, descriptionHtml: rich });
+
+    expect(draft.descriptionIsRich).toBe(true);
+    expect(draft.description).toBe(rich);
+    // Saving must return it untouched — an unrelated edit cannot destroy it.
+    expect(draftToInput(draft, 'USD').descriptionHtml).toBe(rich);
+  });
+
+  it('round-trips entities instead of double-escaping them', () => {
+    expect(htmlToText('<p>Salt &amp; Pepper</p>')).toBe('Salt & Pepper');
+    expect(textToHtml('Salt & Pepper')).toBe('<p>Salt &amp; Pepper</p>');
+    expect(htmlToText(textToHtml('Salt & Pepper'))).toBe('Salt & Pepper');
+  });
+
+  it('knows which markup it can safely unwrap', () => {
+    expect(isSimpleHtml('<p>Hi</p><p>There<br>Again</p>')).toBe(true);
+    expect(isSimpleHtml('plain text')).toBe(true);
+    expect(isSimpleHtml('<p>Hi <em>there</em></p>')).toBe(false);
+  });
+
+  it('keeps an empty description empty rather than emitting an empty tag', () => {
+    expect(textToHtml('')).toBe('');
+    expect(textToHtml('   \n  ')).toBe('');
   });
 });
 

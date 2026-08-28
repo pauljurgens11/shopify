@@ -239,8 +239,13 @@ export function ProductForm({
                   name="description"
                   autoComplete="off"
                   multiline={6}
-                  value={draft.descriptionHtml}
-                  onChange={(descriptionHtml) => patch({ descriptionHtml })}
+                  value={draft.description}
+                  helpText={
+                    draft.descriptionIsRich
+                      ? 'This description uses formatting, so it is shown as HTML.'
+                      : undefined
+                  }
+                  onChange={(description) => patch({ description })}
                 />
               </BlockStack>
             </Card>
