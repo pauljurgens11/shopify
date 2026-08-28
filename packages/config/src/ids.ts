@@ -33,6 +33,7 @@ export const ID_PREFIXES = {
   app: 'app',
   webhook: 'wh',
   theme: 'thm',
+  conversation: 'conv',
   event: 'evt',
   fulfillment: 'ful',
   refund: 'ref',

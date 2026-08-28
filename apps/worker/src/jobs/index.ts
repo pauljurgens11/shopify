@@ -8,12 +8,13 @@
  * Every job must be IDEMPOTENT: BullMQ retries, and a retried order-confirmation
  * email that sends twice is a real customer-visible bug.
  */
+import { aiThemeGenerate } from './ai-theme-generate.ts';
 import type { JobDefinition } from './types.ts';
 
 // biome-ignore lint/suspicious/noExplicitAny: the registry is heterogeneous by design
 export const JOBS: JobDefinition<any>[] = [
   // WS-G: webhookDelivery, orderConfirmationEmail, analyticsRollup
-  // WS-F: aiThemeGeneration
+  aiThemeGenerate,
 ];
 
 export type { JobDefinition };
