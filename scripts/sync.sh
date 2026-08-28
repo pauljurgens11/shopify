@@ -30,7 +30,6 @@ fi
 echo "==> fetching origin"
 git fetch origin --prune --quiet
 
-before=$(git rev-parse HEAD)
 base=$(git rev-parse origin/main)
 if [ "$(git merge-base HEAD origin/main)" = "$base" ]; then
   echo "    already on top of main ($(git rev-parse --short "$base"))"
@@ -50,22 +49,24 @@ MSG
   fi
 fi
 
-if ! git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+# Deliberately NOT `@{upstream}`: a branch cut with `git switch -c x origin/main`
+# tracks origin/main, which would make an unpushed branch look pushed.
+if ! git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
   echo
   echo "Not pushed yet. When you are ready:"
   echo "    git push -u origin $branch && gh pr create --fill && gh pr merge --auto --squash --delete-branch"
   exit 0
 fi
 
-if [ "$(git rev-parse HEAD)" = "$before" ] && git diff --quiet "@{upstream}" HEAD; then
+if [ "$(git rev-parse "origin/$branch")" = "$(git rev-parse HEAD)" ]; then
   echo "    remote already matches — nothing to push"
   exit 0
 fi
 
 echo "==> pushing $branch"
-# Rewritten history, so this has to be a force — with a lease, so a push from
-# somewhere else is never silently clobbered.
-git push --force-with-lease
+# Rebasing rewrote history, so this has to be a force — with a lease, so a push
+# made from somewhere else is never silently clobbered.
+git push --force-with-lease origin "$branch"
 
 echo
 echo "Done. pr-checks starts within a minute; auto-merge lands it from there."
