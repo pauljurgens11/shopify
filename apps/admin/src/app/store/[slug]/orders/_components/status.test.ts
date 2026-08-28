@@ -35,7 +35,8 @@ describe('order badges', () => {
   });
 
   it('uses Shopify’s wording and tone for the three badges that matter', () => {
-    expect(financialBadge('paid')).toMatchObject({ label: 'Paid', tone: 'success' });
+    // PARITY.md badge table: `Paid` is the default subdued badge, not green.
+    expect(financialBadge('paid')).toMatchObject({ label: 'Paid', tone: undefined });
     expect(fulfillmentBadge('unfulfilled')).toMatchObject({
       label: 'Unfulfilled',
       tone: 'attention',
