@@ -47,13 +47,29 @@ static), not writing new animation code.
    hover states on rows/buttons are instant (no transition); focus rings
    visible on keyboard nav only. Everything not listed does not animate.
 2. **Admin sweep** against that section, page by page (same route list as
-   H3). Drive it in the browser via `dev-localhost` (CLAUDE.md §1). For
-   each page check: dirty-form → save bar animates in; save → in-button
-   spinner → toast; open every modal/popover; tab/filter changes don't
-   flash a full-page reload; skeletons match the loaded layout (no jump
-   when data lands); optimistic toggles feel instant. Fix in place under
-   the licence. Any custom element from a 20-min escape hatch animates
-   with `--p-motion-*` tokens only — no hand-rolled cubic-beziers.
+   H3), **in order of merchant traffic — the pages a Shopify user lives in
+   get the deepest pass and any time crunch cuts from the tail, never the
+   head:**
+   1. **Home** (G3) — the first screen after login IS the first impression:
+      metric cards and the Sales-over-time chart load skeleton→content with
+      zero shift (charts are the classic offender — reserve height), delta
+      arrows render with the numbers, nothing "assembles" on first paint.
+   2. **Orders index + order detail** (C5) — the most-visited pages of a
+      real merchant's day: tab/filter changes, bulk-bar swap, fulfill and
+      refund modals, timeline comment posting.
+   3. **Products index + product form** (B5) — the KPI centerpiece: dirty
+      state → save bar, variant table generation on option add, media
+      upload/drag-drop feedback.
+   4. Then the rest: customers/discounts (C6), analytics (G3), settings
+      (A4/D4), AI builder (F4), apps/webhooks (G4).
+
+   For each page check: dirty-form → save bar animates in; save →
+   in-button spinner → toast; open every modal/popover; tab/filter changes
+   don't flash a full-page reload; skeletons match the loaded layout (no
+   jump when data lands); optimistic toggles feel instant. Fix in place
+   under the licence. Any custom element from a 20-min escape hatch
+   animates with `--p-motion-*` tokens only — no hand-rolled
+   cubic-beziers.
 3. **Storefront + checkout sweep.** Storefront design is ours (Tailwind),
    but it must feel like a first-class Shopify store: cart add gives
    immediate feedback (cart count/drawer update, no full reload), product
