@@ -345,6 +345,9 @@ export async function capturePayment(
   }
 
   const money = amount ?? { amount: payment.amount, currencyCode: payment.currencyCode };
+  if (money.currencyCode !== payment.currencyCode) {
+    throw new PaymentError('invalid_request', 'Capture currency must match the payment.');
+  }
   if (money.amount <= 0 || money.amount > payment.amount) {
     throw new PaymentError(
       'invalid_request',
@@ -405,6 +408,14 @@ export interface RefundInput {
  * `payment.refundedAmount`: the column is a denormalisation for listing
  * screens, and a refund that is allowed because a counter drifted is money
  * leaving the merchant's account.
+ *
+ * Two phases, because the cap is only as good as its isolation. RESERVE takes
+ * a row lock on the payment (an empty update — held to commit), re-checks the
+ * cap with `pending` rows included, and writes a `pending` refund row; a
+ * concurrent refund blocks on the lock and then sees that reservation in its
+ * own sum, so two simultaneous refunds can never both pass the cap. Only then
+ * is the processor told; SETTLE marks the row `succeeded` and recomputes the
+ * counter under the same lock. No lock is ever held across a processor call.
  */
 export async function refundPayment(
   db: TenantClient,
@@ -413,29 +424,62 @@ export async function refundPayment(
   input: RefundInput,
   deps: RouterDeps = {},
 ): Promise<Payment> {
-  const replay = await db.paymentRefund.findFirst({
-    where: { idempotencyKey: input.idempotencyKey },
-  });
-  if (replay) return toPayment(await loadPayment(db, replay.paymentId));
-
-  const payment = await loadPayment(db, paymentId);
-  if (payment.status !== 'captured' && payment.status !== 'partially_refunded') {
-    throw new PaymentError(
-      'conflict',
-      `Only a captured payment can be refunded (this one is ${payment.status}). Void it instead.`,
-    );
-  }
-  if (input.amount.currencyCode !== payment.currencyCode) {
-    throw new PaymentError('invalid_request', 'Refund currency must match the payment.');
-  }
-
-  const refunded = await sumRefunds(db, payment.id);
-  const refundable = payment.amount - refunded;
   if (input.amount.amount <= 0) {
     throw new PaymentError('invalid_request', 'Refund amount must be positive.');
   }
-  if (input.amount.amount > refundable) {
-    throw new PaymentError('conflict', `Only ${refundable} is left to refund on this payment.`);
+
+  const replayed = await replayRefund(db, paymentId, input.idempotencyKey);
+  if (replayed) return replayed;
+
+  let payment: PaymentRow;
+  let reservationId: string;
+  try {
+    const reserved = await db.$transaction(async (tx) => {
+      const found = await tx.payment.findUnique({ where: { id: paymentId } });
+      if (!found) throw new PaymentError('not_found', 'Payment not found');
+
+      // The empty update is the lock: Postgres holds the row exclusively until
+      // this transaction commits, serialising concurrent refunds. `row` is the
+      // post-lock state, so the checks below cannot act on a stale status.
+      const row = await tx.payment.update({ where: { id: paymentId }, data: {} });
+      if (row.status !== 'captured' && row.status !== 'partially_refunded') {
+        throw new PaymentError(
+          'conflict',
+          `Only a captured payment can be refunded (this one is ${row.status}). Void it instead.`,
+        );
+      }
+      if (input.amount.currencyCode !== row.currencyCode) {
+        throw new PaymentError('invalid_request', 'Refund currency must match the payment.');
+      }
+
+      const refunded = await sumRefunds(tx, row.id, ['succeeded', 'pending']);
+      const refundable = row.amount - refunded;
+      if (input.amount.amount > refundable) {
+        throw new PaymentError('conflict', `Only ${refundable} is left to refund on this payment.`);
+      }
+
+      const reservation = await tx.paymentRefund.create({
+        data: {
+          id: newId('refund'),
+          shopId,
+          paymentId: row.id,
+          amount: input.amount.amount,
+          reason: input.reason ?? null,
+          status: 'pending',
+          idempotencyKey: input.idempotencyKey,
+        },
+      });
+      return { row, reservationId: reservation.id };
+    });
+    payment = reserved.row;
+    reservationId = reserved.reservationId;
+  } catch (error) {
+    // A concurrent request with the same key won the (shopId, idempotencyKey)
+    // unique index. Its outcome is the answer, exactly as in charge().
+    if (!isUniqueViolation(error)) throw error;
+    const winner = await replayRefund(db, paymentId, input.idempotencyKey);
+    if (!winner) throw error;
+    return winner;
   }
 
   const result = await adapterFrom(db, payment, deps).then((adapter) =>
@@ -443,37 +487,65 @@ export async function refundPayment(
       processor.refund(payment.processorTxnId ?? '', input.amount, credentials),
     ),
   );
-  // Nothing is written on failure: no refund row, no counter change. The
-  // idempotency key stays unused so the admin can simply try again.
-  if (result.outcome === 'failure') throw new PaymentError('conflict', result.message);
-
-  const total = refunded + input.amount.amount;
-  await db.paymentRefund.create({
-    data: {
-      id: newId('refund'),
-      shopId,
-      paymentId: payment.id,
-      amount: input.amount.amount,
-      reason: input.reason ?? null,
-      processorTxnId: result.processorTxnId,
-      idempotencyKey: input.idempotencyKey,
-    },
-  });
+  if (result.outcome === 'failure') {
+    // No money moved: release the reservation so the counter never sees it and
+    // the idempotency key stays free for the admin to simply try again.
+    await db.paymentRefund.delete({ where: { id: reservationId } });
+    throw new PaymentError('conflict', result.message);
+  }
 
   return toPayment(
-    await db.payment.update({
-      where: { id: payment.id },
-      data: {
-        refundedAmount: total,
-        status: total >= payment.amount ? 'refunded' : 'partially_refunded',
-      },
+    await db.$transaction(async (tx) => {
+      // Same lock as the reserve phase, so two settles cannot interleave their
+      // counter writes — the sum below always includes every settled row.
+      const locked = await tx.payment.update({ where: { id: payment.id }, data: {} });
+      await tx.paymentRefund.update({
+        where: { id: reservationId },
+        data: { status: 'succeeded', processorTxnId: result.processorTxnId },
+      });
+      const total = await sumRefunds(tx, payment.id, ['succeeded']);
+      return tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          refundedAmount: total,
+          status: total >= locked.amount ? 'refunded' : 'partially_refunded',
+        },
+      });
     }),
   );
 }
 
-async function sumRefunds(db: TenantClient, paymentId: string): Promise<number> {
+/**
+ * The outcome a reused idempotency key refers to, or null if the key is new.
+ * A key can only ever mean one refund: a different payment behind it is a
+ * client bug worth surfacing, and a still-`pending` row is a refund whose
+ * processor call is in flight right now.
+ */
+async function replayRefund(
+  db: TenantClient,
+  paymentId: string,
+  idempotencyKey: string,
+): Promise<Payment | null> {
+  const replay = await db.paymentRefund.findFirst({ where: { idempotencyKey } });
+  if (!replay) return null;
+  if (replay.paymentId !== paymentId) {
+    throw new PaymentError(
+      'conflict',
+      'This idempotency key was already used to refund a different payment.',
+    );
+  }
+  if (replay.status === 'pending') {
+    throw new PaymentError('conflict', 'A refund with this idempotency key is still in progress.');
+  }
+  return toPayment(await loadPayment(db, replay.paymentId));
+}
+
+/** Satisfied by both `TenantClient` and its `$transaction` callback client. */
+type RefundStore = Pick<TenantClient, 'paymentRefund'>;
+
+async function sumRefunds(db: RefundStore, paymentId: string, statuses: string[]): Promise<number> {
   const rows = await db.paymentRefund.findMany({
-    where: { paymentId, status: 'succeeded' },
+    where: { paymentId, status: { in: statuses } },
     select: { amount: true },
   });
   return rows.reduce((total, row) => total + row.amount, 0);

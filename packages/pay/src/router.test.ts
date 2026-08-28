@@ -479,6 +479,58 @@ describe('capture, void and refund', () => {
     ).rejects.toBeInstanceOf(PaymentError);
   });
 
+  it('enforces its own cap even when the processor would allow more', async () => {
+    // The mock adapter keeps a ledger with its own cap, which would mask a
+    // deleted router check — this stub refunds anything, so only the router's
+    // sum over PaymentRefund rows can say no.
+    const generous = { adapters: adaptersOf({ mock: stubAdapter('mock', 'approved') }) };
+    const payment = await authorized(usd(2500));
+    await capturePayment(db, payment.id, undefined, generous);
+    await refundPayment(
+      db,
+      shopId,
+      payment.id,
+      { amount: usd(2000), idempotencyKey: key() },
+      generous,
+    );
+
+    await expect(
+      refundPayment(db, shopId, payment.id, { amount: usd(600), idempotencyKey: key() }, generous),
+    ).rejects.toThrow(/left to refund/);
+  });
+
+  it('two concurrent refunds cannot exceed the captured amount', async () => {
+    const generous = { adapters: adaptersOf({ mock: stubAdapter('mock', 'approved') }) };
+    const payment = await authorized(usd(2500));
+    await capturePayment(db, payment.id, undefined, generous);
+
+    // Different keys, in flight at once: the unique index cannot save this —
+    // only the reserve-phase row lock can.
+    const outcomes = await Promise.allSettled([
+      refundPayment(db, shopId, payment.id, { amount: usd(2000), idempotencyKey: key() }, generous),
+      refundPayment(db, shopId, payment.id, { amount: usd(2000), idempotencyKey: key() }, generous),
+    ]);
+    expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+
+    const rows = await db.paymentRefund.findMany({ where: { paymentId: payment.id } });
+    expect(rows.reduce((total, row) => total + row.amount, 0)).toBe(2000);
+    const after = await db.payment.findUnique({ where: { id: payment.id } });
+    expect(after?.refundedAmount).toBe(2000);
+  });
+
+  it('refuses an idempotency key that already refunded a different payment', async () => {
+    const first = await authorized(usd(1000));
+    await capturePayment(db, first.id, undefined, withMock);
+    const second = await authorized(usd(1000));
+    await capturePayment(db, second.id, undefined, withMock);
+
+    const idempotencyKey = key();
+    await refundPayment(db, shopId, first.id, { amount: usd(500), idempotencyKey }, withMock);
+    await expect(
+      refundPayment(db, shopId, second.id, { amount: usd(500), idempotencyKey }, withMock),
+    ).rejects.toThrow(/different payment/);
+  });
+
   it('replaying a refund key does not refund twice', async () => {
     const payment = await authorized(usd(2500));
     await capturePayment(db, payment.id, undefined, withMock);
