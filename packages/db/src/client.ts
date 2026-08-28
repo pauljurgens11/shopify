@@ -5,7 +5,7 @@
  * in this codebase (SPEC §6). Sanctioned: shop signup, platform-level auth
  * lookup, migrations, seed. Everywhere else: `dbForShop(shopId)`.
  */
-import { PrismaClient } from '../generated/client/index.js';
+import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { dbAdmin?: PrismaClient };
 
@@ -19,5 +19,5 @@ export const dbAdmin: PrismaClient =
 // refuses connections.
 if (process.env.NODE_ENV !== 'production') globalForPrisma.dbAdmin = dbAdmin;
 
-export * from '../generated/client/index.js';
+export * from '@prisma/client';
 export type { PrismaClient };

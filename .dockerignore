@@ -1,0 +1,26 @@
+# Keep the build context small and reproducible. Without this, `COPY . .` ships
+# host node_modules (with the wrong platform's binaries), .next, and all of .git.
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.turbo
+**/.turbo
+
+.git
+.github
+.githooks
+
+.env
+.env.*
+!.env.example
+
+test-results
+playwright-report
+blob-report
+coverage
+
+*.log
+.DS_Store

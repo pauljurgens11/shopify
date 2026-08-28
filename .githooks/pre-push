@@ -14,9 +14,14 @@ while read -r _local_ref _local_sha remote_ref _remote_sha; do
   esac
 done
 
-# 2. Refuse to push a committed .env (SPEC §15).
-if git diff --cached --name-only origin/main...HEAD 2>/dev/null | grep -qE '(^|/)\.env$'; then
-  echo "pre-push: refusing to push a .env file."
-  exit 1
+# 2. Refuse to push a committed .env (SPEC §15). Compare against the merge base
+#    with main; `--cached` takes no revision range, which silently made the old
+#    version of this check a no-op.
+base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+if [ -n "$base" ]; then
+  if git diff --name-only "$base" HEAD | grep -qE '(^|/)\.env$'; then
+    echo "pre-push: refusing to push a .env file."
+    exit 1
+  fi
 fi
 exit 0

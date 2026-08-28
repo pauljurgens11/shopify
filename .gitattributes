@@ -16,7 +16,6 @@ docs/AGENT-LOG.md     merge=union
 pnpm-lock.yaml        merge=pnpm-lock -diff linguist-generated=true
 
 # Generated / binary: no textual merge, no diff noise.
-packages/db/generated/**  linguist-generated=true
 *.png  binary
 *.jpg  binary
 *.webp binary

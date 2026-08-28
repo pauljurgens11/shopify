@@ -10,11 +10,13 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @merchant/db generate
 RUN pnpm --filter @merchant/storefront build
 
-FROM base AS runtime
-ENV NODE_ENV=production PORT=3002
-COPY --from=build /app/apps/storefront/.next ./.next
-COPY --from=build /app/apps/storefront/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
+FROM gcr.io/distroless/nodejs22-debian12 AS runtime
+ENV NODE_ENV=production PORT=3002 HOSTNAME=0.0.0.0
+WORKDIR /app
+# Next standalone emits its own minimal node_modules plus a server.js. In a
+# monorepo the tree is rooted at the workspace, so the app sits under apps/.
+COPY --from=build /app/apps/storefront/.next/standalone ./
+COPY --from=build /app/apps/storefront/.next/static ./apps/storefront/.next/static
+COPY --from=build /app/apps/storefront/public ./apps/storefront/public
 EXPOSE 3002
-USER node
-CMD ["node_modules/.bin/next", "start", "--port", "3002"]
+CMD ["apps/storefront/server.js"]

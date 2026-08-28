@@ -23,7 +23,7 @@
     },
     "@merchant/db#generate": {
       "inputs": ["prisma/**"],
-      "outputs": ["generated/**"]
+      "cache": false
     }
   }
 }

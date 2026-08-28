@@ -14,9 +14,6 @@ out/
 .env.*
 !.env.example
 
-# prisma generated client
-packages/db/generated/
-
 # test artifacts
 test-results/
 playwright-report/

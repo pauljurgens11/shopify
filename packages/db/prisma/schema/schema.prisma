@@ -5,8 +5,11 @@
 // agents. See CLAUDE.md §3.
 
 generator client {
+  // No custom `output`: the default location makes the client resolvable as the
+  // package `@prisma/client`, which bundlers leave external. Pointing it at a
+  // path inside this package causes tsup to inline the CJS runtime, and its
+  // dynamic require("fs") then throws at runtime in the ESM bundle.
   provider = "prisma-client-js"
-  output   = "../../generated/client"
 }
 
 datasource db {
