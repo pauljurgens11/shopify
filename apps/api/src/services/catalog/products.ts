@@ -523,11 +523,14 @@ export async function updateProduct(
           });
         }
         for (const { resolved: variant, row } of plan.keep) {
+          // A kept row the payload did not mention keeps its OWN values. The
+          // template is for brand-new combinations only — falling back to it
+          // here would reset prices and null skus on rows a partial `variants`
+          // payload never touched.
+          const match = variant.match ?? rowAsPayload(row, currencyCode);
           await tx.productVariant.update({
             where: { id: row.id },
-            // An existing row's own values are the fallback (rowAsPayload), so
-            // this is an update in the merchant's sense, not a reset.
-            data: variantColumns(variant, template, currencyCode),
+            data: variantColumns({ ...variant, match }, template, currencyCode),
           });
         }
         if (plan.create.length > 0) {
