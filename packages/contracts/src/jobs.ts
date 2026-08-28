@@ -18,6 +18,13 @@ export const webhookEventJobSchema = z.object({
   shopId: idSchema,
   topic: webhookTopicSchema,
   occurredAt: timestampSchema,
+  /**
+   * When set, the event is delivered ONLY to this subscription — "send test
+   * event" uses it so a test does not fan out to every same-topic subscription
+   * (other apps included). Optional so events queued before this field existed
+   * still parse; absent means normal topic fan-out.
+   */
+  subscriptionId: idSchema.optional(),
   /** Topic-shaped resource body; becomes `data` in the delivered envelope. */
   data: z.record(z.unknown()),
 });

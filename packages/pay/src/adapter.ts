@@ -56,7 +56,17 @@ export interface ProcessorAdapter {
     creds: ProcessorCredentials,
   ): Promise<AuthResult>;
   capture(txnId: string, amount: MoneyDto, creds: ProcessorCredentials): Promise<ProcessorResult>;
-  refund(txnId: string, amount: MoneyDto, creds: ProcessorCredentials): Promise<ProcessorResult>;
+  /**
+   * `opts.idempotencyKey` reaches the processor (Stripe's idempotency header,
+   * Maverick's `idempotency-key`), so retrying a refund whose first attempt's
+   * outcome was lost REPLAYS it instead of refunding twice.
+   */
+  refund(
+    txnId: string,
+    amount: MoneyDto,
+    creds: ProcessorCredentials,
+    opts?: { idempotencyKey?: string },
+  ): Promise<ProcessorResult>;
   voidAuth(txnId: string, creds: ProcessorCredentials): Promise<ProcessorResult>;
   verifyCredentials(creds: ProcessorCredentials): Promise<boolean>;
 }

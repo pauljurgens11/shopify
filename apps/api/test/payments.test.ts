@@ -351,4 +351,73 @@ describe('saved cards (D4: the repeat-billing beat)', () => {
     expect(replay.json().id).toBe(response.json().id);
     expect(await dbAdmin.payment.count({ where: { shopId: shop.shopId, idempotencyKey } })).toBe(1);
   });
+
+  it('collecting the outstanding balance marks the order paid', async () => {
+    // The charge block prefills exactly this: an unpaid order's outstanding
+    // total. Money collected with the badge stuck on "Payment pending" is a
+    // ledger the admin cannot trust.
+    const orderId = newId('order');
+    await dbAdmin.order.create({
+      data: {
+        id: orderId,
+        shopId: shop.shopId,
+        orderNumber: 990001,
+        email: 'repeat@example.com',
+        subtotal: 2500,
+        total: 2500,
+        financialStatus: 'pending',
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload: {
+        paymentMethodId: methodId,
+        amount: { amount: 2500, currencyCode: 'USD' },
+        idempotencyKey: `d4-collect-${newId('payment')}`,
+        orderId,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'captured', orderId });
+
+    const order = await dbAdmin.order.findUnique({ where: { id: orderId } });
+    expect(order?.financialStatus).toBe('paid');
+  });
+
+  it('an under-collection leaves the order unpaid', async () => {
+    // There is no partial-paid state in the SPEC enum; a short charge must not
+    // pretend the order is settled.
+    const orderId = newId('order');
+    await dbAdmin.order.create({
+      data: {
+        id: orderId,
+        shopId: shop.shopId,
+        orderNumber: 990002,
+        email: 'repeat@example.com',
+        subtotal: 2500,
+        total: 2500,
+        financialStatus: 'pending',
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload: {
+        paymentMethodId: methodId,
+        amount: { amount: 1000, currencyCode: 'USD' },
+        idempotencyKey: `d4-partial-${newId('payment')}`,
+        orderId,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'captured' });
+
+    const order = await dbAdmin.order.findUnique({ where: { id: orderId } });
+    expect(order?.financialStatus).toBe('pending');
+  });
 });

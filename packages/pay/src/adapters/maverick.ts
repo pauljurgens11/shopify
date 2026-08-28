@@ -363,9 +363,12 @@ async function refund(
   txnId: string,
   amount: MoneyDto,
   creds: ProcessorCredentials,
+  opts?: { idempotencyKey?: string },
 ): Promise<ProcessorResult> {
   if (maverickMode(creds) === 'simulated') return ledger.refund(txnId, amount);
-  return liveTransaction('/api/transaction/refund', { transactionId: txnId, amount }, creds);
+  return liveTransaction('/api/transaction/refund', { transactionId: txnId, amount }, creds, {
+    idempotencyKey: opts?.idempotencyKey,
+  });
 }
 
 async function voidAuth(txnId: string, creds: ProcessorCredentials): Promise<ProcessorResult> {
@@ -377,6 +380,7 @@ async function liveTransaction(
   path: string,
   args: { transactionId: string; amount?: MoneyDto },
   creds: ProcessorCredentials,
+  opts?: { idempotencyKey?: string },
 ): Promise<ProcessorResult> {
   const res = await post<MaverickTransactionResponse>(
     path,
@@ -386,6 +390,7 @@ async function liveTransaction(
       ...(args.amount ? { amount: toDecimalString(args.amount) } : {}),
     },
     creds,
+    opts?.idempotencyKey,
   );
   if (!res.ok) {
     return {
