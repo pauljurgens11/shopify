@@ -14,8 +14,11 @@ export async function resolveShopSlug(): Promise<string | null> {
   const host = (await headers()).get('host');
   if (!host) return null;
 
-  const baseDomain = env().STOREFRONT_BASE_DOMAIN.split(':')[0];
-  const hostname = host.split(':')[0];
+  // Lowercased like apps/api/src/lib/host.ts — DNS names are case-insensitive,
+  // and the two resolvers disagreeing means a shop that loads on the API but
+  // 404s on the storefront (test/host.test.ts pins the API side).
+  const baseDomain = env().STOREFRONT_BASE_DOMAIN.split(':')[0]?.toLowerCase();
+  const hostname = host.split(':')[0]?.toLowerCase();
   if (!baseDomain || !hostname) return null;
 
   if (hostname.endsWith(`.${baseDomain}`)) {

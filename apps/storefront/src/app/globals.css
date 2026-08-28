@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 /*
+ * Tailwind v4 scans from this app's directory and never follows the pnpm
+ * symlink into node_modules, so the theme engine's classes are invisible to it
+ * without this. Remove it and every section renders completely unstyled.
+ * (transpilePackages covers the JS side only, not Tailwind's scanner.)
+ */
+@source "../../../../packages/theme-engine/src";
+
+/*
  * Theme tokens (SPEC §12) are injected as CSS custom properties by the theme
  * renderer at request time, then mapped into Tailwind here. That is how one
  * Tailwind build serves every shop's colours and fonts without a rebuild.
