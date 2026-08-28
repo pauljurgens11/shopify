@@ -247,17 +247,35 @@ function buildAuthRequest(
   };
 }
 
+export type MaverickPost<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; retryable: boolean };
+
 /**
- * One place where a live call can fail. Anything that is not a well-formed
- * Maverick response — a timeout, a 5xx, unparseable JSON — is a hard failure:
- * we never got an answer about the card, so the router may try elsewhere.
+ * Every way a live call can fail, classified once.
+ *
+ * The distinction that matters is the same one the router keys on. A non-2xx is
+ * NOT an answer about the card, so it must never become a decline: an expired
+ * API key answering 401 on every request would otherwise read as "your card was
+ * declined" to every customer, on every card, with no failover — the exact
+ * inversion of SPEC §11.
  */
+export function classifyMaverickStatus(status: number): { message: string; retryable: boolean } {
+  // Transport, throttling, or our credentials — another processor may work.
+  if (status >= 500 || status === 401 || status === 403 || status === 408 || status === 429) {
+    return { message: `Maverick returned ${status}`, retryable: true };
+  }
+  // Any other 4xx is a malformed request of ours. Retrying it against a second
+  // processor just repeats the bug, so it stops here.
+  return { message: `Maverick rejected the request (${status})`, retryable: false };
+}
+
 async function post<T>(
   path: string,
   body: unknown,
   creds: ProcessorCredentials,
   idempotencyKey?: string,
-): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+): Promise<MaverickPost<T>> {
   const baseUrl = creds.baseUrl ?? DEFAULT_BASE_URL;
   try {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -270,11 +288,16 @@ async function post<T>(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (res.status >= 500) return { ok: false, message: `Maverick returned ${res.status}` };
+    if (!res.ok) return { ok: false, ...classifyMaverickStatus(res.status) };
     return { ok: true, data: (await res.json()) as T };
   } catch (err) {
-    // Deliberately not `String(err)` on a body — the request carried a PAN.
-    return { ok: false, message: err instanceof Error ? err.message : 'Maverick is unreachable' };
+    // No answer at all: timeout, DNS, connection reset, unparseable body.
+    // Deliberately not `String(err)` on the request — it carried a PAN.
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'Maverick is unreachable',
+      retryable: true,
+    };
   }
 }
 
@@ -295,17 +318,21 @@ async function authorize(
       req.idempotencyKey,
     );
     if (!res.ok) {
-      return {
-        outcome: 'hard_failure',
-        processor: 'maverick',
-        message: res.message,
-        retryable: true,
-      };
+      return res.retryable
+        ? { outcome: 'hard_failure', processor: 'maverick', message: res.message, retryable: true }
+        : {
+            outcome: 'declined',
+            processor: 'maverick',
+            code: 'processing_error',
+            message: res.message,
+            processorTxnId: null,
+          };
     }
     return mapMaverickAuthResponse(res.data, req.amount, req.capture);
   }
 
-  const replay = ledger.recall(req.idempotencyKey);
+  const fingerprint = SimulatedProcessor.fingerprint(req.amount, card, req.capture);
+  const replay = ledger.recall(req.idempotencyKey, fingerprint);
   if (replay) return replay;
 
   const mapped = mapMaverickAuthResponse(simulateResponse(card), req.amount, req.capture);
@@ -316,7 +343,7 @@ async function authorize(
       ? { ...mapped, raw: { simulated: true, processor: 'maverick' } }
       : mapped;
 
-  ledger.remember(req.idempotencyKey, result);
+  ledger.remember(req.idempotencyKey, fingerprint, result);
   if (result.outcome === 'approved') {
     ledger.recordAuthorization(result.processorTxnId, req.amount, result.captured);
   }
@@ -361,7 +388,12 @@ async function liveTransaction(
     creds,
   );
   if (!res.ok) {
-    return { outcome: 'failure', processor: 'maverick', message: res.message, retryable: true };
+    return {
+      outcome: 'failure',
+      processor: 'maverick',
+      message: res.message,
+      retryable: res.retryable,
+    };
   }
   if (res.data.status !== 'approved' || !res.data.transactionId) {
     return {

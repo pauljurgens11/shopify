@@ -15,6 +15,7 @@
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { AuthResult, ProcessorKey, ProcessorResult } from '@merchant/contracts/pay';
 import { ulid } from 'ulid';
+import type { CardMaterial } from '../adapter.ts';
 
 interface SimulatedTxn {
   authorized: number;
@@ -26,7 +27,7 @@ interface SimulatedTxn {
 
 export class SimulatedProcessor {
   private readonly txns = new Map<string, SimulatedTxn>();
-  private readonly replays = new Map<string, AuthResult>();
+  private readonly replays = new Map<string, { fingerprint: string; result: AuthResult }>();
 
   constructor(
     private readonly processor: ProcessorKey,
@@ -51,17 +52,39 @@ export class SimulatedProcessor {
    * Idempotency replay (`AuthorizeRequest.idempotencyKey`: "replaying the same
    * key must NOT double-charge").
    *
+   * The key alone is NOT enough to identify a charge. This ledger is
+   * process-global while `idempotencyKey` is a caller-supplied string with no
+   * shop in it, so two shops can collide on one — order numbers, for instance,
+   * are per-shop sequential from #1001, and every shop has an order #1001. A
+   * bare key lookup would hand shop B shop A's approval and, with it, a
+   * transaction id shop B could then capture or refund. So a hit only counts
+   * when the charge it was stored against matches too; a mismatch falls through
+   * to a fresh authorization. (A real processor answers a reused key with an
+   * idempotency error; here a clean new charge is both safer and less noisy.)
+   *
    * Hard failures are deliberately NOT remembered: they are the outcome the
-   * router retries, and a memoized outage would make the retry return the
-   * outage forever.
+   * router retries, and a memoized outage would return the outage forever.
    */
-  recall(idempotencyKey: string): AuthResult | undefined {
-    return this.replays.get(idempotencyKey);
+  recall(idempotencyKey: string, fingerprint: string): AuthResult | undefined {
+    const hit = this.replays.get(idempotencyKey);
+    return hit?.fingerprint === fingerprint ? hit.result : undefined;
   }
 
-  remember(idempotencyKey: string, result: AuthResult): void {
+  remember(idempotencyKey: string, fingerprint: string, result: AuthResult): void {
     if (result.outcome === 'hard_failure') return;
-    this.replays.set(idempotencyKey, result);
+    this.replays.set(idempotencyKey, { fingerprint, result });
+  }
+
+  /** Identifies the charge, not the card: last4 only, never a PAN. */
+  static fingerprint(amount: MoneyDto, card: CardMaterial, capture: boolean): string {
+    return [
+      amount.amount,
+      amount.currencyCode,
+      card.last4,
+      card.expMonth,
+      card.expYear,
+      capture,
+    ].join('|');
   }
 
   capture(txnId: string, amount: MoneyDto): ProcessorResult {

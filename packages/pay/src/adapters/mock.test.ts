@@ -92,6 +92,28 @@ describe('mockAdapter.authorize', () => {
     expect(second).toEqual(first);
   });
 
+  it('does not replay across a key collision — two shops can pick the same key', async () => {
+    // idempotencyKey is a caller-supplied string with no shop in it, and the
+    // ledger is process-global. A bare key lookup would hand the second shop
+    // the first shop's approval, transaction id included.
+    const key = 'order-1001';
+    const shopA = await mockAdapter.authorize(
+      req({ idempotencyKey: key, amount: usd(2500) }),
+      card(APPROVED),
+      {},
+    );
+    const shopB = await mockAdapter.authorize(
+      req({ idempotencyKey: key, amount: usd(9900) }),
+      card('5555555555554444'),
+      {},
+    );
+    expect(shopB).toMatchObject({ outcome: 'approved', amount: usd(9900) });
+    expect(shopB.outcome === 'approved' && shopA.outcome === 'approved').toBe(true);
+    if (shopA.outcome === 'approved' && shopB.outcome === 'approved') {
+      expect(shopB.processorTxnId).not.toBe(shopA.processorTxnId);
+    }
+  });
+
   it('does not memoize a hard failure — the retry that follows it must reach the processor', async () => {
     const key = 'idem_hardfail_0001';
     const first = await mockAdapter.authorize(req({ idempotencyKey: key }), card(HARD_FAILURE), {});

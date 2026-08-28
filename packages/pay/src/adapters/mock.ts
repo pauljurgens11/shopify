@@ -30,11 +30,12 @@ function authorize(
   card: CardMaterial,
   _creds: Record<string, string>,
 ): Promise<AuthResult> {
-  const replay = ledger.recall(req.idempotencyKey);
+  const fingerprint = SimulatedProcessor.fingerprint(req.amount, card, req.capture);
+  const replay = ledger.recall(req.idempotencyKey, fingerprint);
   if (replay) return Promise.resolve(replay);
 
   const result = decide(req, card);
-  ledger.remember(req.idempotencyKey, result);
+  ledger.remember(req.idempotencyKey, fingerprint, result);
   if (result.outcome === 'approved') {
     ledger.recordAuthorization(result.processorTxnId, req.amount, result.captured);
   }

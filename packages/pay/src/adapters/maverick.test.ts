@@ -15,6 +15,7 @@ import type { AuthorizeRequest } from '@merchant/contracts/pay';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CardMaterial } from '../adapter.ts';
 import {
+  classifyMaverickStatus,
   type MaverickAuthResponse,
   mapMaverickAuthResponse,
   maverickAdapter,
@@ -160,6 +161,23 @@ describe('maverick simulated mode', () => {
 
   it('is usable without credentials — simulated is a working mode, not a broken one', async () => {
     await expect(maverickAdapter.verifyCredentials({})).resolves.toBe(true);
+  });
+});
+
+describe('classifyMaverickStatus', () => {
+  it('never lets a transport or credential status become a card answer', () => {
+    // A revoked API key answers 401 to every request. If that read as a
+    // decline, every customer would be told their card failed and no other
+    // processor would ever be tried.
+    for (const status of [401, 403, 408, 429, 500, 502, 503]) {
+      expect(classifyMaverickStatus(status)).toMatchObject({ retryable: true });
+    }
+  });
+
+  it('stops our own malformed request rather than repeating it elsewhere', () => {
+    for (const status of [400, 404, 422]) {
+      expect(classifyMaverickStatus(status)).toMatchObject({ retryable: false });
+    }
   });
 });
 
