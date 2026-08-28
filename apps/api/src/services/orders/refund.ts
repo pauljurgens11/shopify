@@ -283,6 +283,8 @@ export async function refundOrder(
       total: order.total,
       currencyCode: order.currencyCode,
     },
+    // The refund itself — the order body alone cannot say what was refunded.
+    refund: { id: refundId, amount: calculation.total.amount },
   });
 
   return loadOrderDetail(db, orderId);

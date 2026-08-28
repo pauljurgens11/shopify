@@ -248,7 +248,8 @@ export default function AppDetailPage() {
         <Modal.Section>
           <Box paddingBlockEnd="200">
             <Text as="p">
-              This revokes the token and deletes its webhook subscriptions. It can’t be undone.
+              This revokes the token and stops all webhook deliveries for this app. It can’t be
+              undone.
             </Text>
           </Box>
         </Modal.Section>

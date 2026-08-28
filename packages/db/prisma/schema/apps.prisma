@@ -28,6 +28,11 @@ model WebhookSubscription {
   secret       String
   secretSuffix String
   isActive     Boolean @default(true)
+  // Soft delete: WebhookDelivery cascades on a hard delete, and the delivery
+  // log must outlive the subscription (the delete dialog promises it does).
+  // Duplicate (appId, topic, url) among LIVE rows is enforced in the service —
+  // a DB unique would block re-subscribing after a soft delete.
+  deletedAt    DateTime? @db.Timestamptz(6)
 
   app        App               @relation(fields: [appId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
@@ -35,7 +40,6 @@ model WebhookSubscription {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  @@unique([appId, topic, url])
   @@index([shopId, topic])
   @@map("webhook_subscriptions")
 }
