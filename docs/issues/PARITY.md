@@ -19,9 +19,11 @@ first-class Shopify store.
   "Search", shows `Ctrl K`/`⌘K` hint); right side: notifications bell, then
   store avatar chip (initials square + shop name) opening a menu (shop name
   header, "Log out" at bottom).
-- Search modal (Cmd+K): full-width dropdown panel under the bar; results
-  grouped by type (Products, Orders, Customers) with icon, title, subtitle;
-  keyboard navigable; recent-searches state when empty.
+- Search modal (Cmd+K): dropdown panel anchored under the **search field**,
+  roughly its width — not full-bar-width (corrected against current Shopify
+  and Polaris `TopBar.searchResults`, A3); results grouped by type (Products,
+  Orders, Customers) with title and subtitle; keyboard navigable; "No results
+  for …" when a query matches nothing.
 - Left nav, exact order, exact labels:
   `Home · Orders · Products (▸ Collections, Inventory) · Customers ·
   Marketing · Discounts · Analytics · Storefront · Apps` — `Settings` pinned

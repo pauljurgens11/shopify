@@ -1,26 +1,28 @@
 'use client';
 
-import { Card, Layout, Page, Text } from '@shopify/polaris';
-
 /**
- * Placeholder root. WS-A replaces this with the login redirect and the
- * /store/{shopSlug} shell (Frame + TopBar + Navigation).
+ * `/` → the signed-in shop's admin, or the login page. Owner: WS-A.
  *
- * NOTE the 'use client' above — it is not optional. Polaris components use React
- * context, so any file importing one must be a Client Component. See README.
+ * Shopify's admin has no content at the root either; it resolves to
+ * `/store/{slug}` (SPEC §6).
  */
-export default function HomePage() {
+import { Frame, Loading } from '@shopify/polaris';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useSession } from '../lib/session.ts';
+
+export default function RootPage() {
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
+
+  useEffect(() => {
+    if (isPending) return;
+    router.replace(session ? `/store/${session.shop.slug}` : '/login');
+  }, [session, isPending, router]);
+
   return (
-    <Page title="Merchant">
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <Text as="p" variant="bodyMd">
-              Skeleton is up. WS-A: replace with the Frame shell and auth redirect.
-            </Text>
-          </Card>
-        </Layout.Section>
-      </Layout>
-    </Page>
+    <Frame>
+      <Loading />
+    </Frame>
   );
 }
