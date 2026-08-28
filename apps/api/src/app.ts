@@ -17,7 +17,8 @@ import rateLimit from '@fastify/rate-limit';
 import { RATE_LIMITS } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { ApiError } from './lib/errors.ts';
+import { rateLimited } from './lib/errors.ts';
+import csrf from './plugins/csrf.ts';
 import errorHandler from './plugins/error-handler.ts';
 import tenancy from './plugins/tenancy.ts';
 
@@ -72,12 +73,16 @@ export async function buildApp(): Promise<FastifyInstance> {
     timeWindow: RATE_LIMITS.adminApi.windowMs,
     // @fastify/rate-limit THROWS whatever this returns, so it has to be an
     // Error carrying a statusCode — a bare SPEC-shaped object arrives at
-    // setErrorHandler with no status and comes back out as a 500.
+    // setErrorHandler with no status and comes back out as a 500. Returning an
+    // ApiError puts it on the normal error path, so the 429 and the SPEC §5
+    // body both come from one place.
     errorResponseBuilder: (_req, context) =>
-      new ApiError('rate_limited', `Rate limit exceeded. Retry in ${context.after}.`),
+      rateLimited(`Rate limit exceeded. Retry in ${context.after}.`),
   });
 
   await app.register(tenancy);
+  // After tenancy: it only guards requests tenancy proved with a session cookie.
+  await app.register(csrf);
 
   // Autoloaded route tree — folders become URL segments, with two mappings so
   // the on-disk layout (docs/WORKSTREAMS.md) lands on the SPEC §5/§10 paths:

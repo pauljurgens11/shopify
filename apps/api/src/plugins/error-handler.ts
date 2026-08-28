@@ -4,14 +4,24 @@
  *
  * Owner: WS-A. Add a new error TYPE by extending ApiError, not by editing this.
  */
+import type { ErrorCode } from '@merchant/contracts/common';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
-import { ApiError } from '../lib/errors.ts';
+import { isApiError } from '../lib/errors.ts';
+
+/** The SPEC §5 code that fits each status Fastify raises on its own. */
+const STATUS_CODE: Record<number, ErrorCode> = {
+  401: 'unauthorized',
+  403: 'forbidden',
+  404: 'not_found',
+  409: 'conflict',
+  429: 'rate_limited',
+};
 
 export default fp(
   async (app) => {
     app.setErrorHandler((error, request, reply) => {
-      if (error instanceof ApiError) {
+      if (isApiError(error)) {
         return reply.status(error.statusCode).send(error.toJSON());
       }
 
@@ -33,9 +43,15 @@ export default fp(
         });
       }
 
-      if ((error as { statusCode?: number }).statusCode === 429) {
-        return reply.status(429).send({
-          errors: [{ code: 'rate_limited', message: 'Too many requests. Slow down.' }],
+      // Fastify's own client errors — unsupported media type, body too large,
+      // malformed JSON — carry a 4xx statusCode but are not ApiErrors. Without
+      // this they would render as 500 `internal` and send the caller hunting
+      // for a server bug that is actually a bad request.
+      const status = (error as { statusCode?: number }).statusCode;
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        const message = error instanceof Error ? error.message : 'Bad request.';
+        return reply.status(status).send({
+          errors: [{ code: STATUS_CODE[status] ?? 'invalid_request', message }],
         });
       }
 

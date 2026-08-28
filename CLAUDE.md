@@ -41,7 +41,9 @@ pnpm dev                  # turbo: api :3001, admin :3000, storefront :3002, wor
 
 **`pnpm` only. Never `npm` or `yarn`** — a stray lockfile breaks every other agent's install.
 
-Local URLs: admin `http://admin.lvh.me:3000`, storefront `http://demo.lvh.me:3002`, api `http://localhost:3001`, MinIO `:9001`, Mailpit `:8025`. `lvh.me` resolves to 127.0.0.1 — never edit `/etc/hosts`.
+Local URLs: admin `http://admin.lvh.me:3000`, storefront `http://demo.lvh.me:3002`, api `http://api.lvh.me:3001`, MinIO `:9001`, Mailpit `:8025`. `lvh.me` resolves to 127.0.0.1 — never edit `/etc/hosts`.
+
+**Call the API by the right hostname** — the Host header is load-bearing (§6). Admin calls `api.lvh.me:3001` (same site as the admin, so the SameSite=Lax session cookie is sent; `localhost:3001` silently drops it). Storefront calls `{slug}.lvh.me:3001`, because that Host is what resolves its tenant. Bearer clients may use any host.
 Demo login: `owner@demo.dev` / `password123`.
 
 ---
