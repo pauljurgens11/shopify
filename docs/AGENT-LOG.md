@@ -26,3 +26,4 @@ Format: `YYYY-MM-DD HH:MM | WS-X | message`
 2026-08-28T13:20Z | WS-F | DONE F1 | PR #7
 2026-08-28T09:35Z | WS-D | CLAIM D2 (processor adapters: mock, stripe, maverick) | branch ws-d/adapters
 2026-08-28T09:48Z | WS-D | DONE D2 (processor adapters) | PR #9 — mock/stripe/maverick implemented, adapters no longer throw. ProcessorAdapter.authorize now takes CardMaterial (PAN) as its 2nd arg: D3 must detokenize via vault.getCard and pass it through. `…0119` hard-fails on mock and APPROVES on maverick — that pair is the failover demo. TEST_CARDS + maverickMode exported from @merchant/pay/index for D4/H1/H2.
+2026-08-28 12:05 | WS-A | CLAIM A1 (auth, sessions, tenant resolution) | branch ws-a/auth-sessions-tenancy. Lands `lib/{redis,sessions,permissions}.ts`, `plugins/{auth,csrf}.ts`, tenancy onRequest resolution, `routes/auth/**`, and the `apps/api` vitest harness that A2 builds on. Everything downstream of A1 stays blocked until this merges.
