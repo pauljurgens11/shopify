@@ -4,9 +4,10 @@
  * Data for the AI builder (SPEC §12). Owner: WS-F.
  *
  * Everything goes through WS-A's `apiFetch`, so the CSRF header and credentials
- * are handled once. The conversation uses `useQuery` directly rather than
- * `useApiQuery` for one reason: it needs `refetchInterval` while a generation
- * job is in flight, and the shared helper deliberately exposes no options.
+ * are handled once. The conversation and the preview token use `useQuery`
+ * directly rather than `useApiQuery` for one reason: they need
+ * `refetchInterval` (polling a generation job; re-minting an expiring token),
+ * and the shared helper deliberately exposes no options.
  */
 import type { builderMessageSchema, ThemeVersionSummary } from '@merchant/contracts/theme';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,14 +24,19 @@ export const CONVERSATION_KEY = ['theme-conversation'] as const;
 /** ≥1.5s and only while something is pending — see F4's landmines. */
 const POLL_MS = 2_000;
 /**
- * A generation that has not resolved in this long is not coming back — the
- * worker is down, or its job died. Stop polling rather than leave an open admin
- * tab hitting the API every two seconds forever.
+ * The server sweeps stale `pending` conversation messages to `failed` after
+ * five minutes (a dead worker, a lost job). Poll one minute past that so the
+ * sweep's verdict reaches an open tab: the bubble flips to Failed and the
+ * composer unlocks (`busy` only counts `pending`), instead of the chat sitting
+ * "thinking" forever in a tab that has stopped asking.
  */
-const POLL_GIVE_UP_MS = 3 * 60_000;
+const POLL_GIVE_UP_MS = 6 * 60_000;
 
 export function useVersions() {
-  return useApiQuery<{ data: ThemeVersionSummary[] }>(VERSIONS_KEY, '/admin/api/themes/versions');
+  return useApiQuery<{ data: ThemeVersionSummary[]; nextCursor: string | null }>(
+    VERSIONS_KEY,
+    '/admin/api/themes/versions',
+  );
 }
 
 export function useConversation() {
@@ -48,23 +54,39 @@ export function useConversation() {
   });
 }
 
+export const PREVIEW_TOKEN_KEY = ['theme-preview-token'] as const;
+
 /**
- * A preview token is version-scoped and short-lived, so it is fetched per
- * version rather than once for the page.
+ * A preview token is version-scoped and short-lived (15-minute TTL), so it is
+ * fetched per version rather than once for the page. `useQuery` directly for
+ * the same reason as the conversation: it needs `refetchInterval` — the token
+ * is re-minted every ten minutes so a tab left open never outlives its token
+ * and silently falls back to the published theme mid-"Viewing draft".
  */
 export function usePreviewToken(versionId: string | null) {
-  return useApiQuery<{ token: string; expiresAt: string }>(
-    ['theme-preview-token', versionId ?? 'none'],
-    `/admin/api/themes/preview-token?versionId=${versionId ?? ''}`,
-    { enabled: Boolean(versionId) },
-  );
+  return useQuery<{ token: string; expiresAt: string }, ApiError>({
+    queryKey: [...PREVIEW_TOKEN_KEY, versionId ?? 'none'],
+    queryFn: ({ signal }) =>
+      apiFetch(`/admin/api/themes/preview-token?versionId=${versionId ?? ''}`, { signal }),
+    enabled: Boolean(versionId),
+    refetchInterval: 10 * 60_000,
+  });
 }
 
-/** First active product, for the preview's Product tab. Absent is fine. */
+/** First active product, for the preview's Product tab — drafts 404 on the storefront. Absent is fine. */
 export function useFirstProductHandle() {
   const query = useApiQuery<{ data: { handle: string }[] }>(
     ['builder-first-product'],
-    '/admin/api/products?limit=1',
+    '/admin/api/products?limit=1&status=active',
+  );
+  return query.data?.data[0]?.handle ?? null;
+}
+
+/** First collection, for the preview's Collection tab. Absent is fine. */
+export function useFirstCollectionHandle() {
+  const query = useApiQuery<{ data: { handle: string }[] }>(
+    ['builder-first-collection'],
+    '/admin/api/collections?limit=1',
   );
   return query.data?.data[0]?.handle ?? null;
 }

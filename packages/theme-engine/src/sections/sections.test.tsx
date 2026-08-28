@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
   defaultSettingsFor,
+  demoCollectionData,
   demoContext,
   imagelessSettingsFor,
   maximalSettingsFor,
@@ -110,6 +111,35 @@ describe('unresolved handles', () => {
   });
 });
 
+/**
+ * The other side of the stale-handle coin: a handle that RESOLVED to a real
+ * collection with zero products — every brand-new shop's homepage. That is a
+ * real state, not a loading one, so it must never shimmer forever.
+ */
+describe('resolved but empty', () => {
+  it('featured-collection shows an empty state and a working View all link', () => {
+    const ctx = demoContext({
+      collectionsByHandle: { featured: demoCollectionData({ products: [] }) },
+    });
+    const html = render('featured-collection', maximalSettingsFor('featured-collection'), ctx);
+    expect(html).toContain('No products here yet');
+    expect(html).not.toContain('data-empty="true"');
+    // The collection exists, so the link goes somewhere — keep it.
+    expect(html).toContain('View all');
+  });
+
+  it('product-grid tells an empty catalogue apart from a context still loading', () => {
+    const settings = settingsSchemaFor('product-grid').parse({ productHandles: [], columns: 4 });
+    const resolvedEmpty = render('product-grid', settings, demoContext({ newestProducts: [] }));
+    expect(resolvedEmpty).toContain('No products here yet');
+    expect(resolvedEmpty).not.toContain('data-empty="true"');
+    // No `newestProducts` at all = the builder preview mid-load → skeleton.
+    const midLoad = render('product-grid', settings, demoContext({ newestProducts: undefined }));
+    expect(midLoad).toContain('data-empty="true"');
+    expect(midLoad).not.toContain('No products here yet');
+  });
+});
+
 describe('rich-text', () => {
   it('sanitizes the model-authored body', () => {
     const html = render('rich-text', maximalSettingsFor('rich-text'));
@@ -131,6 +161,13 @@ describe('contact', () => {
     const html = render('contact', maximalSettingsFor('contact'));
     expect(html).toContain('href="mailto:hello@aurorasupply.example"');
     expect(html).toContain('href="tel:+15035550142"');
+  });
+
+  it('renders a phone with no digits as text, never a dead tel: link', () => {
+    const settings = settingsSchemaFor('contact').parse({ phone: 'Mon-Fri, ask for Sam' });
+    const html = render('contact', settings);
+    expect(html).not.toContain('href="tel:');
+    expect(html).toContain('Mon-Fri, ask for Sam');
   });
 
   it('honors showForm', () => {

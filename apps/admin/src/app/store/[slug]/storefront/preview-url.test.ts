@@ -27,11 +27,19 @@ describe('previewUrl', () => {
     ).toBe('http://demo.lvh.me:3002/collections/featured');
   });
 
+  /** The in-app browser only renders localhost origins (CLAUDE.md §1). */
+  it('handles the localhost dev origin the same way', () => {
+    expect(storefrontOrigin('demo', 'http://localhost:3002')).toBe('http://demo.localhost:3002');
+  });
+
   /** The catalogue may be empty, or B1's endpoint may not answer yet. */
   it('falls back to home rather than a broken /products/undefined', () => {
     expect(previewUrl({ shopSlug: 'demo', page: 'product', productHandle: null }, ORIGIN)).toBe(
       'http://demo.lvh.me:3002/',
     );
+    expect(
+      previewUrl({ shopSlug: 'demo', page: 'collection', collectionHandle: null }, ORIGIN),
+    ).toBe('http://demo.lvh.me:3002/');
   });
 
   it('changes the URL when asked to refresh, so the iframe actually reloads', () => {
