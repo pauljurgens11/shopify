@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:localhost": "ADMIN_URL=http://localhost:3000 API_URL=http://localhost:3001 STOREFRONT_BASE_DOMAIN=localhost:3002 turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test --filter=!@merchant/e2e",
