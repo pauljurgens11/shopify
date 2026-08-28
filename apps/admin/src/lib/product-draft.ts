@@ -145,6 +145,39 @@ export const variantTitleOf = (options: OptionDraft[], values: Record<string, st
 };
 
 /**
+ * Re-key each variant's `optionValues` when an option was RENAMED, so the
+ * signature match in `reconcileVariants` still finds the row.
+ *
+ * Options are positional identities in the builder ("Option 1"), so when the
+ * option count is unchanged, a name that differs at a position is a rename of
+ * that option — without the re-key, every keystroke of the new name orphaned
+ * all rows: ids dropped, prices reset to row 1's, skus blanked, and the save
+ * then deleted and recreated the variants server-side, destroying their
+ * inventory. Adding or removing an option changes no surviving name, so those
+ * cases pass through untouched.
+ */
+export function renameOptionKeys(
+  oldOptions: OptionDraft[],
+  newOptions: OptionDraft[],
+  variants: VariantDraft[],
+): VariantDraft[] {
+  if (oldOptions.length !== newOptions.length) return variants;
+  const renames = new Map<string, string>();
+  oldOptions.forEach((option, index) => {
+    const next = newOptions[index];
+    if (next && next.name !== option.name) renames.set(option.name, next.name);
+  });
+  if (renames.size === 0) return variants;
+
+  return variants.map((variant) => ({
+    ...variant,
+    optionValues: Object.fromEntries(
+      Object.entries(variant.optionValues).map(([key, value]) => [renames.get(key) ?? key, value]),
+    ),
+  }));
+}
+
+/**
  * Re-derive the variant rows after an option edit, carrying each surviving
  * combination's price, sku, id and stock across.
  *

@@ -186,6 +186,26 @@ describe('oversell policy', () => {
 
     expect(level.available).toBe(-2);
   });
+
+  it('lets a restock dig a deny variant out of a negative balance', async () => {
+    // Oversold under `continue`, policy flipped to `deny` afterwards — the
+    // exact state a refund's restock hits. Only decrements are policed; a
+    // positive delta that does not yet reach zero must still apply.
+    const { variantId } = await createVariant('Dig Me Out', { inventoryPolicy: 'continue' });
+    await adjust(db, { variantId, locationId: warehouse, delta: -3, reason: 'sold' });
+    await dbAdmin.productVariant.update({
+      where: { id: variantId },
+      data: { inventoryPolicy: 'deny' },
+    });
+
+    const level = await adjust(db, {
+      variantId,
+      locationId: warehouse,
+      delta: 2,
+      reason: 'restock',
+    });
+    expect(level.available).toBe(-1);
+  });
 });
 
 describe('atomicity', () => {

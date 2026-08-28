@@ -157,7 +157,9 @@ export function ProductForm({
         : await apiFetch<Product>('/admin/api/products', { method: 'POST', body });
 
       // Stock second, and only what changed — every call writes an adjustment.
-      const changes = stockLocation ? stockChanges(draft, saved) : [];
+      // Only when the field was editable: with several locations the cells are
+      // read-only sums, and writing a sum to one location would corrupt it.
+      const changes = stockEditable && stockLocation ? stockChanges(draft, saved) : [];
       if (changes.length > 0 && stockLocation) {
         await apiFetch('/admin/api/inventory/set', {
           method: 'POST',
@@ -256,9 +258,9 @@ export function ProductForm({
               options={draft.options}
               variants={draft.variants}
               currencySymbol={currencySymbol}
-              stockLabel={
-                stockEditable || !stockLocation ? 'Available' : `Available at ${stockLocation.name}`
-              }
+              // Always the plain label: with several locations the value shown
+              // is the sum across all of them, so naming one location would lie.
+              stockLabel="Available"
               stockEditable={stockEditable}
               error={submitted ? errors.variants : undefined}
               onChange={({ options, variants }) => patch({ options, variants })}
