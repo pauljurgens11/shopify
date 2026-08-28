@@ -31,6 +31,8 @@ import { useState } from 'react';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
+// D4's saved-card charge block (WS-D owns it; mounted here per the D4 issue).
+import { ChargeSavedCard } from '../../settings/payments/charge-saved-card.tsx';
 import { LineItemsCards } from '../_components/line-items-card.tsx';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from '../_components/order-badges.tsx';
 import { PaymentCard } from '../_components/payment-card.tsx';
@@ -276,6 +278,8 @@ export default function OrderDetailPage() {
                 </BlockStack>
               </BlockStack>
             </Card>
+
+            <ChargeSavedCard order={order} onCharged={refresh} />
 
             {order.tags.length > 0 ? (
               <Card>
