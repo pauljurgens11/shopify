@@ -24,6 +24,38 @@ CLAUDE.md §0's order — appearance parity → functionality → performance �
 everything else. When two defensible options exist, take the one that serves
 that, log a line in `DECISIONS.md`, and keep moving.
 
+### Subagents and sibling skills — leverage, not ceremony
+
+Delegating is available and sometimes clearly better. It is never required, and
+forcing it costs more than it saves.
+
+**Worth delegating:**
+
+- A question that spans many files where you only want the conclusion — "which
+  workstreams call this helper", "where is tenant scoping applied inconsistently".
+  A read-only search agent returns the answer instead of filling your context
+  with file dumps.
+- Genuinely independent work you would otherwise do serially — several unrelated
+  audits, or reading three subsystems at once before a design decision.
+- An adversarial second pass on a finished diff. If a code-review skill or
+  reviewer agent is available in the session, running it over your own work
+  before pushing is cheap and catches what you have gone blind to.
+
+**Not worth it:**
+
+- A focused change in files you already have open. The handoff costs more than
+  the work.
+- Anything needing your live state — a running dev server, a logged-in browser
+  session, uncommitted edits. A subagent does not share them, and will report
+  confidently about a stack it cannot see.
+- A single-fact lookup you could answer with one `grep`.
+
+**The rule that does not bend:** a subagent's report is not verification. It can
+tell you where to look and what it believes; it cannot discharge "I have seen
+this work". Treat its findings as leads to confirm, not conclusions to relay —
+they are sometimes confidently wrong, and the bar at the top of this file is
+still yours to meet.
+
 ---
 
 ## 1. Pick and claim
@@ -247,6 +279,10 @@ item below is something this pass actually caught, after the tests were green.
   trains you to ignore the next one. The linter will tell you.
 - **Rendered controls for cut features.** A button that cannot work must not
   exist.
+- **Is it reachable?** A page nothing links to is not shipped. I built a
+  settings sub-page whose only entry point was a hub another issue had not
+  built yet — it worked perfectly and no one could get to it. Follow the nav
+  registry or an existing link to your screen before calling it done.
 - **Anything branded or external that PARITY forbids** — a CDN asset, a logo, a
   vendor name in copy.
 - **Scope creep and leftovers** — debug logging, a temporary `.env` or
@@ -258,8 +294,10 @@ Then run the repo's own reviewer over it before you push:
 pnpm verify      # lint + typecheck + unit
 ```
 
-If a finding is real, fix it and re-run the loop. If it is not, say why rather
-than silently ignoring it.
+This is also the natural place to spend a subagent, if one is available: an
+adversarial pass over your own diff catches what you have stopped being able to
+see. Its findings are leads — confirm each against the code before acting, and
+if one is wrong, say why rather than silently dropping it.
 
 ---
 
@@ -336,6 +374,7 @@ every suite creates its own shop.
 - [ ] Every bug found by hand got a test BEFORE it got a fix
 - [ ] Read the whole diff back: no lying comments, unsafe casts, dead state,
       stale suppressions, or controls for cut features
+- [ ] Any delegated finding confirmed against the code, not relayed on trust
 - [ ] Cut features not rendered; UI rules enforced server-side too
 - [ ] `pnpm verify` green *after* merging main, installing and migrating
 - [ ] DECISIONS.md + AGENT-LOG handoffs addressed to named downstream issues
