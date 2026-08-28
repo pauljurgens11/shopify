@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Merge strategy for a repo worked by ~20 parallel agents.
+# Goal: make the common concurrent edits auto-resolve instead of blocking a PR.
+# Drivers referenced here must be installed once: `pnpm setup:git`
+# ---------------------------------------------------------------------------
+
+* text=auto eol=lf
+
+# Append-only logs: concurrent appends are ALWAYS both-correct. Union keeps both
+# sides instead of conflicting. Never reorder or edit existing lines in these.
+DECISIONS.md          merge=union
+docs/AGENT-LOG.md     merge=union
+
+# Lockfile: never hand-merge. The driver takes ours and regenerates from the
+# merged package.json files (scripts/git/merge-lockfile.sh).
+pnpm-lock.yaml        merge=pnpm-lock -diff linguist-generated=true
+
+# Generated / binary: no textual merge, no diff noise.
+packages/db/generated/**  linguist-generated=true
+*.png  binary
+*.jpg  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+
+# Prisma migrations are immutable once written. A conflict here means two agents
+# claimed the same migration number — resolve by renaming, never by merging.
+packages/db/prisma/migrations/**  -merge

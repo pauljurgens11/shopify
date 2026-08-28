@@ -1,0 +1,40 @@
+{
+  "name": "merchant",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test --filter=!@merchant/e2e",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "db:generate": "pnpm --filter @merchant/db generate",
+    "db:migrate": "pnpm --filter @merchant/db migrate",
+    "db:setup": "pnpm --filter @merchant/db setup",
+    "db:reset": "pnpm --filter @merchant/db reset",
+    "seed": "pnpm --filter @merchant/db seed",
+    "e2e": "pnpm --filter @merchant/e2e test",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "setup:git": "bash scripts/setup-git.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@shopify/polaris>react": "19",
+        "@shopify/polaris>react-dom": "19"
+      }
+    }
+  }
+}

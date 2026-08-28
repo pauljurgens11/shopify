@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens (SPEC §12) are injected as CSS custom properties by the theme
+ * renderer at request time, then mapped into Tailwind here. That is how one
+ * Tailwind build serves every shop's colours and fonts without a rebuild.
+ */
+@theme inline {
+  --color-primary: var(--theme-color-primary, #1a1a1a);
+  --color-background: var(--theme-color-background, #ffffff);
+  --color-text: var(--theme-color-text, #1a1a1a);
+  --color-accent: var(--theme-color-accent, #5c6ac4);
+  --font-heading: var(--theme-font-heading, ui-sans-serif, system-ui, sans-serif);
+  --font-body: var(--theme-font-body, ui-sans-serif, system-ui, sans-serif);
+  --radius-theme: var(--theme-radius, 0.5rem);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}

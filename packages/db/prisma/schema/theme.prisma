@@ -1,0 +1,36 @@
+// Theme versions & AI builder conversation (SPEC §7, §12). Owner: WS-F.
+
+model ThemeVersion {
+  id     String @id
+  shopId String
+
+  // Validated against themeDocSchema (packages/contracts/theme.ts) on write.
+  // An invalid ThemeDoc must never reach this table — the storefront renderer
+  // trusts it completely.
+  themeJson Json
+  tokens    Json   @default("{}")
+  status    String @default("draft") // draft | published
+
+  publishedAt       DateTime? @db.Timestamptz(6)
+  createdByMessage  String?
+  conversationId    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId, status])
+  @@index([shopId, createdAt])
+  @@map("theme_versions")
+}
+
+model BuilderConversation {
+  id       String @id
+  shopId   String
+  messages Json   @default("[]")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("builder_conversations")
+}

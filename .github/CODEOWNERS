@@ -1,0 +1,20 @@
+# Routing/notification hint only — NOT a merge gate.
+# (Code-owner review is intentionally not required; see docs/PARALLEL-AGENTS.md §2.)
+# Mirrors docs/WORKSTREAMS.md. Keep the two in sync.
+
+*                                   @pauljurgens11
+
+/packages/config/                   @pauljurgens11   # WS-A
+/packages/db/                       @pauljurgens11   # WS-A (schema files shared)
+/apps/api/src/plugins/              @pauljurgens11   # WS-A
+/apps/admin/src/components/shell/   @pauljurgens11   # WS-A
+/apps/admin/src/navigation/         @pauljurgens11   # WS-A
+
+/packages/pay/                      @pauljurgens11   # WS-D — payments isolation
+/packages/theme-engine/             @pauljurgens11   # WS-F
+/apps/storefront/                   @pauljurgens11   # WS-E
+/apps/worker/                       @pauljurgens11   # WS-G
+/e2e/                               @pauljurgens11   # WS-H
+
+/SPEC.md                            @pauljurgens11
+/CLAUDE.md                          @pauljurgens11

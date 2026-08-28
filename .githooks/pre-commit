@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Fast, staged-only lint+format. Keep this under ~2s: 20 agents commit often.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -n "${SKIP_HOOKS:-}" ]; then exit 0; fi
+if ! command -v pnpm >/dev/null 2>&1; then exit 0; fi
+if [ ! -d node_modules ]; then exit 0; fi
+
+if ! pnpm exec biome check --staged --no-errors-on-unmatched --write; then
+  echo
+  echo "pre-commit: biome found problems it could not fix automatically."
+  echo "Fix them, or bypass once with: SKIP_HOOKS=1 git commit ..."
+  exit 1
+fi
+
+# Re-stage anything biome rewrote.
+git diff --name-only --cached --diff-filter=ACMR | while IFS= read -r f; do
+  [ -f "$f" ] && git add -- "$f"
+done
+exit 0

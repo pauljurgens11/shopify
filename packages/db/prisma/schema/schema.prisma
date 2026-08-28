@@ -1,0 +1,15 @@
+// Datasource + generator only. Models live in sibling files, one per domain.
+//
+// Multi-file schema is a deliberate anti-conflict measure: a single
+// schema.prisma would be the hottest merge conflict in a repo worked by 20
+// agents. See CLAUDE.md §3.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

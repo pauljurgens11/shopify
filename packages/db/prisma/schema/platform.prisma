@@ -1,0 +1,67 @@
+// Platform-level models: not tenant-scoped (Shop IS the tenant). Owner: WS-A.
+
+model Shop {
+  id           String   @id
+  slug         String   @unique
+  name         String
+  email        String?
+  currencyCode String   @default("USD")
+  timezone     String   @default("UTC")
+  plan         String   @default("trial")
+
+  // Onboarding checklist state shown on admin Home (SPEC §8).
+  onboarding Json @default("{}")
+
+  // Settings that have no table of their own (SPEC §16 Settings pages).
+  taxSettings      Json @default("{}")
+  checkoutSettings Json @default("{}")
+  shippingRates    Json @default("[]")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("shops")
+}
+
+model StaffUser {
+  id           String    @id
+  shopId       String
+  email        String
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  role         String    @default("staff") // owner | admin | staff
+  permissions  Json      @default("{}")
+  lastLoginAt  DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, email])
+  @@index([shopId])
+  @@map("staff_users")
+}
+
+model CustomDomain {
+  id       String  @id
+  shopId   String
+  hostname String  @unique
+  isPrimary Boolean @default(false)
+  verifiedAt DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("custom_domains")
+}
+
+// Per-shop sequential order numbers starting at #1001 (SPEC §5). A dedicated
+// row lets the order service take a row lock and increment atomically, which a
+// COUNT(*) or a global sequence cannot do correctly under concurrency.
+model OrderSequence {
+  shopId String @id
+  next   Int    @default(1001)
+
+  @@map("order_sequences")
+}

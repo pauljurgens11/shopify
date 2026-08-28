@@ -1,0 +1,136 @@
+// Products & collections (SPEC §7). Owner: WS-B.
+
+model Product {
+  id              String   @id
+  shopId          String
+  title           String
+  descriptionHtml String   @default("")
+  handle          String
+  status          String   @default("draft") // active | draft | archived
+  vendor          String?
+  productType     String?
+  tags            String[] @default([])
+  seoTitle        String?
+  seoDescription  String?
+  metadata        Json     @default("{}")
+
+  options  ProductOption[]
+  variants ProductVariant[]
+  images   ProductImage[]
+  collections CollectionProduct[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, handle])
+  @@index([shopId, status])
+  @@index([shopId, createdAt])
+  @@map("products")
+}
+
+model ProductOption {
+  id        String   @id
+  shopId    String
+  productId String
+  name      String
+  position  Int      @default(0)
+  values    String[] @default([])
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([productId])
+  @@map("product_options")
+}
+
+model ProductVariant {
+  id        String @id
+  shopId    String
+  productId String
+  title     String
+  sku       String?
+  barcode   String?
+
+  // Money is integer minor units (SPEC §5). currencyCode lives on Shop; it is
+  // repeated on Order because an order must stay self-describing forever.
+  price          Int
+  compareAtPrice Int?
+
+  position         Int     @default(0)
+  optionValues     Json    @default("{}") // { "Size": "M", "Color": "Blue" }
+  requiresShipping Boolean @default(true)
+  taxable          Boolean @default(true)
+  weightGrams      Int?
+  inventoryPolicy  String  @default("deny") // deny | continue
+
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryLevels InventoryLevel[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([productId])
+  @@index([shopId, sku])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id         String   @id
+  shopId     String
+  productId  String
+  url        String
+  altText    String?
+  position   Int      @default(0)
+  variantIds String[] @default([])
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([productId])
+  @@map("product_images")
+}
+
+model Collection {
+  id              String  @id
+  shopId          String
+  title           String
+  handle          String
+  descriptionHtml String  @default("")
+  type            String  @default("manual") // manual | smart
+  ruleSet         Json?
+  sortOrder       String  @default("manual")
+  imageUrl        String?
+  seoTitle        String?
+  seoDescription  String?
+
+  products CollectionProduct[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, handle])
+  @@index([shopId])
+  @@map("collections")
+}
+
+model CollectionProduct {
+  shopId       String
+  collectionId String
+  productId    String
+  position     Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, productId])
+  @@index([shopId])
+  @@index([productId])
+  @@map("collection_products")
+}

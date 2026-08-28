@@ -1,0 +1,64 @@
+/** Staff + customer auth (SPEC §8). Owner: WS-A. */
+
+import { PERMISSION_AREAS, STAFF_ROLES } from '@merchant/config/constants';
+import { z } from 'zod';
+import { idSchema, timestampsSchema } from './common.ts';
+
+export const staffRoleSchema = z.enum(STAFF_ROLES);
+export const permissionAreaSchema = z.enum(PERMISSION_AREAS);
+
+/** `staff` role only: per-area booleans. owner/admin bypass this map entirely. */
+export const permissionsSchema = z.record(permissionAreaSchema, z.boolean()).default({});
+export type Permissions = z.infer<typeof permissionsSchema>;
+
+export const staffUserSchema = z
+  .object({
+    id: idSchema,
+    email: z.string().email(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    role: staffRoleSchema,
+    permissions: permissionsSchema,
+    lastLoginAt: z.string().datetime({ offset: true }).nullable(),
+  })
+  .merge(timestampsSchema);
+export type StaffUser = z.infer<typeof staffUserSchema>;
+
+export const loginInput = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  shopSlug: z.string().optional(),
+});
+
+/** Shop + owner created in one transaction (SPEC §8). */
+export const signupInput = z.object({
+  shopName: z.string().min(1).max(255),
+  shopSlug: z
+    .string()
+    .min(3)
+    .max(63)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and hyphens only'),
+  email: z.string().email(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().max(255).optional(),
+  lastName: z.string().max(255).optional(),
+});
+
+/** What every admin page needs on load: who am I, which shop, what may I see. */
+export const sessionResponse = z.object({
+  user: staffUserSchema,
+  shop: z.object({
+    id: idSchema,
+    slug: z.string(),
+    name: z.string(),
+    currencyCode: z.string().length(3),
+    timezone: z.string(),
+  }),
+});
+export type SessionResponse = z.infer<typeof sessionResponse>;
+
+export const inviteStaffInput = z.object({
+  email: z.string().email(),
+  role: staffRoleSchema,
+  permissions: permissionsSchema.optional(),
+});

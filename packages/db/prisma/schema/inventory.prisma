@@ -1,0 +1,58 @@
+// Locations & inventory (SPEC §7). Owner: WS-B.
+//
+// Quantities change ONLY through the inventory service, which writes an
+// InventoryAdjustment alongside every InventoryLevel update. Raw updates are a
+// bug: they destroy the history the admin's inventory drawer reads.
+
+model Location {
+  id                   String  @id
+  shopId               String
+  name                 String
+  address              Json?
+  isActive             Boolean @default(true)
+  fulfillsOnlineOrders Boolean @default(true)
+
+  inventoryLevels InventoryLevel[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("locations")
+}
+
+model InventoryLevel {
+  id         String @id
+  shopId     String
+  variantId  String
+  locationId String
+  available  Int    @default(0)
+
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([variantId, locationId])
+  @@index([shopId])
+  @@index([locationId])
+  @@map("inventory_levels")
+}
+
+model InventoryAdjustment {
+  id          String  @id
+  shopId      String
+  variantId   String
+  locationId  String
+  delta       Int
+  reason      String  @default("correction")
+  referenceId String?
+  actor       String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([shopId, createdAt])
+  @@index([variantId])
+  @@map("inventory_adjustments")
+}

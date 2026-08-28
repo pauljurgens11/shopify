@@ -1,0 +1,147 @@
+// Pay (SPEC §11). Owner: WS-D.
+//
+// VaultCard is the only table in this repo holding an encrypted PAN. Nothing
+// outside packages/pay may read it — not the API, not the admin, not a report.
+
+model VaultCard {
+  id     String @id // card_tok_...
+  shopId String
+
+  // AES-256-GCM ciphertext of { number, cvc } under VAULT_MASTER_KEY.
+  // iv and authTag are stored alongside; none of the three is a secret on its own.
+  encryptedBlob String
+  iv            String
+  authTag       String
+
+  // Safe metadata — everything else in the system uses only these fields.
+  brand    String
+  last4    String
+  expMonth Int
+  expYear  Int
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("vault_cards")
+}
+
+model ProcessorConfig {
+  id          String  @id
+  shopId      String
+  processor   String // mock | stripe | maverick
+  displayName String
+  enabled     Boolean @default(true)
+  testMode    Boolean @default(true)
+
+  // AES-encrypted credential bundle. Never returned by any API response.
+  encryptedCredentials String?
+  credentialsIv        String?
+  credentialsAuthTag   String?
+
+  lastVerifiedAt DateTime? @db.Timestamptz(6)
+
+  routingRules RoutingRule[]
+  payments     Payment[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, processor])
+  @@index([shopId])
+  @@map("processor_configs")
+}
+
+model RoutingRule {
+  id                String @id
+  shopId            String
+  processorConfigId String
+  position          Int    @default(0)
+  weight            Int    @default(100)
+  conditions        Json   @default("{}")
+
+  processorConfig ProcessorConfig @relation(fields: [processorConfigId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId, position])
+  @@map("routing_rules")
+}
+
+model Payment {
+  id         String  @id
+  shopId     String
+  orderId    String?
+  checkoutId String?
+
+  amount         Int
+  refundedAmount Int    @default(0)
+  currencyCode   String @default("USD")
+  status         String // authorized | captured | refunded | partially_refunded | voided | failed
+
+  processor         String
+  processorConfigId String?
+  processorTxnId    String?
+  cardTokenId       String?
+  last4             String?
+  brand             String?
+  errorCode         String?
+
+  // Which processors were attempted and how each responded. Without this,
+  // debugging a failover in production is guesswork.
+  routingTrail Json @default("[]")
+
+  // Deduplicates retries: the same key must never produce a second charge.
+  idempotencyKey String?
+
+  processorConfig ProcessorConfig? @relation(fields: [processorConfigId], references: [id])
+  paymentRefunds  PaymentRefund[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, createdAt])
+  @@index([orderId])
+  @@map("payments")
+}
+
+model PaymentRefund {
+  id             String  @id
+  shopId         String
+  paymentId      String
+  amount         Int
+  reason         String?
+  processorTxnId String?
+  status         String  @default("succeeded")
+  idempotencyKey String?
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId])
+  @@index([paymentId])
+  @@map("payment_refunds")
+}
+
+// A customer's saved card: the repeat-billing / subscription primitive (SPEC §11).
+model PaymentMethod {
+  id          String  @id
+  shopId      String
+  customerId  String
+  cardTokenId String
+  brand       String
+  last4       String
+  expMonth    Int
+  expYear     Int
+  isDefault   Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([customerId])
+  @@map("payment_methods")
+}

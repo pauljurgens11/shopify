@@ -1,0 +1,37 @@
+// Analytics (SPEC §7, §13). Owner: WS-G.
+
+// Insert-only, high volume. Never UPDATE a row here — the dashboard reads
+// rollups plus today's raw events, so mutation would corrupt both.
+model AnalyticsEvent {
+  id         String @id
+  shopId     String
+  type       String // page_view | product_view | add_to_cart | begin_checkout | purchase
+  sessionId  String
+  path       String
+  productId  String?
+  orderId    String?
+  value      Int?
+  occurredAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([shopId, occurredAt])
+  @@index([shopId, type, occurredAt])
+  @@index([shopId, sessionId])
+  @@map("analytics_events")
+}
+
+// Written by the worker every 5 minutes. The dashboard reads these instead of
+// aggregating millions of raw rows per page load.
+model AnalyticsRollupDaily {
+  id     String   @id
+  shopId String
+  date   DateTime @db.Date
+  metric String // sales | orders | sessions | product_views | add_to_carts | purchases
+  value  Int      @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, date, metric])
+  @@index([shopId, date])
+  @@map("analytics_rollups_daily")
+}

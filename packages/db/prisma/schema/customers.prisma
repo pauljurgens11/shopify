@@ -1,0 +1,61 @@
+// Customers (SPEC §7). Owner: WS-C.
+
+model Customer {
+  id               String   @id
+  shopId           String
+  email            String
+  firstName        String?
+  lastName         String?
+  phone            String?
+  acceptsMarketing Boolean  @default(false)
+  note             String?
+  tags             String[] @default([])
+
+  // Storefront login is optional; guest checkout is the default path (SPEC §8).
+  passwordHash String?
+
+  // Denormalized for the index table — Shopify shows these as columns and
+  // recomputing them per row would make the list query quadratic.
+  ordersCount Int @default(0)
+  totalSpent  Int @default(0)
+
+  metadata Json @default("{}")
+
+  addresses CustomerAddress[]
+  orders    Order[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, email])
+  @@index([shopId, createdAt])
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id           String  @id
+  shopId       String
+  customerId   String
+  firstName    String?
+  lastName     String?
+  company      String?
+  address1     String
+  address2     String?
+  city         String
+  province     String?
+  provinceCode String?
+  country      String
+  countryCode  String
+  zip          String
+  phone        String?
+  isDefault    Boolean @default(false)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([customerId])
+  @@map("customer_addresses")
+}

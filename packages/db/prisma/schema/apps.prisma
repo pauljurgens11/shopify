@@ -1,0 +1,63 @@
+// Private apps, Admin API tokens, webhooks (SPEC §7, §13). Owner: WS-G.
+
+model App {
+  id           String   @id
+  shopId       String
+  name         String
+  apiTokenHash String   @unique // SHA-256; plaintext is shown exactly once
+  tokenSuffix  String
+  scopes       String[] @default([])
+  lastUsedAt   DateTime? @db.Timestamptz(6)
+  uninstalledAt DateTime? @db.Timestamptz(6)
+
+  webhooks WebhookSubscription[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("apps")
+}
+
+model WebhookSubscription {
+  id           String  @id
+  shopId       String
+  appId        String
+  topic        String
+  url          String
+  secret       String
+  secretSuffix String
+  isActive     Boolean @default(true)
+
+  app        App               @relation(fields: [appId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([appId, topic, url])
+  @@index([shopId, topic])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id             String    @id
+  shopId         String
+  subscriptionId String
+  topic          String
+  payload        Json
+  status         String    @default("pending") // pending | success | failed | exhausted
+  attempts       Int       @default(0)
+  responseStatus Int?
+  lastError      String?
+  deliveredAt    DateTime? @db.Timestamptz(6)
+
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId, createdAt])
+  @@index([subscriptionId, status])
+  @@map("webhook_deliveries")
+}

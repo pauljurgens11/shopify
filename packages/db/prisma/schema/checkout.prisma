@@ -1,0 +1,46 @@
+// Cart & checkout (SPEC §7, §10). Owner: WS-E.
+
+model Cart {
+  id           String @id
+  shopId       String
+  token        String @unique
+  currencyCode String @default("USD")
+  lineItems    Json   @default("[]")
+  discountCode String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@map("carts")
+}
+
+model Checkout {
+  id     String @id
+  shopId String
+  token  String @unique
+
+  // Snapshot of the cart at checkout creation. The cart may keep changing in
+  // another tab; the checkout the shopper is paying for must not.
+  cartSnapshot Json
+
+  email                 String?
+  phone                 String?
+  acceptsMarketing      Boolean @default(false)
+  shippingAddress       Json?
+  billingAddress        Json?
+  billingSameAsShipping Boolean @default(true)
+  shippingRateId        String?
+  discountCode          String?
+  note                  String?
+  totals                Json    @default("{}")
+
+  status           String  @default("open") // open | completed | expired
+  completedOrderId String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId, status])
+  @@map("checkouts")
+}

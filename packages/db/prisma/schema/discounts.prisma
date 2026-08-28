@@ -1,0 +1,48 @@
+// Discounts (SPEC §7). Owner: WS-C.
+
+model Discount {
+  id                 String    @id
+  shopId             String
+  title              String
+  code               String? // null = automatic discount
+  type               String // amount_off_order | amount_off_products | free_shipping
+  valueType          String // percentage | fixed
+  value              Int // percentage points, or minor units for fixed
+  appliesTo          Json      @default("{\"scope\":\"all\"}")
+  minimumRequirement Json      @default("{\"type\":\"none\"}")
+  usageLimit         Int?
+  oncePerCustomer    Boolean   @default(false)
+  usedCount          Int       @default(0)
+  startsAt           DateTime  @default(now()) @db.Timestamptz(6)
+  endsAt             DateTime? @db.Timestamptz(6)
+  status             String    @default("active")
+
+  redemptions DiscountRedemption[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, code])
+  @@index([shopId, status])
+  @@map("discounts")
+}
+
+// Backs `oncePerCustomer` and `usageLimit`. A counter alone cannot answer
+// "has THIS customer used it", and cannot be rolled back on a cancelled order.
+model DiscountRedemption {
+  id         String  @id
+  shopId     String
+  discountId String
+  orderId    String
+  customerId String?
+  amount     Int
+
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([discountId, orderId])
+  @@index([shopId])
+  @@index([discountId, customerId])
+  @@map("discount_redemptions")
+}

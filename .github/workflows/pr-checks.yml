@@ -1,0 +1,80 @@
+# The ONLY required status check. Budget: under ~4 minutes.
+# Anything slower belongs in main-checks.yml — see docs/PARALLEL-AGENTS.md §3.
+#
+# The job name below IS the required-check context in .github/rulesets/main.json.
+# Renaming it silently disables branch protection. Rename both or neither.
+name: pr-checks
+
+on:
+  pull_request:
+  merge_group: # required, or merge-queue entries wait forever for a check that never runs
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-checks:
+    name: pr-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: merchant
+          POSTGRES_PASSWORD: merchant
+          POSTGRES_DB: merchant_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U merchant -d merchant_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://merchant:merchant@localhost:5432/merchant_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      SESSION_SECRET: ci_session_secret_0000000000000000000000
+      VAULT_MASTER_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Prisma loads .env from the repo root; the job `env:` above still wins,
+      # because dotenv never overrides an already-set variable.
+      - run: cp .env.example .env
+
+      # Cheap guards first: they fail in seconds and save a compile.
+      - name: env parity (.env.example ↔ env.ts)
+        run: node scripts/check-env-parity.mjs
+
+      - name: lint + format
+        run: pnpm exec biome ci .
+
+      - name: prisma generate
+        run: pnpm db:generate
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: migrate test database
+        run: pnpm --filter @merchant/db exec prisma migrate deploy
+
+      # SPEC §14: tenancy suite, pay, money/discounts. Nothing else.
+      - name: unit + tenancy tests
+        run: pnpm test

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Guardrails that are cheap locally and expensive in CI.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+if [ -n "${SKIP_HOOKS:-}" ]; then exit 0; fi
+
+# 1. Never push straight to main — everything goes through a PR (see CLAUDE.md).
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      echo "pre-push: direct pushes to main are not allowed. Open a PR."
+      exit 1
+      ;;
+  esac
+done
+
+# 2. Refuse to push a committed .env (SPEC §15).
+if git diff --cached --name-only origin/main...HEAD 2>/dev/null | grep -qE '(^|/)\.env$'; then
+  echo "pre-push: refusing to push a .env file."
+  exit 1
+fi
+exit 0

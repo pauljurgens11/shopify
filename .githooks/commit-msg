@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Conventional Commits with a workstream scope, e.g.  feat(ws-b): product form
+# Scope is how a human reads `git log` across 20 concurrent agents.
+set -euo pipefail
+[ -n "${SKIP_HOOKS:-}" ] && exit 0
+
+msg_file="$1"
+first_line="$(head -n1 "$msg_file")"
+
+# Allow merge/revert/fixup commits through untouched.
+case "$first_line" in
+  Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+
+pattern='^(feat|fix|docs|chore|refactor|test|perf|build|ci)(\(ws-[a-h]\)|\(shared\)|\(root\))?!?: .{1,}'
+if ! printf '%s' "$first_line" | grep -qE "$pattern"; then
+  cat >&2 <<'MSG'
+commit-msg: message must follow Conventional Commits.
+
+  <type>(<scope>): <summary>
+
+  type  : feat | fix | docs | chore | refactor | test | perf | build | ci
+  scope : ws-a … ws-h  (your workstream), or `shared` / `root`
+
+Examples:
+  feat(ws-b): product form with variant option builder
+  fix(ws-d): do not cascade routing on card decline
+  chore(shared): add Discount zod contract
+
+Bypass once with SKIP_HOOKS=1.
+MSG
+  exit 1
+fi
+exit 0

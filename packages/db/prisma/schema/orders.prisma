@@ -1,0 +1,145 @@
+// Orders (SPEC §7). Owner: WS-C.
+//
+// Line items snapshot title/sku/price at purchase time. Editing a product must
+// never retroactively change what an old order says it sold.
+
+model Order {
+  id          String @id
+  shopId      String
+  orderNumber Int
+  customerId  String?
+  email       String
+  phone       String?
+  currencyCode String @default("USD")
+
+  // All money is integer minor units.
+  subtotal      Int @default(0)
+  discountTotal Int @default(0)
+  shippingTotal Int @default(0)
+  taxTotal      Int @default(0)
+  total         Int @default(0)
+  refundedTotal Int @default(0)
+
+  financialStatus   String    @default("pending")
+  fulfillmentStatus String    @default("unfulfilled")
+  cancelledAt       DateTime? @db.Timestamptz(6)
+  cancelReason      String?
+
+  shippingAddress Json?
+  billingAddress  Json?
+  shippingLine    Json?
+  discountCodes   Json     @default("[]")
+  note            String?
+  tags            String[] @default([])
+  metadata        Json     @default("{}")
+
+  customer     Customer?       @relation(fields: [customerId], references: [id])
+  lineItems    OrderLineItem[]
+  fulfillments Fulfillment[]
+  refunds      Refund[]
+  events       OrderEvent[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([shopId, orderNumber])
+  @@index([shopId, createdAt])
+  @@index([shopId, financialStatus])
+  @@index([shopId, fulfillmentStatus])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id        String  @id
+  shopId    String
+  orderId   String
+  productId String?
+  variantId String?
+
+  title        String
+  variantTitle String?
+  sku          String?
+  imageUrl     String?
+
+  quantity          Int
+  price             Int
+  totalDiscount     Int @default(0)
+  fulfilledQuantity Int @default(0)
+  refundedQuantity  Int @default(0)
+
+  requiresShipping Boolean @default(true)
+  taxable          Boolean @default(true)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_line_items")
+}
+
+model Fulfillment {
+  id              String  @id
+  shopId          String
+  orderId         String
+  locationId      String
+  status          String  @default("success")
+  trackingNumber  String?
+  trackingUrl     String?
+  trackingCompany String?
+  lineItems       Json    @default("[]")
+  notifyCustomer  Boolean @default(true)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([orderId])
+  @@map("fulfillments")
+}
+
+model Refund {
+  id              String  @id
+  shopId          String
+  orderId         String
+  amount          Int
+  reason          String?
+  note            String?
+  lineItems       Json    @default("[]")
+  restock         Boolean @default(true)
+  paymentRefundId String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([orderId])
+  @@map("refunds")
+}
+
+// The order-detail timeline. Append-only: never update or delete a row here.
+model OrderEvent {
+  id      String  @id
+  shopId  String
+  orderId String
+  type    String
+  message String
+  actor   String?
+  payload Json    @default("{}")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([shopId])
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
