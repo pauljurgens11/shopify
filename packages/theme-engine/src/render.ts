@@ -36,5 +36,8 @@ export function themeCssVariables(tokens: ThemeTokens): Record<string, string> {
     '--theme-font-heading': FONT_STACKS[tokens.fontHeading] ?? FONT_STACKS.inter ?? 'sans-serif',
     '--theme-font-body': FONT_STACKS[tokens.fontBody] ?? FONT_STACKS.inter ?? 'sans-serif',
     '--theme-radius': RADIUS[tokens.radius],
+    // Raw enum value ('solid' | 'outline' | 'soft'); button components branch on
+    // it via data-attribute or class. Without this var the token is dead weight.
+    '--theme-button-style': tokens.buttonStyle,
   };
 }

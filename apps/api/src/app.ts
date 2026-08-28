@@ -41,16 +41,25 @@ export async function buildApp(): Promise<FastifyInstance> {
         censor: '[redacted]',
       },
     },
-    // ULIDs make a request traceable across api → worker → webhook delivery.
+    // A per-request id makes a request traceable across api → worker → webhook delivery.
     genReqId: () => crypto.randomUUID(),
     trustProxy: config.NODE_ENV === 'production',
   });
 
   await app.register(errorHandler);
 
+  // Storefront origins are per-shop subdomains: http://{slug}.lvh.me:3002.
+  // The Origin header includes scheme and port, so the pattern must too —
+  // a bare `\.lvh.me$` matches nothing. This also has to admit the checkout's
+  // direct browser POST to /vault/tokenize (SPEC §11).
+  const storefrontHost = config.STOREFRONT_BASE_DOMAIN.split(':')[0] ?? 'lvh.me';
+  const storefrontOrigin = new RegExp(
+    `^https?://[a-z0-9-]+\\.${storefrontHost.replaceAll('.', '\\.')}(:\\d+)?$`,
+  );
+
   await app.register(cors, {
     // Admin and storefront are separate origins in dev; cookies must survive.
-    origin: [config.ADMIN_URL, new RegExp(`\\.${config.STOREFRONT_BASE_DOMAIN.split(':')[0]}$`)],
+    origin: [config.ADMIN_URL, storefrontOrigin],
     credentials: true,
   });
 
@@ -60,15 +69,37 @@ export async function buildApp(): Promise<FastifyInstance> {
     global: false, // opt in per route group — see RATE_LIMITS
     max: RATE_LIMITS.adminApi.max,
     timeWindow: RATE_LIMITS.adminApi.windowMs,
+    // @fastify/rate-limit builds its own 429 body instead of going through
+    // setErrorHandler, so the SPEC §5 error shape has to be produced here.
+    errorResponseBuilder: (_req, context) => ({
+      errors: [
+        {
+          code: 'rate_limited',
+          message: `Rate limit exceeded. Retry in ${context.after}.`,
+        },
+      ],
+    }),
   });
 
   await app.register(tenancy);
 
-  // Autoloaded route tree. `dirNameRoutePrefix` turns folders into URL segments.
+  // Autoloaded route tree — folders become URL segments, with two mappings so
+  // the on-disk layout (docs/WORKSTREAMS.md) lands on the SPEC §5/§10 paths:
+  //   routes/admin/products/**    → /admin/api/products/**
+  //   routes/storefront/carts/**  → /storefront/api/carts/**
+  //   routes/api/**               → /api/**            (public Admin REST API)
+  //   routes/vault/**, health/**  → /vault/**, /health  (verbatim)
   await app.register(autoload, {
     dir: join(here, 'routes'),
     routeParams: true,
     ignorePattern: /.*\.(test|spec)\.ts$/,
+    dirNameRoutePrefix: (folderParent, folderName) => {
+      if (folderParent === join(here, 'routes')) {
+        if (folderName === 'admin') return 'admin/api';
+        if (folderName === 'storefront') return 'storefront/api';
+      }
+      return folderName;
+    },
     options: {},
   });
 

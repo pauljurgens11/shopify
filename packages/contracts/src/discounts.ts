@@ -46,8 +46,8 @@ export const discountSchema = z
     code: z.string().min(1).max(64).nullable().default(null),
     type: discountTypeSchema,
     valueType: discountValueTypeSchema,
-    /** percentage: 0–100. fixed: minor units. */
-    value: z.number().nonnegative(),
+    /** percentage: integer 0–100. fixed: integer minor units (SPEC §5 — never floats). */
+    value: z.number().int().nonnegative(),
     appliesTo: discountAppliesToSchema.default({ scope: 'all' }),
     minimumRequirement: minimumRequirementSchema.default({ type: 'none' }),
     usageLimit: z.number().int().positive().nullable().default(null),

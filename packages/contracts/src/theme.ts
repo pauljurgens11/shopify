@@ -333,6 +333,13 @@ export function validateThemeDoc(doc: ThemeDoc): string[] {
       const key = `${page}:${section.id}`;
       if (ids.has(key)) problems.push(`Duplicate section id "${section.id}" on page ${page}`);
       ids.add(key);
+      // The footer lives at doc level (`doc.footer`) and renders on every page;
+      // one placed inside a page would render twice.
+      if (section.type === 'footer') {
+        problems.push(
+          `pages.${page} contains a "footer" section — the footer belongs at doc.footer`,
+        );
+      }
     }
   }
   return problems;

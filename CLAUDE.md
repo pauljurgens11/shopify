@@ -32,7 +32,7 @@ pnpm dev                  # turbo: api :3001, admin :3000, storefront :3002, wor
 | Typecheck everything | `pnpm typecheck` |
 | Lint + format | `pnpm lint` / `pnpm format` (Biome — one root config) |
 | Unit tests | `pnpm test` (Vitest) |
-| One test file | `pnpm vitest run path/to/file.test.ts` |
+| One test file | `pnpm --filter <package> exec vitest run path/to/file.test.ts` (vitest is per-package, not root) |
 | Everything CI checks, locally | `pnpm verify` (lint + typecheck + unit) — run before every push |
 | E2E smoke | `pnpm e2e` (Playwright, needs seeded stack) |
 | New migration | `pnpm db:migrate --name NNN_ws{x}_description` |
@@ -48,6 +48,7 @@ Demo login: `owner@demo.dev` / `password123`.
 
 ## 2. Before you touch a file
 
+0. **Pick an issue from `docs/issues/`** — the backlog is the development plan, pre-sliced for parallel work. Claim it in `docs/AGENT-LOG.md`, follow its test plan, land it as one PR (protocol: `docs/issues/README.md`).
 1. **Read your workstream row in SPEC.md §16 and the exact paths in `docs/WORKSTREAMS.md`** — they define the directories you own.
 2. **Read `DECISIONS.md`** — it records what other agents already settled. Never relitigate a logged decision.
 3. **Cut a branch off fresh `main`** (§4) — never work on `main` itself.

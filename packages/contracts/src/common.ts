@@ -99,6 +99,15 @@ export type PaginationQuery = z.infer<typeof paginationQuery>;
 /** Free-text search — every list endpoint whose Shopify page has a search box. */
 export const searchQuery = z.object({ query: z.string().trim().max(255).optional() });
 
+/**
+ * Boolean query-string param. NEVER `z.coerce.boolean()` for query params —
+ * `Boolean('false') === true`, so `?flag=false` would filter for true.
+ */
+export const booleanish = z
+  .enum(['true', 'false'])
+  .or(z.boolean())
+  .transform((v) => v === true || v === 'true');
+
 export const sortQuery = z.object({
   sortKey: z.string().optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),

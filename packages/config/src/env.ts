@@ -31,8 +31,9 @@ const schema = z.object({
   STOREFRONT_PORT: z.coerce.number().int().positive().default(3002),
 
   // --- auth (SPEC §8) ---
+  // Cookie NAME is not env-configurable — it is `SESSION_COOKIE` in
+  // constants.ts, the single source of truth. Only the secret and TTL vary.
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
-  SESSION_COOKIE_NAME: z.string().default('_merchant_session'),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
   // --- Pay / vault (SPEC §11) ---

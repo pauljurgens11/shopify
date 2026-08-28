@@ -38,8 +38,9 @@ export function subtract(a: Money, b: Money): Money {
   return { amount: a.amount - b.amount, currencyCode: a.currencyCode };
 }
 
-export function sum(items: Money[], currencyCode: string = DEFAULT_CURRENCY): Money {
-  return items.reduce(add, zero(currencyCode));
+/** Currency comes from the items themselves; the parameter only matters for `[]`. */
+export function sum(items: Money[], currencyCode?: string): Money {
+  return items.reduce(add, zero(currencyCode ?? items[0]?.currencyCode ?? DEFAULT_CURRENCY));
 }
 
 /** Line total. Quantity is a count, so this stays exact. */
@@ -106,14 +107,34 @@ export function minorUnitFactor(currencyCode: string): number {
   return ZERO_DECIMAL.has(currencyCode.toUpperCase()) ? 1 : 100;
 }
 
-/** Parse merchant/admin input ("19.99") into minor units. Never use for arithmetic. */
+/**
+ * Parse merchant/admin input ("19.99") into minor units. Never use for arithmetic.
+ *
+ * Digit-wise on the string — `Math.round(1.005 * 100)` is 100, not 101, because
+ * 1.005 has no exact binary representation. Extra decimals round half away from
+ * zero.
+ */
 export function fromDecimal(
   value: string | number,
   currencyCode: string = DEFAULT_CURRENCY,
 ): Money {
-  const n = typeof value === 'number' ? value : Number.parseFloat(value);
-  if (!Number.isFinite(n)) throw new Error(`Not a number: ${String(value)}`);
-  return { amount: Math.round(n * minorUnitFactor(currencyCode)), currencyCode };
+  const factor = minorUnitFactor(currencyCode);
+  const decimals = factor === 1 ? 0 : 2;
+  const match = /^(-?)(\d+)(?:\.(\d*))?$/.exec(
+    typeof value === 'number' ? String(value) : value.trim(),
+  );
+  if (!match) throw new Error(`Not a decimal amount: ${String(value)}`);
+  const [, sign, whole = '0', fracRaw = ''] = match;
+
+  const roundUp = fracRaw.length > decimals && (fracRaw.charCodeAt(decimals) ?? 0) - 48 >= 5;
+  const frac = fracRaw.slice(0, decimals).padEnd(decimals, '0');
+  const minor =
+    BigInt(whole) * BigInt(factor) + BigInt(frac === '' ? 0 : frac) + BigInt(roundUp ? 1 : 0);
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`Amount out of range: ${String(value)}`);
+  }
+  const amount = Number(minor) * (sign ? -1 : 1);
+  return { amount, currencyCode };
 }
 
 export function toDecimal(m: Money): number {

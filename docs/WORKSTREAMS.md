@@ -31,7 +31,7 @@ apps/admin/src/lib/**
 ```
 apps/api/src/routes/admin/products/**, .../collections/**, .../inventory/**, .../locations/**, .../files/**
 apps/api/src/services/{catalog,inventory}/**
-apps/admin/src/app/(shop)/products/**, .../collections/**, .../inventory/**
+apps/admin/src/app/store/[slug]/products/**, .../collections/**, .../inventory/**
 packages/db/prisma/schema/{catalog,inventory}.prisma
 packages/contracts/src/{products,collections,inventory,locations,files}.ts
 apps/admin/src/navigation/items/products.ts
@@ -42,7 +42,7 @@ apps/admin/src/navigation/items/products.ts
 ```
 apps/api/src/routes/admin/orders/**, .../customers/**, .../discounts/**, .../draft-orders/**
 apps/api/src/services/{orders,customers,discounts}/**
-apps/admin/src/app/(shop)/orders/**, .../customers/**, .../discounts/**
+apps/admin/src/app/store/[slug]/orders/**, .../customers/**, .../discounts/**
 packages/db/prisma/schema/{orders,customers,discounts}.prisma
 packages/contracts/src/{orders,customers,discounts}.ts
 apps/admin/src/navigation/items/{orders,customers,discounts}.ts
@@ -55,7 +55,7 @@ packages/pay/**
 apps/api/src/routes/vault/**, apps/api/src/routes/admin/payments/**
 packages/db/prisma/schema/pay.prisma
 packages/contracts/src/pay.ts
-apps/admin/src/app/(shop)/settings/payments/**
+apps/admin/src/app/store/[slug]/settings/payments/**
 ```
 Nothing outside `packages/pay` may import a processor SDK or decrypt a card blob.
 
@@ -73,7 +73,7 @@ packages/contracts/src/{storefront,cart,checkout}.ts
 **own**
 ```
 packages/theme-engine/**
-apps/admin/src/app/(shop)/storefront/**
+apps/admin/src/app/store/[slug]/storefront/**
 apps/worker/src/jobs/ai-*.ts
 apps/api/src/routes/admin/themes/**
 packages/db/prisma/schema/theme.prisma
@@ -87,7 +87,7 @@ apps/admin/src/navigation/items/storefront.ts
 apps/worker/src/**                 (except ai-*.ts, owned by F)
 apps/api/src/routes/admin/{apps,analytics,webhooks}/**
 apps/api/src/routes/api/**         (public Admin REST API, Bearer token)
-apps/admin/src/app/(shop)/{analytics,apps}/**
+apps/admin/src/app/store/[slug]/{analytics,apps}/**
 packages/db/prisma/schema/{analytics,apps}.prisma
 packages/contracts/src/{analytics,apps,webhooks}.ts
 apps/admin/src/navigation/items/{analytics,apps}.ts
