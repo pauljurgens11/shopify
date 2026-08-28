@@ -106,6 +106,12 @@ export async function deleteTestShops(shopIds: string[]): Promise<void> {
   await dbAdmin.product.deleteMany({ where });
   await dbAdmin.inventoryAdjustment.deleteMany({ where });
   await dbAdmin.location.deleteMany({ where });
+  // Storefront surface (E1): carts, collections, themes and beacon events hang
+  // off shopId with no FK to Shop, so nothing cascades them.
+  await dbAdmin.cart.deleteMany({ where });
+  await dbAdmin.collection.deleteMany({ where });
+  await dbAdmin.themeVersion.deleteMany({ where });
+  await dbAdmin.analyticsEvent.deleteMany({ where });
   await dbAdmin.app.deleteMany({ where });
   await dbAdmin.staffUser.deleteMany({ where });
   await dbAdmin.orderSequence.deleteMany({ where: { shopId: { in: shopIds } } });
