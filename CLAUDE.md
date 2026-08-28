@@ -53,9 +53,13 @@ Demo login: `owner@demo.dev` / `password123`.
 0. **Pick an issue from `docs/issues/`** — the backlog is the development plan, pre-sliced for parallel work. Claim it in `docs/AGENT-LOG.md`, follow its test plan, land it as one PR (protocol: `docs/issues/README.md`).
 1. **Read your workstream row in SPEC.md §16 and the exact paths in `docs/WORKSTREAMS.md`** — they define the directories you own.
 2. **Read `DECISIONS.md`** — it records what other agents already settled. Never relitigate a logged decision.
-3. **Cut a branch off fresh `main`** (§4) — never work on `main` itself.
-4. **`git pull`** before creating a Prisma migration.
-5. **Types before code**: whatever crosses a package or service boundary is defined in `packages/contracts` first.
+3. **Run `pnpm worktree:env --migrate` once per worktree.** Every worktree shares one
+   Postgres and one Redis; this gives yours its own database and keyspace. Without it,
+   your `ADD COLUMN … NOT NULL` breaks nine other agents and their `db:reset` drops your
+   data mid-test. Ports 3000/3001/3002 stay shared on purpose — one dev stack at a time.
+4. **Cut a branch off fresh `main`** (§4) — never work on `main` itself.
+5. **`git pull`** before creating a Prisma migration.
+6. **Types before code**: whatever crosses a package or service boundary is defined in `packages/contracts` first.
 
 ## 3. Ownership & conflict rules
 
