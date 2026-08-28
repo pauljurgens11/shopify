@@ -9,12 +9,12 @@
  * endpoint has not landed yet simply report nothing (see `lib/search.ts`).
  */
 import type { SessionResponse } from '@merchant/contracts/auth';
-import { ActionList, Card, Icon, InlineStack, Text, TopBar } from '@shopify/polaris';
+import { ActionList, Box, Card, Icon, InlineStack, Text, TopBar } from '@shopify/polaris';
 import { NotificationIcon } from '@shopify/polaris-icons';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { storeHref } from '../../lib/nav.ts';
-import { useSearch } from '../../lib/search.ts';
+import { type SearchHit, useSearch } from '../../lib/search.ts';
 import { useLogout } from '../../lib/session.ts';
 
 function initialsOf(name: string): string {
@@ -46,40 +46,89 @@ export function AdminTopBar({
 
   const { data: groups, isFetching } = useSearch(query);
 
-  // ⌘K / Ctrl+K focuses the search field, the way Shopify's does.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        setSearchFocused(true);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  const hasQuery = query.trim().length > 0;
 
   const dismissSearch = useCallback(() => {
     setQuery('');
     setSearchFocused(false);
   }, []);
 
-  const searchSections = useMemo(
-    () =>
-      (groups ?? []).map((group) => ({
-        title: group.title,
-        items: group.hits.map((hit) => ({
-          content: hit.title,
-          helpText: hit.subtitle,
-          onAction: () => {
-            dismissSearch();
-            router.push(storeHref(slug, hit.url));
-          },
-        })),
-      })),
-    [groups, dismissSearch, router, slug],
+  const openHit = useCallback(
+    (hit: SearchHit) => {
+      dismissSearch();
+      router.push(storeHref(slug, hit.url));
+    },
+    [dismissSearch, router, slug],
   );
 
-  const hasQuery = query.trim().length > 0;
+  // Results are grouped for display but navigated as one list, so the arrow
+  // keys cross from the last product into the first order the way Shopify's do.
+  const flatHits = useMemo(() => (groups ?? []).flatMap((group) => group.hits), [groups]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // A new query means new results; leaving the old index would highlight an
+  // unrelated row and Enter would open it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resets per result set
+  useEffect(() => setActiveIndex(0), [flatHits]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // ⌘K / Ctrl+K focuses the search field, the way Shopify's does.
+      if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setSearchFocused(true);
+        return;
+      }
+
+      if (!hasQuery) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        dismissSearch();
+        return;
+      }
+
+      if (flatHits.length === 0) return;
+
+      // Wrap around: from the last hit, ArrowDown returns to the first.
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActiveIndex((i) => (i + 1) % flatHits.length);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveIndex((i) => (i - 1 + flatHits.length) % flatHits.length);
+      } else if (event.key === 'Enter') {
+        const hit = flatHits[activeIndex];
+        if (hit) {
+          event.preventDefault();
+          openHit(hit);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hasQuery, flatHits, activeIndex, dismissSearch, openHit]);
+
+  const searchSections = useMemo(() => {
+    let index = 0;
+    return (groups ?? []).map((group) => ({
+      title: group.title,
+      items: group.hits.map((hit) => {
+        // Index into the flattened list, so the highlight and the arrow keys
+        // agree across group boundaries.
+        const itemIndex = index;
+        index += 1;
+        return {
+          content: hit.title,
+          helpText: hit.subtitle,
+          active: itemIndex === activeIndex,
+          onAction: () => openHit(hit),
+        };
+      }),
+    }));
+  }, [groups, activeIndex, openHit]);
+
   const hasResults = searchSections.length > 0;
 
   const searchResults = hasQuery ? (
@@ -87,11 +136,11 @@ export function AdminTopBar({
       {hasResults ? (
         <ActionList actionRole="menuitem" sections={searchSections} />
       ) : (
-        <div style={{ padding: 'var(--p-space-400)' }}>
+        <Box padding="400">
           <Text as="p" tone="subdued">
-            {isFetching ? 'Searching…' : `No results for “${query.trim()}”`}
+            {isFetching ? 'Searching\u2026' : `No results for \u201c${query.trim()}\u201d`}
           </Text>
-        </div>
+        </Box>
       )}
     </Card>
   ) : null;
