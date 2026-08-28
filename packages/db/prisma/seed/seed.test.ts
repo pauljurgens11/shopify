@@ -353,6 +353,47 @@ describe('theme and processor', () => {
     expect(config.routingRules).toHaveLength(1);
     expect(config.routingRules[0]?.weight).toBe(100);
   });
+
+  it('saves cards for repeat customers so the charge-saved-card demo has data', async () => {
+    const methods = await dbAdmin.paymentMethod.findMany({ where: where() });
+    expect(methods.length).toBeGreaterThanOrEqual(3);
+
+    // Every saved card points at a vault row of the sealed three-column shape —
+    // this is what D4's "Charge" click decrypts (see seed/pay.ts).
+    for (const method of methods) {
+      const card = await dbAdmin.vaultCard.findUniqueOrThrow({
+        where: { id: method.cardTokenId },
+      });
+      expect(card.shopId).toBe(shopId);
+      expect(card.encryptedBlob.length).toBeGreaterThan(0);
+      expect(card.iv.length).toBeGreaterThan(0);
+      expect(card.authTag.length).toBeGreaterThan(0);
+      expect(card.last4).toBe(method.last4);
+    }
+
+    // The charge block lives on order pages, so cardholders must be buyers —
+    // and one of them holds two cards so the list renders as a list.
+    const byCustomer = new Map<string, typeof methods>();
+    for (const method of methods) {
+      byCustomer.set(method.customerId, [...(byCustomer.get(method.customerId) ?? []), method]);
+    }
+    const orderCounts = await dbAdmin.order.groupBy({
+      by: ['customerId'],
+      where: { ...where(), customerId: { in: [...byCustomer.keys()] } },
+      _count: true,
+    });
+    expect(orderCounts.length).toBeGreaterThanOrEqual(3);
+    expect([...byCustomer.values()].some((list) => list.length === 2)).toBe(true);
+    for (const list of byCustomer.values()) {
+      expect(list.filter((m) => m.isDefault)).toHaveLength(1);
+    }
+
+    // Jane is the demo login; she keeps a saved card even without orders.
+    const jane = await dbAdmin.customer.findUniqueOrThrow({
+      where: { shopId_email: { shopId, email: 'jane@example.com' } },
+    });
+    expect(byCustomer.get(jane.id)?.length ?? 0).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('analytics', () => {
