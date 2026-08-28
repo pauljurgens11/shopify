@@ -15,7 +15,8 @@
 #   pnpm stack stop     stop the dev servers (leaves docker infra up)
 #   pnpm stack down     stop dev servers and docker infra
 #   pnpm stack reset    drop + remigrate + reseed the database
-#   pnpm stack doctor   check prerequisites without changing anything
+#   pnpm stack disk     where the disk is going and what is safe to reclaim
+  pnpm stack doctor   check prerequisites without changing anything
 #   pnpm stack open     open the admin, storefront and tool UIs in a browser
 #
 set -uo pipefail
@@ -540,6 +541,48 @@ cmd_watch() {
   done
 }
 
+# Disk accounting. Ten worktrees at ~840 MB of node_modules each is the single
+# largest consumer in this repo, and it is avoidable — see .npmrc.
+cmd_disk() {
+  local store; store=$HOME/Library/pnpm/store/v3
+
+  step "Volume"
+  df -h /System/Volumes/Data 2>/dev/null | tail -1 | awk '{ printf "  %s free of %s (%s used)\n", $4, $2, $5 }'
+
+  step "Worktrees"
+  local w nm size linked sample total=0 wasted=0
+  for w in "$ROOT" $(ls -d "$ROOT"/.claude/worktrees/*/ 2>/dev/null | sed 's|/$||'); do
+    nm="$w/node_modules"
+    [ -d "$nm" ] || { printf '  %-34s %s\n' "$(basename "$w")" "${DIM}no node_modules${R}"; continue; }
+    size=$(du -sm "$nm" 2>/dev/null | cut -f1)
+    total=$((total + size))
+    sample=$(find "$nm/.pnpm" -type f -name '*.js' 2>/dev/null | head -1)
+    if [ -n "$sample" ] && [ "$(stat -f '%l' "$sample" 2>/dev/null)" -gt 1 ] 2>/dev/null; then
+      linked="${GRN}hardlinked${R}"
+    else
+      linked="${YEL}own copy${R}"; wasted=$((wasted + size))
+    fi
+    printf '  %-34s %5s MB  %s\n' "$(basename "$w")" "$size" "$linked"
+  done
+  printf '  %s%s MB across all worktrees; %s MB of that is duplicated%s\n' "$DIM" "$total" "$wasted" "$R"
+  [ "$wasted" -gt 500 ] && warn "run \`pnpm install\` in those worktrees to convert them (.npmrc hardlinks now)"
+
+  step "Regenerable caches"
+  local caches=0 d
+  for d in $(find "$ROOT" "$ROOT"/.claude/worktrees -maxdepth 4 -type d \( -name '.next' -o -name '.turbo' \) 2>/dev/null); do
+    caches=$((caches + $(du -sm "$d" 2>/dev/null | cut -f1)))
+  done
+  printf '  %-34s %5s MB  %s\n' ".next + .turbo" "$caches" "${DIM}safe to delete, rebuilt on demand${R}"
+  [ -d "$store" ] && printf '  %-34s %5s MB  %s\n' "pnpm store" "$(du -sm "$store" | cut -f1)" "${DIM}shared; \`pnpm store prune\` trims it${R}"
+
+  step "Docker"
+  docker system df 2>/dev/null | sed 's/^/  /' || warn "docker not running"
+  printf '\n  %sBuild cache and unused images are reclaimable with:%s\n' "$DIM" "$R"
+  printf '    docker builder prune -af\n'
+  printf '    docker image prune -a\n'
+  printf '  %sNote: this Docker also serves your other projects, and freeing space inside\n  the VM does not always shrink Docker.raw on the host.%s\n' "$DIM" "$R"
+}
+
 usage() {
   cat <<'HELP'
 stack.sh — run and survey the local `main` stack
@@ -560,6 +603,7 @@ HELP
 case "${1:-status}" in
   up)      cmd_up ;;
   status)  cmd_status ;;
+  disk)    cmd_disk ;;
   sync)    cmd_sync ;;
   watch)   cmd_watch "${2:-120}" ;;
   logs)    LINES_ARG=${2:-80} cmd_logs ;;

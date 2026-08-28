@@ -62,6 +62,18 @@ migrates and seeds it. Both are free — databases are catalog entries, not
 processes, and redis-server already allocates all 16 logical dbs. Ports stay
 shared deliberately: only one agent runs a dev stack at a time.
 
+### Disk
+
+```bash
+pnpm stack disk
+```
+
+Ten worktrees means ten `node_modules`. The root `.npmrc` sets
+`package-import-method=hardlink` so they share inodes with the pnpm store — a
+hardlinked tree costs ~0 MB instead of ~840 MB. A worktree created before that
+landed converts on its next `pnpm install`; `pnpm stack disk` flags which ones
+are still carrying their own copy.
+
 Requires **Node 22** and **pnpm 9** (`corepack enable` picks up the pinned version).
 
 ---
