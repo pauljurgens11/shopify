@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3000,
+      "url": "http://admin.lvh.me:3000"
+    },
+    {
+      "name": "storefront",
+      "port": 3002,
+      "url": "http://demo.lvh.me:3002"
+    },
+    {
+      "name": "api",
+      "port": 3001,
+      "url": "http://api.lvh.me:3001"
+    },
+    {
+      "name": "mail",
+      "port": 8025,
+      "url": "http://localhost:8025"
+    }
+  ]
+}

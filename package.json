@@ -19,6 +19,7 @@
     "db:migrate": "pnpm --filter @merchant/db run migrate",
     "db:setup": "pnpm --filter @merchant/db run setup",
     "db:reset": "pnpm --filter @merchant/db run reset",
+    "db:query": "bash scripts/db-query.sh",
     "seed": "pnpm --filter @merchant/db run seed",
     "e2e": "pnpm --filter @merchant/e2e run test",
     "verify": "node scripts/check-env-parity.mjs && pnpm lint && pnpm typecheck && pnpm test",

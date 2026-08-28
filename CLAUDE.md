@@ -37,6 +37,7 @@ pnpm dev                  # turbo: api :3001, admin :3000, storefront :3002, wor
 | E2E smoke | `pnpm e2e` (Playwright, needs seeded stack) |
 | New migration | `pnpm db:migrate --name NNN_ws{x}_description` |
 | Reseed from scratch | `pnpm db:reset` |
+| Read the database | `pnpm db:query "select …"` (read-only; `tables`, `describe <t>`, `--csv`) |
 | Single package script | `pnpm --filter @merchant/api dev` |
 
 **`pnpm` only. Never `npm` or `yarn`** — a stray lockfile breaks every other agent's install.
@@ -45,6 +46,13 @@ Local URLs: admin `http://admin.lvh.me:3000`, storefront `http://demo.lvh.me:300
 
 **Call the API by the right hostname** — the Host header is load-bearing (§6). Admin calls `api.lvh.me:3001` (same site as the admin, so the SameSite=Lax session cookie is sent; `localhost:3001` silently drops it). Storefront calls `{slug}.lvh.me:3001`, because that Host is what resolves its tenant. Bearer clients may use any host.
 Demo login: `owner@demo.dev` / `password123`.
+
+**Agent tooling** (`.claude/`, committed — it applies to every worktree):
+
+- **See the app.** `.claude/launch.json` defines the preview targets, so Claude Code can boot the stack and drive it in a browser: start `dev` (runs `pnpm dev`, i.e. all four apps), then attach `storefront`, `api` or `mail`. The admin's *first* compile takes ~4 min, so the initial navigate can 404 — reload once it is warm. Pixel-parity work (§7) should be checked this way, not by asking a human to look.
+- **Read the database.** `pnpm db:query` runs SQL against whichever database this checkout's `.env` points at (main's stack uses `merchant_main`, worktrees the shared `merchant`). Postgres enforces read-only on the connection, so writes fail at the server — schema changes still go through a migration.
+- **Guards.** `.claude/settings.json` denies `npm`/`yarn` (§9: a stray lockfile breaks every other agent) and force-pushes, and a `PreToolUse` hook blocks `git commit` while HEAD is `main`. The `.githooks` hooks still run at commit/push time; these just fail earlier and louder.
+- Ports 3000/3001/3002 are shared across worktrees. If a dev server will not bind, the main stack owns them — `pnpm stack status`.
 
 ---
 

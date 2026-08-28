@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm format:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm verify:*)",
+      "Bash(pnpm e2e:*)",
+      "Bash(pnpm db:generate:*)",
+      "Bash(pnpm db:migrate:*)",
+      "Bash(pnpm db:setup:*)",
+      "Bash(pnpm db:query:*)",
+      "Bash(pnpm seed:*)",
+      "Bash(pnpm stack:*)",
+      "Bash(pnpm setup:git)",
+      "Bash(pnpm --filter:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm -s:*)",
+
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git blame:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git config --local --list:*)",
+
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh api:*)",
+
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose exec -T postgres psql:*)",
+      "Bash(docker compose exec -T redis redis-cli:*)",
+      "Bash(docker ps:*)",
+
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -s http://api.lvh.me:*)",
+      "Bash(curl -s http://admin.lvh.me:*)",
+      "Bash(curl -s http://demo.lvh.me:*)",
+      "Bash(curl -sS http://localhost:*)",
+      "Bash(curl -i http://localhost:*)",
+
+      "Bash(node scripts/*)",
+      "Bash(bash scripts/*)",
+      "Bash(rg:*)",
+      "Bash(jq:*)",
+      "Bash(tree:*)",
+      "Bash(lsof -ti:*)"
+    ],
+    "deny": [
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(bunx:*)",
+      "Bash(pnpm dlx:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard origin/main:*)",
+      "Bash(docker compose down -v:*)",
+      "Bash(rm -rf /:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
