@@ -415,6 +415,57 @@ describe('POST /admin/api/orders/:id/cancel', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('GET /admin/api/orders', () => {
+  /**
+   * Shopify's orders index shows "Hiroshi Tanabe", not an email address. The
+   * summary carried only `customerId` and `email`, so the admin's Customer
+   * column had nothing but the email to render — every row of the index read
+   * as a mailing list. The name has to come down with the row: the index does
+   * not fetch each customer separately.
+   */
+  it('carries the customer name on the index row, not just the email', async () => {
+    const nameShop = await createTestShop();
+    shopIds.push(nameShop.shopId);
+    const nameCookie = await sessionCookie(app, {
+      shopId: nameShop.shopId,
+      staffUserId: nameShop.ownerId,
+    });
+    const nameDb = dbForShop(nameShop.shopId);
+
+    const customerId = newId('customer');
+    await dbAdmin.customer.create({
+      data: {
+        id: customerId,
+        shopId: nameShop.shopId,
+        email: 'hiroshi.tanabe@example.com',
+        firstName: 'Hiroshi',
+        lastName: 'Tanabe',
+      },
+    });
+
+    await createOrder(
+      nameDb,
+      nameShop.shopId,
+      orderInput({ customerId, email: 'hiroshi.tanabe@example.com' }),
+    );
+    // A guest order has no customer row at all, and must still serialize.
+    await createOrder(nameDb, nameShop.shopId, orderInput({ email: 'guest@example.com' }));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/api/orders',
+      headers: { cookie: nameCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const rows: { email: string; customer: { firstName: string; lastName: string } | null }[] =
+      res.json().data;
+
+    const named = rows.find((r) => r.email === 'hiroshi.tanabe@example.com');
+    expect(named?.customer).toEqual({ firstName: 'Hiroshi', lastName: 'Tanabe' });
+
+    const guest = rows.find((r) => r.email === 'guest@example.com');
+    expect(guest?.customer).toBeNull();
+  });
+
   it('filters by tab, searches, and pages with a cursor', async () => {
     const listShop = await createTestShop();
     shopIds.push(listShop.shopId);

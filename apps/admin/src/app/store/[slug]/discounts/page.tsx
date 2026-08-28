@@ -166,7 +166,7 @@ export default function DiscountsPage() {
   );
 
   return (
-    <Page title="Discounts" primaryAction={createMenu}>
+    <Page title="Discounts" primaryAction={createMenu} fullWidth>
       <Card padding="0">
         {empty ? (
           <Box padding="800">

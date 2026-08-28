@@ -106,7 +106,7 @@ export default function InventoryPage() {
     row.levels.find((level) => level.locationId === activeLocation?.id)?.available ?? 0;
 
   return (
-    <Page title="Inventory">
+    <Page title="Inventory" fullWidth>
       {/* The dirty grid uses the same contextual save bar as every other admin
           form (PARITY.md → Global chrome), not a second pair of buttons. */}
       <SaveBar
