@@ -164,6 +164,18 @@ export const updateRoutingRulesInput = z.object({
   rules: z.array(routingRuleSchema.omit({ id: true }).partial({ position: true })),
 });
 
+/** Toggle a connected processor without re-sending credentials. */
+export const updateProcessorInput = z.object({
+  displayName: z.string().max(255).optional(),
+  enabled: z.boolean().optional(),
+  testMode: z.boolean().optional(),
+});
+
+/** Capture an authorization. Omit `amount` to capture the full authorization. */
+export const capturePaymentInput = z.object({
+  amount: moneySchema.optional(),
+});
+
 /* --- payments ------------------------------------------------------------- */
 
 export const paymentStatusSchema = z.enum([
