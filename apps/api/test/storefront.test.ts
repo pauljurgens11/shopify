@@ -17,7 +17,7 @@ import { dbAdmin } from '@merchant/db/client';
 import { presetThemeDoc } from '@merchant/theme-engine/presets';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { signThemePreview } from '../src/services/storefront/theme.ts';
+import { signPreviewToken } from '../src/services/themes/preview-token.ts';
 import { buildTestApp, createTestShop, deleteTestShops, type TestShop } from './helpers.ts';
 
 let app: FastifyInstance;
@@ -371,7 +371,7 @@ describe('theme', () => {
   });
 
   it('serves a draft only for a correctly signed preview token', async () => {
-    const signed = signThemePreview(draftThemeId);
+    const signed = signPreviewToken(shop.shopId, draftThemeId);
     const previewed = await get(`/storefront/api/theme?preview=${encodeURIComponent(signed)}`);
     expect(previewed.json().themeVersionId).toBe(draftThemeId);
     // A preview is per-shopper and must never enter a shared cache.
@@ -382,6 +382,21 @@ describe('theme', () => {
       const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(bad)}`);
       expect(response.json().themeVersionId, bad).toBe(publishedThemeId);
     }
+  });
+
+  it('will not honour a validly-signed token minted for another shop', async () => {
+    // This is the one unauthenticated path that can reach an unpublished row,
+    // so the token's shop binding has to be enforced, not merely present.
+    const foreign = signPreviewToken(neighbour.shopId, draftThemeId);
+    const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(foreign)}`);
+    expect(response.json().themeVersionId).toBe(publishedThemeId);
+    expect(response.json().isPreview).toBe(false);
+  });
+
+  it('will not honour an expired token', async () => {
+    const expired = signPreviewToken(shop.shopId, draftThemeId, -1);
+    const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(expired)}`);
+    expect(response.json().themeVersionId).toBe(publishedThemeId);
   });
 
   it('404s a shop with no published theme', async () => {
