@@ -29,6 +29,7 @@ import {
   type OptionDraft,
   PRICE_PATTERN,
   reconcileVariants,
+  renameOptionKeys,
   usableOptions,
   type VariantDraft,
 } from '../../../../../lib/product-draft.ts';
@@ -117,14 +118,19 @@ export function VariantsCard({
   options: OptionDraft[];
   variants: VariantDraft[];
   currencySymbol: string;
-  /** "Available" or "Available at Aurora Warehouse" when there is more than one. */
+  /** Label over the stock column — the value is the sum across locations. */
   stockLabel: string;
   stockEditable: boolean;
   error?: string;
   onChange: (next: { options: OptionDraft[]; variants: VariantDraft[] }) => void;
 }) {
   const setOptions = (next: OptionDraft[]) =>
-    onChange({ options: next, variants: reconcileVariants(next, variants) });
+    // Renamed options are re-keyed first, so editing a name keeps every row's
+    // id, price, sku and stock instead of regenerating the table from scratch.
+    onChange({
+      options: next,
+      variants: reconcileVariants(next, renameOptionKeys(options, next, variants)),
+    });
 
   const setVariant = (index: number, patch: Partial<VariantDraft>) =>
     onChange({

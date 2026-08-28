@@ -301,7 +301,16 @@ export function CollectionForm({
                       },
                     ]}
                     selected={[draft.type]}
-                    onChange={([type]) => patch({ type: type as Draft['type'] })}
+                    onChange={([type]) =>
+                      patch({
+                        type: type as Draft['type'],
+                        // A smart collection has no dragged positions; without
+                        // this the Select showed one order and saved another.
+                        ...(type === 'smart' && draft.sortOrder === 'manual'
+                          ? { sortOrder: 'created-desc' }
+                          : {}),
+                      })
+                    }
                   />
                 )}
               </BlockStack>

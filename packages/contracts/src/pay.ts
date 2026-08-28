@@ -222,6 +222,12 @@ export const paymentMethodSchema = z
     isDefault: z.boolean().default(false),
   })
   .merge(timestampsSchema);
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+/** The order page's card list: one customer's saved cards, nothing broader. */
+export const listPaymentMethodsQuery = z.object({
+  customerId: idSchema,
+});
 
 /** Admin "charge saved card" on order detail. */
 export const chargeSavedCardInput = z.object({

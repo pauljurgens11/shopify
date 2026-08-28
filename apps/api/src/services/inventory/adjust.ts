@@ -244,7 +244,11 @@ export async function adjustMany(
 
       // `deny` is Shopify's "stop selling when out of stock"; `continue` is the
       // merchant explicitly allowing an oversell, so negative is legitimate.
-      if (level.available < 0 && policies.get(input.variantId) === 'deny') {
+      // Only a DECREMENT is policed: a level can already be negative (oversold
+      // under `continue`, policy flipped to `deny` later), and refusing the
+      // positive delta that digs it out would block restocks — and fail the
+      // refund/cancel batches that restock through this service.
+      if (input.delta < 0 && level.available < 0 && policies.get(input.variantId) === 'deny') {
         throw conflict(
           `Only ${level.available - input.delta} available; that would leave ${level.available}.`,
           'delta',

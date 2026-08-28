@@ -121,14 +121,15 @@ export function buildWebhookEventJob(
  * job — the caller only says what happened.
  *
  * Deliberately never throws: an order must not fail to save because Redis
- * blinked (DECISIONS.md). Returns whether the job was actually queued, so a
- * caller that cares can say so.
+ * blinked (DECISIONS.md). Returns the id of the event it queued, or null if it
+ * could not — a caller that shows the merchant a delivery needs to say WHICH
+ * one, and a bare boolean cannot (DECISIONS.md).
  */
 export async function emitWebhookEvent(
   shopId: string,
   topic: WebhookTopic,
   data: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<string | null> {
   const job = buildWebhookEventJob(shopId, topic, data);
   try {
     await enqueue(QUEUES.webhooks, JOB_NAMES.webhookDeliver, job, {
@@ -136,12 +137,12 @@ export async function emitWebhookEvent(
       attempts: WEBHOOK_MAX_ATTEMPTS,
       backoff: { type: 'exponential', delay: 2_000 },
     });
-    return true;
+    return job.eventId;
   } catch (err) {
     console.warn(
       `queue: dropped ${topic} for ${shopId} — ${err instanceof Error ? err.message : String(err)}`,
     );
-    return false;
+    return null;
   }
 }
 

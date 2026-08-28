@@ -38,6 +38,9 @@ declare module 'fastify' {
     staffUserId?: string;
     staffRole?: StaffRole;
     staffPermissions?: Permissions;
+    /** Bearer requests only: the installed app and the scopes it was granted. */
+    appId?: string;
+    appScopes?: string[];
     /** Present on session requests; logout needs it. */
     sessionId?: string;
     authKind?: AuthKind;
@@ -128,13 +131,17 @@ async function resolveFromBearer(request: FastifyRequest): Promise<void> {
 
   const installed = await dbAdmin.app.findUnique({
     where: { apiTokenHash: tokenHash },
-    select: { shopId: true, uninstalledAt: true },
+    select: { id: true, shopId: true, uninstalledAt: true, scopes: true },
   });
   if (!installed || installed.uninstalledAt) {
     throw unauthorized('Invalid Admin API access token.');
   }
 
   request.shopId = installed.shopId;
+  request.appId = installed.id;
+  // `requirePermission` waves Bearer through; `requireScope` (G4) is what
+  // actually authorizes an Admin API call, and it reads these.
+  request.appScopes = installed.scopes;
   request.authKind = 'bearer';
 }
 
@@ -147,6 +154,8 @@ export default fp(
     app.decorateRequest('staffPermissions', undefined);
     app.decorateRequest('sessionId', undefined);
     app.decorateRequest('authKind', undefined);
+    app.decorateRequest('appId', undefined);
+    app.decorateRequest('appScopes', undefined);
 
     // Getter, so `request.db` is impossible to read before a shop is resolved.
     // dbForShop memoizes per shopId, so repeated reads are cheap.
