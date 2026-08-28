@@ -32,6 +32,7 @@ export const ID_PREFIXES = {
   routingRule: 'rule',
   app: 'app',
   webhook: 'wh',
+  webhookDelivery: 'whd',
   theme: 'thm',
   conversation: 'conv',
   event: 'evt',

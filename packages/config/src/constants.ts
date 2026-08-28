@@ -30,7 +30,12 @@ export type WebhookTopic = (typeof WEBHOOK_TOPICS)[number];
 
 export const WEBHOOK_HMAC_HEADER = 'x-merchant-hmac-sha256';
 export const WEBHOOK_TOPIC_HEADER = 'x-merchant-topic';
+export const WEBHOOK_SHOP_HEADER = 'x-merchant-shop-id';
+/** Stable across retries — receivers de-duplicate on it (SPEC §13 idempotency). */
+export const WEBHOOK_EVENT_HEADER = 'x-merchant-event-id';
 export const WEBHOOK_MAX_ATTEMPTS = 5;
+/** Merchant-supplied URLs. A hung endpoint must not pin a worker slot. */
+export const WEBHOOK_TIMEOUT_MS = 5_000;
 
 /** SPEC §8 — staff permission areas. `owner`/`admin` bypass these. */
 export const PERMISSION_AREAS = [

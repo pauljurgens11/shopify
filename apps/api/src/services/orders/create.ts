@@ -20,8 +20,9 @@ import {
 import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { badRequest } from '../../lib/errors.ts';
+import { recordPurchaseEvent } from '../analytics/record.ts';
+import { loadOrderDetail } from './detail.ts';
 import { notifyOrder } from './notify.ts';
-import { toOrderDetail } from './serialize.ts';
 
 type Parsed = ReturnType<typeof createOrderInput.parse>;
 
@@ -208,6 +209,15 @@ export async function createOrder(
     return created;
   });
 
+  // Revenue the dashboard can trust: the beacon drops browser-sent purchases,
+  // so this is the only place a `purchase` event is born (SPEC §13).
+  await recordPurchaseEvent(db, shopId, {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    total: order.total,
+    createdAt: order.createdAt,
+  });
+
   await notifyOrder({
     shopId,
     topic: 'orders/create',
@@ -220,5 +230,5 @@ export async function createOrder(
     },
   });
 
-  return toOrderDetail(order);
+  return loadOrderDetail(db, order.id);
 }

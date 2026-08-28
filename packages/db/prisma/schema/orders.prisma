@@ -105,10 +105,13 @@ model Fulfillment {
 }
 
 model Refund {
-  id              String  @id
-  shopId          String
-  orderId         String
-  amount          Int
+  id     String @id
+  shopId String
+  orderId String
+  amount  Int
+  // The part of `amount` that came off shipping. Without it a second refund
+  // cannot tell how much shipping is left to give back.
+  shippingAmount  Int     @default(0)
   reason          String?
   note            String?
   lineItems       Json    @default("[]")

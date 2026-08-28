@@ -12,6 +12,8 @@ import { newId } from '@merchant/config/ids';
 import {
   addOrderNoteInput,
   cancelOrderInput,
+  createFulfillmentInput,
+  createRefundInput,
   listOrdersQuery,
   updateOrderInput,
 } from '@merchant/contracts/orders';
@@ -20,8 +22,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { notFound } from '../../../lib/errors.ts';
 import { requirePermission } from '../../../lib/permissions.ts';
 import { cancelOrder } from '../../../services/orders/cancel.ts';
+import { loadOrderDetail } from '../../../services/orders/detail.ts';
+import { fulfillOrder } from '../../../services/orders/fulfill.ts';
 import { listOrders } from '../../../services/orders/list.ts';
-import { toOrderDetail } from '../../../services/orders/serialize.ts';
+import { previewRefund, refundOrder } from '../../../services/orders/refund.ts';
 
 /** Who to attribute a timeline entry to. Staff email is what C5 shows. */
 async function actorFor(request: FastifyRequest): Promise<string | null> {
@@ -31,29 +35,6 @@ async function actorFor(request: FastifyRequest): Promise<string | null> {
     select: { email: true },
   });
   return user?.email ?? null;
-}
-
-async function loadDetail(request: FastifyRequest, id: string) {
-  const order = await request.db.order.findUnique({
-    where: { id },
-    include: {
-      lineItems: true,
-      events: { orderBy: { createdAt: 'asc' } },
-      customer: {
-        select: { id: true, email: true, firstName: true, lastName: true, ordersCount: true },
-      },
-    },
-  });
-  if (!order) throw notFound('Order');
-
-  // Payments are joined by orderId rather than by a relation — Pay owns those
-  // rows and this endpoint only reads them.
-  const payments = await request.db.payment.findMany({
-    where: { orderId: id },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  return toOrderDetail(order, { payments });
 }
 
 export default async function routes(app: FastifyInstance) {
@@ -70,7 +51,7 @@ export default async function routes(app: FastifyInstance) {
   /* ---------------------------------------------------------------- detail */
   app.get('/:id', async (request) => {
     const { id } = request.params as { id: string };
-    return loadDetail(request, id);
+    return loadOrderDetail(request.db, id);
   });
 
   /* ------------------------------------------------- note / tags / contact */
@@ -94,7 +75,7 @@ export default async function routes(app: FastifyInstance) {
     });
     if (count === 0) throw notFound('Order');
 
-    return loadDetail(request, id);
+    return loadOrderDetail(request.db, id);
   });
 
   /* ---------------------------------------------------------------- cancel */
@@ -103,6 +84,45 @@ export default async function routes(app: FastifyInstance) {
     const input = cancelOrderInput.parse(request.body ?? {});
     // requireShop already ran: an admin route without a shop never gets here.
     return cancelOrder(request.db, request.shopId as string, id, input, await actorFor(request));
+  });
+
+  /* ----------------------------------------------------------- fulfilment */
+  app.post('/:id/fulfillments', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = createFulfillmentInput.parse(request.body);
+    const order = await fulfillOrder(
+      request.db,
+      request.shopId as string,
+      id,
+      input,
+      await actorFor(request),
+    );
+    return reply.status(201).send(order);
+  });
+
+  /* --------------------------------------------------------------- refunds */
+  // Preview first: C5's refund form shows these numbers before the merchant
+  // commits, the same way Shopify does, and it must be the same arithmetic.
+  app.post('/:id/refunds/calculate', async (request) => {
+    const { id } = request.params as { id: string };
+    const input = createRefundInput.partial().parse(request.body ?? {});
+    return previewRefund(request.db, id, {
+      lineItems: input.lineItems,
+      shippingAmount: input.shippingAmount?.amount,
+    });
+  });
+
+  app.post('/:id/refunds', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = createRefundInput.parse(request.body);
+    const order = await refundOrder(
+      request.db,
+      request.shopId as string,
+      id,
+      input,
+      await actorFor(request),
+    );
+    return reply.status(201).send(order);
   });
 
   /* -------------------------------------------------------- timeline note */

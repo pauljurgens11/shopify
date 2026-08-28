@@ -369,7 +369,7 @@ describe('POST /admin/api/orders/:id/cancel', () => {
       where: { variantId: stocked.variantId, referenceId: order.id },
     });
     expect(adjustment.delta).toBe(3);
-    expect(adjustment.reason).toBe('restocked');
+    expect(adjustment.reason).toBe('restock');
   });
 
   it('refuses to cancel a paid order — it must be refunded first', async () => {

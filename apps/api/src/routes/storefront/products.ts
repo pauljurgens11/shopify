@@ -26,15 +26,15 @@ export default async function routes(app: FastifyInstance) {
 
     // `?collection=` is the search page's filter; the collection page itself
     // uses /collections/:handle/products, which also returns the collection.
-    const collectionId = query.collection
-      ? (await getStorefrontCollection(request.db, query.collection)).id
+    const membership = query.collection
+      ? (await getStorefrontCollection(request.db, query.collection)).membership
       : undefined;
 
     cacheable(reply);
     return storefrontProductListResponse.parse(
       await listStorefrontProducts(request.db, await shopCurrency(request.db), {
         ...query,
-        collectionId,
+        membership,
       }),
     );
   });

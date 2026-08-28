@@ -39,7 +39,19 @@
       },
       "style": {
         "useImportType": "error",
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "warn",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "@merchant/db/client": {
+                "importNames": ["dbAdmin"],
+                "message": "dbAdmin is unscoped \u2014 request handlers use request.db / dbForShop (CLAUDE.md \u00a76). The sanctioned exceptions (signup, platform auth lookup, vault origin lookup, seeds, tests) are allowlisted in this file's overrides; if your use genuinely qualifies, add it there in the same PR and say why."
+              },
+              "@prisma/client": "Construct no raw Prisma client outside packages/db \u2014 import types and dbForShop via @merchant/db/* so every query stays behind the tenancy boundary."
+            }
+          }
+        }
       },
       "correctness": {
         "noUnusedImports": "error",
@@ -47,6 +59,28 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": [
+        "packages/db/**",
+        "apps/api/src/plugins/tenancy.ts",
+        "apps/api/src/routes/auth/**",
+        "apps/api/src/routes/vault/**",
+        "apps/worker/scripts/**",
+        "apps/worker/src/jobs/analytics-rollup.ts",
+        "apps/api/test/**",
+        "**/*.test.ts",
+        "e2e/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
