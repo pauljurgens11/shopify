@@ -1,83 +1,147 @@
 /**
- * Seed (SPEC §7). Harness owned by WS-A; the demo content is WS-H's.
+ * Seed (SPEC §7) — **the seed IS the demo**.
  *
- * **The seed IS the demo.** It must end up looking like a real store, not test
- * fixtures: "Aurora Supply Co.", ~30 apparel products with real-looking images,
- * 40 orders spread over 60 days so analytics has a shape to it.
+ * It builds Aurora Supply Co., a small-run Portland apparel label: ~30 products
+ * with real photography, two locations with stock history, 25 customers, 40
+ * orders across 60 days, three discounts, a connected processor, a published
+ * theme and sixty days of analytics. Everything a reviewer clicks in the admin
+ * is data written here, so it has to look like a store rather than a fixture
+ * (CLAUDE.md §8).
  *
- * What exists today is the minimum that makes the stack resolvable: one shop and
- * its owner. Everything below the marker is WS-H's to build out.
+ * Two properties it must keep:
  *
- * Idempotent by construction — `pnpm seed` twice in a row is a normal thing to do.
+ *   **Deterministic** — one fixed RNG seed (`random.ts`), no `Math.random()`,
+ *   no unseeded dates. Eight agents run `pnpm db:reset` all day; a store that
+ *   reshuffles itself makes every screenshot and bug report irreproducible.
+ *
+ *   **Idempotent** — running it twice is normal. It wipes the demo shop's rows
+ *   and rebuilds them, which is the only way the SPEC §7 counts stay exact.
+ *
+ * `dbAdmin` (unscoped) is sanctioned here — seed is one of the four call sites
+ * (SPEC §6). Every row still sets `shopId` explicitly.
  */
 
-import { newId } from '@merchant/config/ids';
-import { hash } from '@node-rs/argon2';
+import { pathToFileURL } from 'node:url';
 import { dbAdmin } from '../../src/client.ts';
+import { createAnalytics } from './analytics.ts';
+import { createCatalog } from './catalog.ts';
+import { createCollections } from './collections.ts';
+import type { SeedContext } from './context.ts';
+import { createCustomers } from './customers.ts';
+import { createDiscounts } from './discounts.ts';
+import { applyStockCorrections, InventoryLedger } from './inventory.ts';
+import { createOrders } from './orders.ts';
+import { createRng } from './random.ts';
+import {
+  applyShopSettings,
+  createLocations,
+  createProcessor,
+  createShop,
+  createStaff,
+  createTheme,
+  DEMO_OWNER_EMAIL,
+  DEMO_PASSWORD,
+  DEMO_SHOP_SLUG,
+  resetDemoData,
+  TAX_RATE_PERCENTAGE,
+} from './shop.ts';
 
-const DEMO_SHOP_SLUG = 'demo';
-const DEMO_OWNER_EMAIL = 'owner@demo.dev';
-const DEMO_OWNER_PASSWORD = 'password123';
+export { DEMO_OWNER_EMAIL, DEMO_PASSWORD, DEMO_SHOP_SLUG } from './shop.ts';
 
-async function main() {
-  console.log('seeding…');
-
-  // dbAdmin is correct here: seed is one of the four sanctioned unscoped call
-  // sites (SPEC §6). Every tenant row below sets shopId explicitly.
-  const shop = await dbAdmin.shop.upsert({
-    where: { slug: DEMO_SHOP_SLUG },
-    update: {},
-    create: {
-      id: newId('shop'),
-      slug: DEMO_SHOP_SLUG,
-      name: 'Aurora Supply Co.',
-      email: DEMO_OWNER_EMAIL,
-      currencyCode: 'USD',
-      timezone: 'America/New_York',
-      plan: 'trial',
-    },
-  });
-
-  // Per-shop order numbers start at #1001, like Shopify (SPEC §5).
-  await dbAdmin.orderSequence.upsert({
-    where: { shopId: shop.id },
-    update: {},
-    create: { shopId: shop.id },
-  });
-
-  // argon2id — the same hasher the login route uses (SPEC §8).
-  const passwordHash = await hash(DEMO_OWNER_PASSWORD);
-
-  await dbAdmin.staffUser.upsert({
-    where: { shopId_email: { shopId: shop.id, email: DEMO_OWNER_EMAIL } },
-    update: {},
-    create: {
-      id: newId('user'),
-      shopId: shop.id,
-      email: DEMO_OWNER_EMAIL,
-      passwordHash,
-      firstName: 'Aurora',
-      lastName: 'Owner',
-      role: 'owner',
-      permissions: {},
-    },
-  });
-
-  console.log(`  shop  ${shop.slug} (${shop.id})`);
-  console.log(`  staff ${DEMO_OWNER_EMAIL} / ${DEMO_OWNER_PASSWORD}`);
-
-  // ---------------------------------------------------------------------------
-  // TODO(WS-H): the actual demo — 2 locations, ~30 products with images,
-  // 4 collections, 25 customers, 40 orders over 60 days, 3 discounts,
-  // mock processor connected, one published AI theme.
-  // ---------------------------------------------------------------------------
-
-  console.log('seed complete');
+export interface SeedSummary {
+  shopId: string;
+  products: number;
+  variants: number;
+  customers: number;
+  orders: number;
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(() => dbAdmin.$disconnect());
+export async function seedDemo(): Promise<SeedSummary> {
+  const shop = await createShop(dbAdmin);
+  await resetDemoData(dbAdmin, shop.id);
+
+  const ctx: SeedContext = {
+    shopId: shop.id,
+    // Captured once: every relative timestamp in this run is derived from it, so
+    // orders, adjustments, events and rollups all agree on what "today" means.
+    now: new Date(),
+    rng: createRng(),
+    currencyCode: 'USD',
+    taxRatePercentage: TAX_RATE_PERCENTAGE,
+  };
+
+  await applyShopSettings(dbAdmin, ctx);
+  await createStaff(dbAdmin, ctx);
+
+  const locations = await createLocations(dbAdmin, ctx);
+  const ledger = new InventoryLedger(ctx.shopId);
+
+  const products = await createCatalog(dbAdmin, ctx, locations, ledger);
+  await createCollections(dbAdmin, ctx, products);
+
+  const customers = await createCustomers(dbAdmin, ctx);
+  const discounts = await createDiscounts(dbAdmin, ctx);
+
+  await createProcessor(dbAdmin, ctx);
+  await createTheme(dbAdmin, ctx);
+
+  const orders = await createOrders(dbAdmin, ctx, {
+    products,
+    customers,
+    locations,
+    discounts,
+    ledger,
+  });
+
+  // A handful of genuinely sold-out variants: two everywhere (storefront
+  // sold-out badge) and four more only in the store (the per-location split B6
+  // renders). Deliberate, because 40 orders never exhaust a warehouse.
+  const sellableVariants = products
+    .filter((p) => p.status === 'active')
+    .flatMap((p) => p.variants.map((v) => v.id));
+  const soldOut = ctx.rng.sample(sellableVariants, 2);
+  const storeOnly = ctx.rng.sample(
+    sellableVariants.filter((id) => !soldOut.includes(id)),
+    4,
+  );
+  applyStockCorrections(ledger, soldOut, [locations.retail.id, locations.warehouse.id], ctx.now);
+  applyStockCorrections(ledger, storeOnly, [locations.retail.id], ctx.now);
+
+  // Last: the ledger has now collected opening stock, sales, restocks and
+  // corrections, and writes the levels their sum implies (inventory.ts).
+  await ledger.flush(dbAdmin);
+
+  await createAnalytics(dbAdmin, ctx, { products, orders });
+
+  return {
+    shopId: shop.id,
+    products: products.length,
+    variants: products.reduce((acc, p) => acc + p.variants.length, 0),
+    customers: customers.length,
+    orders: orders.length,
+  };
+}
+
+/**
+ * Only run when invoked as a script — `seed.test.ts` imports `seedDemo` directly
+ * and must not trigger a second run on import. The canonical ESM entrypoint
+ * check, rather than a substring match on the path: a checkout living under a
+ * directory with "seed" in its name would defeat that.
+ */
+const entrypoint = process.argv[1];
+if (entrypoint !== undefined && import.meta.url === pathToFileURL(entrypoint).href) {
+  seedDemo()
+    .then((summary) => {
+      console.log(`  shop      ${DEMO_SHOP_SLUG} (${summary.shopId})`);
+      console.log(`  staff     ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD}`);
+      console.log(
+        `  catalog   ${summary.products} products · ${summary.variants} variants · ${summary.customers} customers · ${summary.orders} orders`,
+      );
+      console.log('seed complete');
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    })
+    .finally(() => dbAdmin.$disconnect());
+}
