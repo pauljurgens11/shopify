@@ -22,8 +22,10 @@ export type PreviewTarget = {
 
 /** `{slug}.{origin-host}` — the origin is a bare domain, the shop is a subdomain. */
 export function storefrontOrigin(shopSlug: string, origin: string = STOREFRONT_ORIGIN): string {
-  const [protocol, host] = origin.split('://');
-  return `${protocol ?? 'http'}://${shopSlug}.${host ?? 'lvh.me:3002'}`;
+  // Tolerate a scheme-less origin in the env var; a naive split would have
+  // glued the host into the protocol slot and produced `lvh.me:3002://…`.
+  const [protocol, host] = origin.includes('://') ? origin.split('://') : ['http', origin];
+  return `${protocol}://${shopSlug}.${host}`;
 }
 
 function pathFor(target: PreviewTarget): string {

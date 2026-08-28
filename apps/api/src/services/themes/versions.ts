@@ -88,7 +88,10 @@ export async function getVersion(db: TenantClient, id: string) {
  * storefront picks whichever `findFirst` happens to return.
  */
 export async function publishVersion(db: TenantClient, id: string) {
-  await getVersion(db, id);
+  const row = await getVersion(db, id);
+  // createDraft/restoreVersion validate on the way in; publish must validate
+  // too, or a bad row promoted here becomes the doc the storefront trusts.
+  assertValidThemeDoc(row.themeJson);
   return db.$transaction(async (tx) => {
     await tx.themeVersion.updateMany({
       where: { status: 'published', id: { not: id } },

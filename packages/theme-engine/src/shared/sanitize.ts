@@ -22,7 +22,8 @@ const OPTIONS: sanitizeHtml.IOptions = {
   transformTags: {
     a: (tagName, attribs) => {
       const next: Record<string, string> = { ...attribs };
-      if (next.target === '_blank') next.rel = 'noopener noreferrer';
+      // Any target (not just `_blank`) can open a window with a live opener.
+      if (next.target !== undefined) next.rel = 'noopener noreferrer';
       return { tagName, attribs: next };
     },
   },
