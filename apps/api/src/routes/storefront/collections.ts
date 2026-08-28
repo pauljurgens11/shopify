@@ -12,10 +12,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { cacheable } from '../../services/storefront/cache.ts';
-import {
-  collectionSortOrder,
-  getStorefrontCollection,
-} from '../../services/storefront/collections.ts';
+import { getStorefrontCollection } from '../../services/storefront/collections.ts';
 import { listStorefrontProducts } from '../../services/storefront/products.ts';
 import { shopCurrency } from '../../services/storefront/shop.ts';
 
@@ -28,14 +25,14 @@ export default async function routes(app: FastifyInstance) {
     const { handle } = handleParam.parse(request.params);
     const query = collectionQuery.parse(request.query);
 
-    const { id, collection } = await getStorefrontCollection(request.db, handle);
+    const { collection, membership, sortOrder } = await getStorefrontCollection(request.db, handle);
     const page = await listStorefrontProducts(request.db, await shopCurrency(request.db), {
       limit: query.limit,
       cursor: query.cursor,
       query: query.query,
       // The merchant's chosen order is the default; an explicit ?sort= wins.
-      sort: query.sort ?? (await collectionSortOrder(request.db, id)),
-      collectionId: id,
+      sort: query.sort ?? sortOrder,
+      membership,
     });
 
     cacheable(reply);

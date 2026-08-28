@@ -102,14 +102,16 @@ export async function createCollections(
       },
     });
 
-    members.forEach((product, position) => {
+    // Manual collections only. B3 resolves a smart collection's membership from
+    // its rule set on every read and materializes nothing, so join rows here
+    // would be dead data that reads as if membership were stored.
+    const stored = definition.type === 'manual' ? members : [];
+    stored.forEach((product, position) => {
       joinRows.push({
         shopId: ctx.shopId,
         collectionId: id,
         productId: product.id,
-        // Smart collections have no manual order; leaving position 0 across the
-        // set is what B3 will see when it recomputes membership from the rules.
-        position: definition.type === 'manual' ? position : 0,
+        position,
       });
     });
 

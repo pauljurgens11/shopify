@@ -17,7 +17,7 @@ import { dbAdmin } from '@merchant/db/client';
 import { presetThemeDoc } from '@merchant/theme-engine/presets';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { signThemePreview } from '../src/services/storefront/theme.ts';
+import { signPreviewToken } from '../src/services/themes/preview-token.ts';
 import { buildTestApp, createTestShop, deleteTestShops, type TestShop } from './helpers.ts';
 
 let app: FastifyInstance;
@@ -151,7 +151,7 @@ beforeAll(async () => {
     handle: 'alpine-merino-crewneck',
     title: 'Alpine Merino Crewneck',
     price: 14800,
-    tags: ['knitwear'],
+    tags: ['knitwear', 'new'],
     variants: [
       { key: 'alpineS', title: 'S', stock: 3 },
       { key: 'alpineM', title: 'M', price: 15200, stock: 0 },
@@ -221,6 +221,24 @@ beforeAll(async () => {
         position: 1,
       },
     ],
+  });
+
+  await dbAdmin.collection.create({
+    data: {
+      id: newId('collection'),
+      shopId: shop.shopId,
+      title: 'New Arrivals',
+      handle: 'new-arrivals',
+      type: 'smart',
+      descriptionHtml: '<p>Just landed</p>',
+      sortOrder: 'created-desc',
+      // Deliberately NO CollectionProduct rows: B3 resolves smart membership on
+      // read from the rule set, so anything that reads join rows sees nothing.
+      ruleSet: {
+        appliedDisjunctively: false,
+        rules: [{ column: 'tag', relation: 'equals', condition: 'new' }],
+      },
+    },
   });
 
   publishedThemeId = newId('theme');
@@ -306,6 +324,20 @@ describe('product visibility', () => {
     expect(handles).toEqual(['alpine-merino-crewneck']);
   });
 
+  it('resolves a smart collection from its rules, not from join rows', async () => {
+    // B3 materializes nothing — membership is a `where` evaluated on read. A
+    // storefront that reads CollectionProduct would show an empty collection
+    // page for every smart collection a merchant creates.
+    const response = await get('/storefront/api/collections/new-arrivals/products');
+    expect(response.statusCode).toBe(200);
+
+    const handles = response.json().data.map((p: { handle: string }) => p.handle);
+    expect(handles).toContain('alpine-merino-crewneck');
+    // The draft carries no `new` tag, and would be filtered by status anyway.
+    expect(handles).not.toContain('quarry-shearling-coat');
+    expect(response.json().collection.productCount).toBe(handles.length);
+  });
+
   it('scopes `?query=` to this tenant', async () => {
     const response = await get('/storefront/api/products?query=Alpine');
     const prices = response
@@ -371,7 +403,7 @@ describe('theme', () => {
   });
 
   it('serves a draft only for a correctly signed preview token', async () => {
-    const signed = signThemePreview(draftThemeId);
+    const signed = signPreviewToken(shop.shopId, draftThemeId);
     const previewed = await get(`/storefront/api/theme?preview=${encodeURIComponent(signed)}`);
     expect(previewed.json().themeVersionId).toBe(draftThemeId);
     // A preview is per-shopper and must never enter a shared cache.
@@ -382,6 +414,21 @@ describe('theme', () => {
       const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(bad)}`);
       expect(response.json().themeVersionId, bad).toBe(publishedThemeId);
     }
+  });
+
+  it('will not honour a validly-signed token minted for another shop', async () => {
+    // This is the one unauthenticated path that can reach an unpublished row,
+    // so the token's shop binding has to be enforced, not merely present.
+    const foreign = signPreviewToken(neighbour.shopId, draftThemeId);
+    const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(foreign)}`);
+    expect(response.json().themeVersionId).toBe(publishedThemeId);
+    expect(response.json().isPreview).toBe(false);
+  });
+
+  it('will not honour an expired token', async () => {
+    const expired = signPreviewToken(shop.shopId, draftThemeId, -1);
+    const response = await get(`/storefront/api/theme?preview=${encodeURIComponent(expired)}`);
+    expect(response.json().themeVersionId).toBe(publishedThemeId);
   });
 
   it('404s a shop with no published theme', async () => {

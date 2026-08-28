@@ -117,14 +117,16 @@ export type ListOptions = {
   cursor?: string;
   query?: string;
   sort: string;
-  collectionId?: string;
+  /** Collection membership as a `where`, from `getStorefrontCollection`. */
+  membership?: Prisma.ProductWhereInput;
 };
 
 function listWhere(options: ListOptions): Prisma.ProductWhereInput {
   const where: Prisma.ProductWhereInput = { ...VISIBLE };
-  if (options.collectionId) {
-    where.collections = { some: { collectionId: options.collectionId } };
-  }
+  // ANDed as its own clause: a smart collection's rule set is an arbitrary
+  // where, which may itself carry OR/AND and must not collide with the search
+  // clause below.
+  if (options.membership) where.AND = [options.membership];
 
   const search = options.query?.trim();
   if (search) {

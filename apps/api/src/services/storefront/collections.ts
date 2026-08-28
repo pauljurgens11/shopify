@@ -1,50 +1,69 @@
 /**
  * Storefront collection reads (SPEC §10). Owner: WS-E.
  *
- * Membership is read from the `CollectionProduct` join table for BOTH manual
- * and smart collections — the storefront never evaluates a rule set. Shopify
- * materializes smart-collection membership the same way, and it is what keeps
- * this query one indexed join instead of a rule interpreter on the hot path.
+ * Membership is whatever B3 says it is. A manual collection is its join rows; a
+ * smart one is its rule set translated to a product `where` by
+ * `smartCollectionWhere`, which B3 exports for exactly this. Nothing is
+ * materialized, so nothing can go stale — and the storefront cannot disagree
+ * with the admin about which products are in a collection.
  *
- * That makes it B3's job to keep the join table in step with a smart
- * collection's rules (logged in DECISIONS.md). If B3 moves to evaluating rules
- * at query time instead, `collectionProductIds` below is the single place the
- * storefront has to change.
+ * `productCount` is derived from the same clause, filtered to live products: a
+ * badge reading "12 products" over a grid of four is worse than no badge.
  */
+
+import { collectionRuleSetSchema } from '@merchant/contracts/collections';
 import type { StorefrontCollection } from '@merchant/contracts/storefront';
 import { storefrontCollectionSchema } from '@merchant/contracts/storefront';
+import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { notFound } from '../../lib/errors.ts';
+import { smartCollectionWhere } from '../catalog/collections.ts';
+
+export interface ResolvedCollection {
+  id: string;
+  collection: StorefrontCollection;
+  /** Membership as a product `where`, ready to AND with the visibility filter. */
+  membership: Prisma.ProductWhereInput;
+  /** The merchant's chosen order, used when the request does not override it. */
+  sortOrder: string;
+}
+
+function membershipWhere(row: {
+  id: string;
+  type: string;
+  ruleSet: Prisma.JsonValue;
+}): Prisma.ProductWhereInput {
+  if (row.type === 'manual') return { collections: { some: { collectionId: row.id } } };
+
+  // A stored rule set is JSON; parsing it here means a bad row fails loudly
+  // rather than quietly resolving to the whole catalogue.
+  const ruleSet = row.ruleSet === null ? null : collectionRuleSetSchema.parse(row.ruleSet);
+  return ruleSet ? smartCollectionWhere(ruleSet) : { id: { in: [] } };
+}
 
 export async function getStorefrontCollection(
   db: TenantClient,
   handle: string,
-): Promise<{ id: string; collection: StorefrontCollection }> {
-  const row = await db.collection.findFirst({
-    where: { handle },
-    include: {
-      // Only live products count towards the badge — a collection reading
-      // "12 products" that renders four is worse than no count at all.
-      _count: { select: { products: { where: { product: { status: 'active' } } } } },
-    },
-  });
+): Promise<ResolvedCollection> {
+  const row = await db.collection.findFirst({ where: { handle } });
   if (!row) throw notFound('Collection');
+
+  const membership = membershipWhere(row);
+  const productCount = await db.product.count({
+    where: { AND: [{ status: 'active' }, membership] },
+  });
 
   return {
     id: row.id,
+    membership,
+    sortOrder: row.sortOrder,
     collection: storefrontCollectionSchema.parse({
       id: row.id,
       title: row.title,
       handle: row.handle,
       descriptionHtml: row.descriptionHtml,
       imageUrl: row.imageUrl,
-      productCount: row._count.products,
+      productCount,
     }),
   };
-}
-
-/** The collection's own default sort, used when the request does not override it. */
-export async function collectionSortOrder(db: TenantClient, id: string): Promise<string> {
-  const row = await db.collection.findFirst({ where: { id }, select: { sortOrder: true } });
-  return row?.sortOrder ?? 'manual';
 }
