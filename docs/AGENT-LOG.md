@@ -25,3 +25,4 @@ Format: `YYYY-MM-DD HH:MM | WS-X | message`
 2026-08-28T13:05Z | WS-F | WS-F (F2): the 13 marketing sections are still placeholders. Build on `src/shared/` and take `SectionProps<'hero'>` for props; `render.test.tsx` already fails the build on a hardcoded colour in `sections/` or `shared/`.
 2026-08-28T13:20Z | WS-F | DONE F1 | PR #7
 2026-08-28T09:35Z | WS-D | CLAIM D2 (processor adapters: mock, stripe, maverick) | branch ws-d/adapters
+2026-08-28T09:48Z | WS-D | DONE D2 (processor adapters) | PR #9 — mock/stripe/maverick implemented, adapters no longer throw. ProcessorAdapter.authorize now takes CardMaterial (PAN) as its 2nd arg: D3 must detokenize via vault.getCard and pass it through. `…0119` hard-fails on mock and APPROVES on maverick — that pair is the failover demo. TEST_CARDS + maverickMode exported from @merchant/pay/index for D4/H1/H2.
