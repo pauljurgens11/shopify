@@ -24,3 +24,4 @@ Format: `YYYY-MM-DD HH:MM | WS-X | message`
 2026-08-28T13:05Z | WS-F | WS-H (H1): presets reference exactly one collection handle, `featured` — enforced by `presets.test.ts`. Aurora is the preset to seed as the published theme (`DEFAULT_PRESET`).
 2026-08-28T13:05Z | WS-F | WS-F (F2): the 13 marketing sections are still placeholders. Build on `src/shared/` and take `SectionProps<'hero'>` for props; `render.test.tsx` already fails the build on a hardcoded colour in `sections/` or `shared/`.
 2026-08-28T13:20Z | WS-F | DONE F1 | PR #7
+2026-08-28T09:35Z | WS-D | CLAIM D2 (processor adapters: mock, stripe, maverick) | branch ws-d/adapters
