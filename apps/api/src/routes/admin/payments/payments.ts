@@ -17,6 +17,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ApiError } from '../../../lib/errors.ts';
 import { requirePermission } from '../../../lib/permissions.ts';
+import { notifyOrderPaid } from '../../../services/orders/notify.ts';
 
 const listQuery = paginationQuery.extend({
   orderId: z.string().optional(),
@@ -120,13 +121,20 @@ export default async function routes(app: FastifyInstance) {
       .parse(request.body ?? {});
 
     return run(() =>
-      chargeSavedCard(request.db, request.shopId as string, {
-        paymentMethodId: input.paymentMethodId,
-        amount: input.amount,
-        idempotencyKey: input.idempotencyKey,
-        orderId: input.orderId ?? null,
-        checkoutId: input.checkoutId ?? null,
-      }),
+      chargeSavedCard(
+        request.db,
+        request.shopId as string,
+        {
+          paymentMethodId: input.paymentMethodId,
+          amount: input.amount,
+          idempotencyKey: input.idempotencyKey,
+          orderId: input.orderId ?? null,
+          checkoutId: input.checkoutId ?? null,
+        },
+        // D3's `onPaid` seam: emits `orders/paid` once the Payment row is
+        // committed. Its failures are swallowed, so it cannot fail the charge.
+        { onPaid: notifyOrderPaid },
+      ),
     );
   });
 }

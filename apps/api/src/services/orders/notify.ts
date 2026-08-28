@@ -1,28 +1,88 @@
 /**
  * Outbound notifications for order lifecycle changes (SPEC §13).
  *
- * This is a seam, not a stub with an opinion: WS-G's producer
- * (`emitWebhookEvent` / `enqueueOrderConfirmationEmail` in
- * `@merchant/config/queue`) is not on `main` yet, so today these calls do
- * nothing. When G1 lands, the bodies below are the only place to change — the
- * order service already calls them at the right points, with the right payload.
+ * Every `orders/*` webhook is emitted from here, so a merchant writing one
+ * handler sees the same body shape whichever topic fired.
  *
- * Whatever fills them in MUST NOT throw: an order that is already committed
- * must not fail its request because Redis blinked (G1's producer is written the
- * same way). See DECISIONS.md.
+ * Nothing here may throw. Each function runs AFTER its order or payment row is
+ * committed, so a dead Redis must not fail the request that already succeeded —
+ * `@merchant/config/queue` is written the same way and swallows internally; the
+ * guards below are the belt to its braces. See DECISIONS.md.
  *
- * Owner: WS-C.
+ * Seam owned by WS-C; bodies filled in by WS-G when G1 landed.
  */
 import type { WebhookTopic } from '@merchant/config/constants';
+import { emitWebhookEvent, enqueueOrderConfirmationEmail } from '@merchant/config/queue';
+import { dbForShop } from '@merchant/db/tenant';
+import type { PaidEvent } from '@merchant/pay/router';
+
+export type OrderSummary = {
+  id: string;
+  orderNumber: number;
+  email: string;
+  /** Minor units, as everywhere (SPEC §5). Becomes a Money on the way out. */
+  total: number;
+  currencyCode: string;
+};
 
 export type OrderNotification = {
   shopId: string;
   topic: Extract<WebhookTopic, 'orders/create' | 'orders/paid' | 'orders/cancelled'>;
-  order: { id: string; orderNumber: number; email: string; total: number; currencyCode: string };
+  order: OrderSummary;
 };
 
+/**
+ * The body every `orders/*` webhook carries. `total` goes out as a Money
+ * object, never a bare integer — a merchant reading `total` off the wire must
+ * not have to know our minor-unit convention to charge the right amount.
+ */
+function orderPayload(order: OrderSummary): Record<string, unknown> {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    email: order.email,
+    total: { amount: order.total, currencyCode: order.currencyCode },
+  };
+}
+
+function swallow(what: string, err: unknown): void {
+  console.warn(`notify: ${what} failed — ${err instanceof Error ? err.message : String(err)}`);
+}
+
 /** Fire-and-forget: callers do not await a delivery, only the enqueue. */
-export async function notifyOrder(_notification: OrderNotification): Promise<void> {
-  // WS-G: `await emitWebhookEvent(shopId, topic, order)` goes here, and for
-  // 'orders/create' also `await enqueueOrderConfirmationEmail(shopId, order.id)`.
+export async function notifyOrder({ shopId, topic, order }: OrderNotification): Promise<void> {
+  try {
+    await emitWebhookEvent(shopId, topic, orderPayload(order));
+    if (topic === 'orders/create') {
+      // orderStatusUrl is E3's to supply — it holds the checkout token. Null
+      // omits the button rather than linking a customer at a guessed 404.
+      await enqueueOrderConfirmationEmail(shopId, order.id);
+    }
+  } catch (err) {
+    swallow(`${topic} for order ${order.id}`, err);
+  }
+}
+
+/**
+ * The Pay router's `onPaid` seam (D3). Passed as `deps.onPaid` wherever a
+ * charge is made, so a capture emits `orders/paid` with the same body as the
+ * other order topics rather than a payment-shaped one.
+ */
+export async function notifyOrderPaid(event: PaidEvent): Promise<void> {
+  // A charge with no order behind it (a bare saved-card charge) is a payment,
+  // not an order payment — there is no `payments/*` topic and inventing one
+  // would break `webhookTopicSchema`.
+  if (!event.orderId) return;
+
+  try {
+    const order = await dbForShop(event.shopId).order.findUnique({
+      where: { id: event.orderId },
+      select: { id: true, orderNumber: true, email: true, total: true, currencyCode: true },
+    });
+    if (!order) return;
+
+    await emitWebhookEvent(event.shopId, 'orders/paid', orderPayload(order));
+  } catch (err) {
+    swallow(`orders/paid for order ${event.orderId}`, err);
+  }
 }
