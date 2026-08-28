@@ -160,6 +160,7 @@ async function createRollups(
     track(day, 'sessions', event.sessionId);
     if (event.type === 'product_view') bump(day, 'product_views', 1);
     if (event.type === 'add_to_cart') bump(day, 'add_to_carts', 1);
+    if (event.type === 'begin_checkout') bump(day, 'begin_checkouts', 1);
     if (event.type === 'purchase') bump(day, 'purchases', 1);
   }
 
@@ -170,7 +171,18 @@ async function createRollups(
     bump(day, 'sales', order.total);
   }
 
-  const METRICS = ['sales', 'orders', 'sessions', 'product_views', 'add_to_carts', 'purchases'];
+  // One metric per funnel stage: the dashboard contract's funnel.reachedCheckout
+  // (contracts/analytics.ts) reads from rollups on closed days, so every stage —
+  // begin_checkouts included — must exist here or that bar renders as zero.
+  const METRICS = [
+    'sales',
+    'orders',
+    'sessions',
+    'product_views',
+    'add_to_carts',
+    'begin_checkouts',
+    'purchases',
+  ];
 
   await db.analyticsRollupDaily.createMany({
     data: [...buckets.entries()].flatMap(([day, bucket]) =>

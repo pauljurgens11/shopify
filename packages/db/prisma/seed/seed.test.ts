@@ -387,9 +387,24 @@ describe('analytics', () => {
 
     const metrics = new Set(rollups.map((r) => r.metric));
     expect([...metrics].sort()).toEqual(
-      ['add_to_carts', 'orders', 'product_views', 'purchases', 'sales', 'sessions'].sort(),
+      [
+        'add_to_carts',
+        'begin_checkouts',
+        'orders',
+        'product_views',
+        'purchases',
+        'sales',
+        'sessions',
+      ].sort(),
     );
     for (const r of rollups) expect(Number.isInteger(r.value)).toBe(true);
+
+    // The rolled-up funnel must narrow like the raw one — begin_checkouts is
+    // the stage the dashboard's funnel.reachedCheckout reads on closed days.
+    const totalOf = (metric: string) =>
+      rollups.filter((r) => r.metric === metric).reduce((acc, r) => acc + r.value, 0);
+    expect(totalOf('add_to_carts')).toBeGreaterThan(totalOf('begin_checkouts'));
+    expect(totalOf('begin_checkouts')).toBeGreaterThan(totalOf('purchases'));
 
     // Sales rollups must reconcile with the orders they summarize.
     const salesTotal = rollups
