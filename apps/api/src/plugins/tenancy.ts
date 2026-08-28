@@ -32,6 +32,7 @@ export default fp(
     app.decorateRequest('staffUserId', undefined);
 
     // Getter, so `request.db` is impossible to read before a shop is resolved.
+    // dbForShop memoizes per shopId, so repeated reads are cheap.
     app.decorateRequest('db', {
       getter(this: { shopId?: string }) {
         if (!this.shopId) {

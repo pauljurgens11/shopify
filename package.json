@@ -21,7 +21,7 @@
     "db:reset": "pnpm --filter @merchant/db run reset",
     "seed": "pnpm --filter @merchant/db run seed",
     "e2e": "pnpm --filter @merchant/e2e run test",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "verify": "node scripts/check-env-parity.mjs && pnpm lint && pnpm typecheck && pnpm test",
     "setup:git": "bash scripts/setup-git.sh"
   },
   "devDependencies": {

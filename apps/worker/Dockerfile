@@ -1,8 +1,7 @@
 # Multi-stage build for @merchant/worker (SPEC §17).
 #
 # No bundler. Two things in this repo's design rule one out:
-#   1. @fastify/autoload discovers routes by scanning the filesystem, so the
-#      route tree must exist as real files at runtime (CLAUDE.md §3).
+#   1. Worker jobs are autoloaded from src/jobs/** as real files (CLAUDE.md §3).
 #   2. Workspace packages export raw TypeScript, so their deps get inlined into
 #      an ESM bundle and the CJS/native ones (Prisma, argon2) break.
 # The app therefore runs from source under tsx. Costs ~1s of startup compile;

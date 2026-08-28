@@ -27,11 +27,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - name: start infrastructure
-        run: docker compose up -d --wait
+        # minio-init is a one-shot container; `--wait` errors on services that
+        # exit, so wait on the long-running four and run the init job explicitly.
+        run: |
+          docker compose up -d --wait postgres redis minio mailpit
+          docker compose up minio-init
 
       - run: cp .env.example .env
       - run: pnpm db:setup
-      - run: pnpm exec playwright install --with-deps chromium
+      # playwright lives in the e2e workspace package, not the root — a root
+      # `pnpm exec playwright` finds no binary.
+      - run: pnpm --filter @merchant/e2e exec playwright install --with-deps chromium
       - run: pnpm build
       - run: pnpm e2e
 

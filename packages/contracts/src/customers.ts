@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   addressSchema,
+  booleanish,
   idSchema,
   metadataSchema,
   moneySchema,
@@ -59,7 +60,7 @@ export const listCustomersQuery = paginationQuery
   .merge(searchQuery)
   .merge(sortQuery)
   .extend({
-    acceptsMarketing: z.coerce.boolean().optional(),
+    acceptsMarketing: booleanish.optional(),
     tag: z.string().optional(),
     /** "segments-lite" (SPEC §2). */
     segment: z.enum(['all', 'returning', 'new', 'abandoned-checkout']).optional(),
