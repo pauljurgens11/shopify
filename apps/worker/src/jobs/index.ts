@@ -9,6 +9,7 @@
  * email that sends twice is a real customer-visible bug.
  */
 import { aiThemeGenerate } from './ai-theme-generate.ts';
+import { analyticsRollupJob } from './analytics-rollup.ts';
 import { orderConfirmationEmailJob } from './order-confirmation-email.ts';
 import type { JobDefinition } from './types.ts';
 import { webhookDeliverJob } from './webhook-deliver.ts';
@@ -18,7 +19,7 @@ export const JOBS: JobDefinition<any>[] = [
   webhookDeliverJob,
   orderConfirmationEmailJob,
   aiThemeGenerate,
-  // WS-G: analyticsRollup
+  analyticsRollupJob,
 ];
 
 export type { JobContext, JobDefinition } from './types.ts';

@@ -4,10 +4,12 @@
  * Ingestion glue only: rows go in, nothing comes back out. G2 owns rollups and
  * every query over this table.
  *
- * `purchase` is deliberately accepted from the browser but recorded
- * server-side at order creation as well — the contract says the server-side one
- * is authoritative, because a beacon is trivially forgeable and revenue must
- * not be.
+ * `purchase` events are DROPPED here. The contract calls the server-side one
+ * authoritative "never trusted from here", and this endpoint is unauthenticated
+ * and Host-resolved: anyone who can curl it could otherwise mint revenue into a
+ * merchant's dashboard. `recordPurchaseEvent` writes the real one at order
+ * creation. Dropped rather than rejected, because `purchase` is a legal member
+ * of the contract's event enum and a beacon must not fail on a legal payload.
  */
 import { newId } from '@merchant/config/ids';
 import { ingestEventsInput } from '@merchant/contracts/analytics';
@@ -20,8 +22,10 @@ export default async function routes(app: FastifyInstance) {
     const { events } = ingestEventsInput.parse(request.body);
     const shopId = requireShop(request);
 
+    const trusted = events.filter((event) => event.type !== 'purchase');
+
     await request.db.analyticsEvent.createMany({
-      data: events.map((event) => ({
+      data: trusted.map((event) => ({
         id: newId('event'),
         shopId,
         type: event.type,

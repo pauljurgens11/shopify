@@ -114,6 +114,7 @@ export async function deleteTestShops(shopIds: string[]): Promise<void> {
   await dbAdmin.collection.deleteMany({ where });
   await dbAdmin.themeVersion.deleteMany({ where });
   await dbAdmin.analyticsEvent.deleteMany({ where });
+  await dbAdmin.analyticsRollupDaily.deleteMany({ where });
   await dbAdmin.app.deleteMany({ where });
   await dbAdmin.staffUser.deleteMany({ where });
   await dbAdmin.orderSequence.deleteMany({ where: { shopId: { in: shopIds } } });
