@@ -17,6 +17,7 @@ export const ID_PREFIXES = {
   collection: 'col',
   location: 'loc',
   inventory: 'inv',
+  inventoryAdjustment: 'inv_adj',
   order: 'ord',
   lineItem: 'li',
   customer: 'cus',

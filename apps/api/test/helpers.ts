@@ -100,8 +100,12 @@ export async function createApiToken(shopId: string): Promise<string> {
 export async function deleteTestShops(shopIds: string[]): Promise<void> {
   if (shopIds.length === 0) return;
   const where = { shopId: { in: shopIds } };
-  // Options, variants and images cascade from the product row.
+  // Options, variants and images cascade from the product row; inventory levels
+  // cascade from the variant and from the location. Adjustments have no FK — the
+  // history deliberately outlives what it describes — so they go by hand.
   await dbAdmin.product.deleteMany({ where });
+  await dbAdmin.inventoryAdjustment.deleteMany({ where });
+  await dbAdmin.location.deleteMany({ where });
   await dbAdmin.app.deleteMany({ where });
   await dbAdmin.staffUser.deleteMany({ where });
   await dbAdmin.orderSequence.deleteMany({ where: { shopId: { in: shopIds } } });
