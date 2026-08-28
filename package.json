@@ -23,6 +23,7 @@
     "e2e": "pnpm --filter @merchant/e2e run test",
     "verify": "node scripts/check-env-parity.mjs && pnpm lint && pnpm typecheck && pnpm test",
     "setup:git": "bash scripts/setup-git.sh",
+    "sync": "bash scripts/sync.sh",
     "stack": "bash scripts/stack.sh",
     "worktree:env": "bash scripts/worktree-env.sh"
   },

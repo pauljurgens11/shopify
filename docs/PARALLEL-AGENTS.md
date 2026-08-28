@@ -114,6 +114,7 @@ leaf files; they don't edit shared arrays.
 **`.gitattributes` merge drivers.** Committed at the repo root:
 - `DECISIONS.md`, `docs/AGENT-LOG.md` → `merge=union`. Concurrent appends both
   survive, automatically. Requires that agents only ever append at the bottom.
+  **This works locally and not on GitHub** — see the box below.
 - `pnpm-lock.yaml` → custom `merge=pnpm-lock` driver
   ([`scripts/git/merge-lockfile.sh`](../scripts/git/merge-lockfile.sh)): takes
   our side and regenerates from the merged `package.json` files. Textual merges of
@@ -131,6 +132,34 @@ driver, git config defines it.
 
 **PR size.** A ~400-line, one-hour PR rebases cleanly. A two-day branch does not.
 This is the highest-leverage rule on the list and the easiest to let slip.
+
+> ### GitHub ignores merge drivers, and the failure is silent
+>
+> `merge=union` is applied by *your* git, not by GitHub's. When GitHub computes
+> whether a PR is mergeable it does a plain three-way merge, so two agents
+> appending to `DECISIONS.md` make each other's PRs **CONFLICTING** even though
+> both rebase cleanly on a laptop.
+>
+> That would be a minor annoyance if it were visible. It is not: GitHub cannot
+> build a merge commit for a conflicting PR, and `pull_request` workflows run
+> against that merge commit — so **`pr-checks` never starts**. The PR does not go
+> red. It sits with auto-merge armed and zero checks, indefinitely. Three PRs
+> were stuck this way, including the admin shell, before anyone noticed.
+>
+> Mitigations, in the order they fire:
+> 1. [`pr-health.yml`](../.github/workflows/pr-health.yml) runs on every push to
+>    `main` and labels each unmergeable PR `needs-rebase` with a comment saying
+>    what to do. It uses `pull_request_target`, which — unlike `pull_request` —
+>    still fires for a conflicting PR.
+> 2. `pnpm sync` rebases your branch and pushes it. That is the whole fix.
+> 3. Optionally, the `rebase` job in the same workflow does step 2 for you, for
+>    any PR that already has auto-merge enabled. It needs a PAT
+>    (`gh secret set AGENT_PAT`) because a push made with the built-in
+>    `GITHUB_TOKEN` does not trigger workflows — the branch would become
+>    mergeable and then wait forever for a check that can never start.
+>
+> The durable fix is the one in CLAUDE.md §3: keep shared files out of the hot
+> path. Every file two agents append to on the same day will do this.
 
 ---
 
@@ -150,9 +179,14 @@ Then **start the next slice immediately**. Do not poll the PR. If checks fail,
 GitHub leaves it open and the agent picks it up on its next sweep:
 
 ```bash
-gh pr list --author @me --state open   # anything here needs attention
+gh pr list --author @me --state open --json number,title,mergeable,labels
 gh pr checks <n>                       # why it's red
+pnpm sync                              # `needs-rebase`, or no checks at all
 ```
+
+Read `mergeable` on that sweep, not just the check status. `CONFLICTING`, or a
+PR with **no checks at all**, both mean the same thing and have the same fix:
+`pnpm sync` from that branch's worktree.
 
 Belt-and-braces: [`.github/workflows/auto-merge.yml`](../.github/workflows/auto-merge.yml)
 enables auto-merge on any PR labelled `automerge`, for agents that forget the flag.
@@ -169,3 +203,5 @@ enables auto-merge on any PR labelled `automerge`, for agents that forget the fl
 | Two migrations with the same number | agent didn't pull before generating | Rename yours; migrations are `-merge` on purpose |
 | Constant conflicts in one file | that file is a shared registry | Split it file-per-unit; see the table in CLAUDE.md §3 |
 | Auto-merge silently not enabled | repo setting off, or PR is a draft | `gh repo edit --enable-auto-merge`; `gh pr ready <n>` |
+| **PR has no checks at all** — not red, not pending, nothing | PR is `CONFLICTING`, so GitHub never built the merge commit `pull_request` workflows run against | `pnpm sync`. This is the §5 box; it is the most expensive failure here because it looks like CI being slow |
+| PR conflicts only in `DECISIONS.md` / `docs/AGENT-LOG.md` | GitHub does not apply the `merge=union` driver your machine does | `pnpm sync` — the rebase resolves them locally. Do not hand-edit the log files |

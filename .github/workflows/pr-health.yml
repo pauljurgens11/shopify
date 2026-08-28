@@ -1,0 +1,84 @@
+# Why this workflow exists
+# ------------------------
+# `.gitattributes` marks DECISIONS.md and docs/AGENT-LOG.md `merge=union`, so two
+# agents appending to them merge cleanly — LOCALLY. GitHub does not apply
+# gitattributes merge drivers when it computes a PR's mergeability, so the same
+# two appends make the PR CONFLICTING on the server.
+#
+# That alone would be a minor annoyance. What makes it expensive is the second
+# half: GitHub cannot build a merge commit for a conflicting PR, and `pull_request`
+# workflows run against that merge commit — so `pr-checks` NEVER STARTS. The PR
+# does not go red. It goes silent, with auto-merge armed, forever.
+#
+# This workflow turns that silence into a label and a comment. It runs on
+# `pull_request_target` (which, unlike `pull_request`, still fires for a
+# conflicting PR) and after every push to `main`, because that is when a PR that
+# was fine a minute ago becomes conflicted.
+#
+# Owner: root. See docs/PARALLEL-AGENTS.md §7.
+name: pr-health
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # Serialize: two runs labelling the same PR would race on the sticky comment.
+  group: pr-health
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: label and comment on unmergeable PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: bash scripts/ci/pr-health.sh
+
+  # Optional second half: actually fix them. Inert until a PAT exists, because a
+  # push made with GITHUB_TOKEN does not trigger workflows — the branch would
+  # become mergeable and then wait forever for a `pr-checks` run that can never
+  # start. Enable with:  gh secret set AGENT_PAT
+  rebase:
+    needs: triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HAS_PAT: ${{ secrets.AGENT_PAT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.HAS_PAT == 'true'
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_PAT }}
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_PAT == 'true'
+        with:
+          node-version: 22
+
+      # The lockfile merge driver regenerates pnpm-lock.yaml rather than merging
+      # it textually; without pnpm on PATH it silently keeps our side instead.
+      - name: enable pnpm
+        if: env.HAS_PAT == 'true'
+        run: corepack enable
+
+      - name: rebase what can be rebased
+        if: env.HAS_PAT == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
+          REPO: ${{ github.repository }}
+        run: bash scripts/ci/pr-rebase.sh

@@ -92,6 +92,7 @@ gh pr merge --auto --squash --delete-branch   # merges itself once checks pass
 - **Never force-push a branch another agent may have pulled**, and never force-push `main`.
 - **Rebase on `main` rather than merging it back into your branch** — keeps the two-day history readable.
 - If CI is red on your PR, fix it on your branch. Never disable a test or lower a check to get a merge through — the §14 suites are blocking by design.
+- **A PR with *no* checks is not a slow PR — it is an unmergeable one.** GitHub never builds a merge commit for a conflicting PR, so `pr-checks` never starts and the PR sits silent with auto-merge armed. Run `pnpm sync` (rebase onto `main` + push) from that worktree. Usually the only conflict is concurrent appends to `DECISIONS.md` / `docs/AGENT-LOG.md`, which your local `merge=union` driver resolves and GitHub's merge does not. Details: `docs/PARALLEL-AGENTS.md` §5.
 - A PR that touches `packages/contracts` or `schema.prisma` names it in the title (`[contracts]`, `[schema]`), so other agents know to pull before their next migration.
 
 ---
