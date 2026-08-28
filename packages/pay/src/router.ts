@@ -12,9 +12,11 @@
  * idempotency-key dedupe are all mandatory unit tests (SPEC §14.2).
  *
  * Everything here takes `db` — a `dbForShop(shopId)` client — so every read and
- * write is tenant-scoped by construction. `shopId` is passed alongside it
- * because Prisma's generated create input still requires the column even though
- * the tenant extension overrides it (see docs/AGENT-LOG.md).
+ * write is tenant-scoped by construction. A `shopId` argument appears only on
+ * the functions that CREATE a row, because Prisma's generated create input
+ * still requires the column even though the tenant extension overrides it (see
+ * docs/AGENT-LOG.md). `capturePayment` and `voidPayment` only read and update,
+ * so they take none — the scoped client is the whole tenancy story there.
  */
 
 import { newId } from '@merchant/config/ids';
@@ -296,7 +298,6 @@ function errorCodeOf(result: AuthResult): string | null {
  */
 export async function capturePayment(
   db: TenantClient,
-  shopId: string,
   paymentId: string,
   amount?: MoneyDto,
   deps: RouterDeps = {},
@@ -334,7 +335,6 @@ export async function capturePayment(
 
 export async function voidPayment(
   db: TenantClient,
-  shopId: string,
   paymentId: string,
   deps: RouterDeps = {},
 ): Promise<Payment> {

@@ -403,25 +403,25 @@ describe('capture, void and refund', () => {
 
   it('captures an authorization exactly once', async () => {
     const payment = await authorized();
-    const captured = await capturePayment(db, shopId, payment.id, undefined, withMock);
+    const captured = await capturePayment(db, payment.id, undefined, withMock);
     expect(captured.status).toBe('captured');
-    await expect(
-      capturePayment(db, shopId, payment.id, undefined, withMock),
-    ).rejects.toBeInstanceOf(PaymentError);
+    await expect(capturePayment(db, payment.id, undefined, withMock)).rejects.toBeInstanceOf(
+      PaymentError,
+    );
   });
 
   it('voids an authorization and refuses to void a captured payment', async () => {
     const payment = await authorized();
-    expect((await voidPayment(db, shopId, payment.id, withMock)).status).toBe('voided');
+    expect((await voidPayment(db, payment.id, withMock)).status).toBe('voided');
 
     const other = await authorized();
-    await capturePayment(db, shopId, other.id, undefined, withMock);
-    await expect(voidPayment(db, shopId, other.id, withMock)).rejects.toBeInstanceOf(PaymentError);
+    await capturePayment(db, other.id, undefined, withMock);
+    await expect(voidPayment(db, other.id, withMock)).rejects.toBeInstanceOf(PaymentError);
   });
 
   it('caps two partial refunds at the captured amount', async () => {
     const payment = await authorized(usd(2500));
-    await capturePayment(db, shopId, payment.id, undefined, withMock);
+    await capturePayment(db, payment.id, undefined, withMock);
 
     const first = await refundPayment(
       db,
@@ -450,7 +450,7 @@ describe('capture, void and refund', () => {
 
   it('caps against the sum of refund rows, not against a single request', async () => {
     const payment = await authorized(usd(2500));
-    await capturePayment(db, shopId, payment.id, undefined, withMock);
+    await capturePayment(db, payment.id, undefined, withMock);
     await refundPayment(
       db,
       shopId,
@@ -466,7 +466,7 @@ describe('capture, void and refund', () => {
 
   it('replaying a refund key does not refund twice', async () => {
     const payment = await authorized(usd(2500));
-    await capturePayment(db, shopId, payment.id, undefined, withMock);
+    await capturePayment(db, payment.id, undefined, withMock);
     const idempotencyKey = key();
 
     await refundPayment(db, shopId, payment.id, { amount: usd(1000), idempotencyKey }, withMock);
@@ -491,7 +491,7 @@ describe('capture, void and refund', () => {
 
   it('leaves the payment untouched when the processor refuses the refund', async () => {
     const payment = await authorized(usd(2500));
-    await capturePayment(db, shopId, payment.id, undefined, withMock);
+    await capturePayment(db, payment.id, undefined, withMock);
 
     const refusing = stubAdapter('mock', 'approved');
     refusing.refund = () =>

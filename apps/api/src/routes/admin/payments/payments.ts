@@ -101,12 +101,12 @@ export default async function routes(app: FastifyInstance) {
   app.post('/:id/capture', { preHandler: requirePermission('orders') }, async (request) => {
     const { id } = request.params as { id: string };
     const { amount } = capturePaymentInput.parse(request.body ?? {});
-    return run(() => capturePayment(request.db, request.shopId as string, id, amount));
+    return run(() => capturePayment(request.db, id, amount));
   });
 
   app.post('/:id/void', { preHandler: requirePermission('orders') }, async (request) => {
     const { id } = request.params as { id: string };
-    return run(() => voidPayment(request.db, request.shopId as string, id));
+    return run(() => voidPayment(request.db, id));
   });
 
   /**
