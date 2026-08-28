@@ -16,10 +16,20 @@
 #   pnpm stack down     stop dev servers and docker infra
 #   pnpm stack reset    drop + remigrate + reseed the database
 #   pnpm stack disk     where the disk is going and what is safe to reclaim
-  pnpm stack doctor   check prerequisites without changing anything
+#   pnpm stack doctor   check prerequisites without changing anything
 #   pnpm stack open     open the admin, storefront and tool UIs in a browser
 #
 set -uo pipefail
+
+# Recursion guard. A malformed edit to the header comment once left a usage line
+# ("pnpm stack doctor …") executable at top level; every run re-invoked the
+# script, which fork-bombed the machine to a load average of 20. Cheap insurance
+# that no future edit can do that again.
+if [ -n "${MERCHANT_STACK_DEPTH:-}" ]; then
+  echo "stack: refusing to re-enter itself (recursion guard) — this is a bug in scripts/stack.sh" >&2
+  exit 1
+fi
+export MERCHANT_STACK_DEPTH=1
 
 # --- where are we ------------------------------------------------------------
 # --git-common-dir points at the ONE real .git for the repo, from any worktree.
@@ -85,7 +95,7 @@ use_node() {
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "\`$1\` is not installed."; }
 
-docker_ok() { docker info >/dev/null 2>&1; }
+docker_ok() { cap 10 docker info >/dev/null 2>&1; }
 
 # --- process / port helpers --------------------------------------------------
 
@@ -152,6 +162,17 @@ reclaim_ports() {
   fi
 }
 
+# `status` is what you run WHEN something is wrong, so nothing in it may block.
+# A restarting Postgres made `docker compose exec` hang for minutes; every call
+# that leaves this process now carries a deadline.
+if command -v timeout >/dev/null 2>&1; then TIMEOUT=timeout
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT=gtimeout
+else TIMEOUT=""; fi
+cap() {  # cap <seconds> <command...>
+  local secs=$1; shift
+  if [ -n "$TIMEOUT" ]; then "$TIMEOUT" "$secs" "$@"; else "$@"; fi
+}
+
 # --- database ----------------------------------------------------------------
 
 # Name of the database the root .env currently points at.
@@ -160,7 +181,7 @@ db_name() {
 }
 
 psql_main() {
-  ( cd "$ROOT" && docker compose exec -T postgres psql -U merchant -d "$(db_name)" "$@" ) 2>/dev/null
+  ( cd "$ROOT" && cap 15 docker compose exec -T postgres psql -U merchant -d "$(db_name)" "$@" ) 2>/dev/null
 }
 
 # Every worktree in this repo shares one Postgres container, and agents run
@@ -446,7 +467,7 @@ cmd_status() {
   step "main"
   local branch behind
   branch=$(git rev-parse --abbrev-ref HEAD)
-  git fetch origin --quiet 2>/dev/null || warn "could not reach origin — counts below may be stale"
+  cap 20 git fetch origin --quiet 2>/dev/null || warn "could not reach origin — counts below may be stale"
   printf '  %-22s %s\n' "checkout" "$ROOT"
   printf '  %-22s %s\n' "branch"   "$branch$( [ "$branch" != main ] && printf ' %s(expected main)%s' "$YEL" "$R" )"
   printf '  %-22s %s\n' "head"     "$(git log -1 --format='%h %s %C(reset)' | cat)"
@@ -488,7 +509,7 @@ cmd_status() {
 
   step "Infrastructure"
   if docker_ok; then
-    docker compose ps --format '{{.Service}}\t{{.Status}}' 2>/dev/null | expand -t 14 | sed 's/^/  /' || warn "no containers"
+    cap 15 docker compose ps --format '{{.Service}}\t{{.Status}}' 2>/dev/null | expand -t 14 | sed 's/^/  /' || warn "no containers (or docker is not responding)"
   else
     bad "docker is not running"
   fi
@@ -506,7 +527,7 @@ cmd_status() {
        and relname not like '\\_prisma%'
      order by n desc, relname;")
   if [ -z "$rows" ]; then
-    warn "could not query postgres"
+    warn "could not query postgres within 15s — it may be restarting"
   elif [ -z "$(printf '%s' "$rows" | awk '$2 > 0')" ]; then
     warn "every table is empty — run \`pnpm stack reset\` to reseed"
   else
