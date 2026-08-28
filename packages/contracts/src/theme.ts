@@ -385,3 +385,49 @@ export const THEME_PRESETS = ['aurora', 'monochrome', 'bloom'] as const;
 export type ThemePreset = (typeof THEME_PRESETS)[number];
 
 export const applyPresetInput = z.object({ preset: z.enum(THEME_PRESETS) });
+
+/* -------------------------------------------------------------------------- */
+/* Themes API (SPEC §12) — WS-F3                                               */
+/* -------------------------------------------------------------------------- */
+
+/** Version-history row. The full `themeJson` is deliberately NOT in the list. */
+export const themeVersionSummary = z.object({
+  id: idSchema,
+  status: z.enum(['draft', 'published']),
+  createdByMessage: z.string().max(1000).nullable(),
+  publishedAt: z.string().datetime({ offset: true }).nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+});
+export type ThemeVersionSummary = z.infer<typeof themeVersionSummary>;
+
+export const themeVersionListResponse = z.object({ data: z.array(themeVersionSummary) });
+
+/** One version with its document — what the builder preview and F4 load. */
+export const themeVersionDetail = themeVersionSummary.extend({ themeJson: themeDocSchema });
+
+export const builderConversationResponse = z.object({
+  id: idSchema,
+  messages: z.array(builderMessageSchema),
+});
+
+/**
+ * Short-lived, signed, and version-specific: a draft must never be reachable on
+ * the public storefront just because someone guessed a version id.
+ */
+export const previewTokenResponse = z.object({
+  token: z.string(),
+  expiresAt: z.string().datetime({ offset: true }),
+});
+
+/**
+ * `ai-theme-generation` job payload. Lives here rather than in `jobs.ts` because
+ * the theme domain owns it; the worker parses it with this schema on the way in.
+ */
+export const aiThemeJobPayload = z.object({
+  shopId: idSchema,
+  conversationId: idSchema,
+  /** The pending assistant message this job resolves. */
+  messageId: z.string(),
+  prompt: z.string().min(1).max(4000),
+});
+export type AiThemeJobPayload = z.infer<typeof aiThemeJobPayload>;
