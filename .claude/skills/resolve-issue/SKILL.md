@@ -24,7 +24,7 @@ CLAUDE.md §0's order — appearance parity → functionality → performance �
 everything else. When two defensible options exist, take the one that serves
 that, log a line in `DECISIONS.md`, and keep moving.
 
-### Subagents and sibling skills — leverage, not ceremony
+### Delegating — leverage, not ceremony
 
 Delegating is available and sometimes clearly better. It is never required, and
 forcing it costs more than it saves.
@@ -37,9 +37,9 @@ forcing it costs more than it saves.
   with file dumps.
 - Genuinely independent work you would otherwise do serially — several unrelated
   audits, or reading three subsystems at once before a design decision.
-- An adversarial second pass on a finished diff. If a code-review skill or
-  reviewer agent is available in the session, running it over your own work
-  before pushing is cheap and catches what you have gone blind to.
+- An adversarial second pass on a finished diff — that is what
+  [`critical-review`](../critical-review/SKILL.md) is for. Running it over your
+  own work before pushing is cheap and catches what you have gone blind to.
 
 **Not worth it:**
 
@@ -294,10 +294,11 @@ Then run the repo's own reviewer over it before you push:
 pnpm verify      # lint + typecheck + unit
 ```
 
-This is also the natural place to spend a subagent, if one is available: an
-adversarial pass over your own diff catches what you have stopped being able to
-see. Its findings are leads — confirm each against the code before acting, and
-if one is wrong, say why rather than silently dropping it.
+This is also the natural place to hand the diff to
+[`critical-review`](../critical-review/SKILL.md): an adversarial pass catches
+what you have stopped being able to see. Its findings are leads — confirm each
+against the code before acting, and if one is wrong, say why rather than
+silently dropping it.
 
 ---
 
