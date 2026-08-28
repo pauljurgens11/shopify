@@ -6,6 +6,7 @@
 
 import { QUEUES } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
+import { enqueue, JOB_NAMES } from '@merchant/config/queue';
 import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { JOBS } from './jobs/index.ts';
@@ -44,6 +45,26 @@ const workers = Object.values(QUEUES).map((queue) => {
   });
 
   return worker;
+});
+
+/**
+ * Scheduled work (SPEC §13). BullMQ keys a repeatable by name + repeat options,
+ * so re-adding it on every boot is idempotent rather than a duplicate.
+ *
+ * Registered here rather than in the job file so every schedule in the system is
+ * visible in one place.
+ */
+await enqueue(
+  QUEUES.analytics,
+  JOB_NAMES.analyticsRollup,
+  {},
+  { repeat: { every: 5 * 60 * 1000 }, removeOnComplete: { count: 20 } },
+).catch((err: unknown) => {
+  // A worker that cannot schedule still processes what is queued; say so loudly
+  // rather than exiting and taking webhook delivery down with it.
+  console.log(
+    `[error] worker: could not schedule the analytics rollup — ${err instanceof Error ? err.message : String(err)}`,
+  );
 });
 
 console.log(`worker: listening on ${Object.values(QUEUES).join(', ')} (${JOBS.length} jobs)`);
