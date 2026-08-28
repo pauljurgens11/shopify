@@ -14,6 +14,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { QUEUES } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
 import { newId } from '@merchant/config/ids';
+import { JOB_NAMES } from '@merchant/config/queue';
 import {
   type AiThemeJobPayload,
   aiThemeJobPayload,
@@ -25,9 +26,6 @@ import {
 import { dbForShop } from '@merchant/db/tenant';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { JobDefinition } from './types.ts';
-
-/** Must equal WS-G's `JOB_NAMES.aiThemeGeneration` in `@merchant/config/queue`. */
-export const AI_THEME_JOB_NAME = 'ai-theme-generation';
 
 /* -------------------------------------------------------------------------- */
 /* Prompt assembly                                                             */
@@ -371,7 +369,7 @@ export async function handler(
 }
 
 export const aiThemeGenerate: JobDefinition<AiThemeJobPayload> = {
-  name: AI_THEME_JOB_NAME,
+  name: JOB_NAMES.aiThemeGeneration,
   queue: QUEUES.ai,
   handler: (payload) => handler(payload),
 };
