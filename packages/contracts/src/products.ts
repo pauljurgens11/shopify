@@ -113,7 +113,8 @@ export const upsertVariantInput = createVariantInput.extend({ id: idSchema.optio
 /**
  * Every field is optional and `undefined` means "leave it alone" — in
  * particular, omitting `variants` keeps the existing variants rather than
- * deleting them. Send `variants: []` to reset to the default variant.
+ * deleting them, and a partial `variants` list only touches the rows it names.
+ * To collapse a product back to the single default variant, send `options: []`.
  */
 export const updateProductInput = createProductInput
   .partial()

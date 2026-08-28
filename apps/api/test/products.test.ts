@@ -230,6 +230,53 @@ describe('PUT reconciliation', () => {
     ]);
   });
 
+  it('keeps unmentioned rows intact when the payload names only some variants', async () => {
+    const created = await createProduct({
+      title: 'Partial Variants Tee',
+      options: [{ name: 'Size', position: 0, values: ['S', 'M'] }],
+      variants: [
+        { optionValues: { Size: 'S' }, price: usd(1500), sku: 'TEE-S' },
+        { optionValues: { Size: 'M' }, price: usd(1800), sku: 'TEE-M', barcode: '4006381333931' },
+      ],
+    });
+    const small = created.variants.find((v: VariantDto) => v.title === 'S')?.id;
+
+    // Update only S. M must keep its own price, sku and barcode — not inherit
+    // the payload's first variant or reset to nulls.
+    const response = await write('PUT', `${PRODUCTS}/${created.id}`, {
+      variants: [{ id: small, optionValues: { Size: 'S' }, price: usd(1200), sku: 'TEE-S' }],
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const byTitle = (title: string) =>
+      response.json().variants.find((v: VariantDto) => v.title === title);
+
+    expect(byTitle('S')).toMatchObject({ id: small, price: usd(1200), sku: 'TEE-S' });
+    expect(byTitle('M')).toMatchObject({
+      price: usd(1800),
+      sku: 'TEE-M',
+      barcode: '4006381333931',
+    });
+  });
+
+  it('rejects an oversized option matrix without materializing it', async () => {
+    const values = (n: number) => Array.from({ length: n }, (_, i) => `v${i}`);
+    const started = Date.now();
+    const response = await write('POST', PRODUCTS, {
+      title: 'Combinatorial Bomb',
+      options: [
+        { name: 'A', position: 0, values: values(100) },
+        { name: 'B', position: 1, values: values(100) },
+        { name: 'C', position: 2, values: values(100) },
+      ],
+      variants: [{ price: usd(1000) }],
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().errors[0].field).toBe('options');
+    // The ceiling must fire on the option counts, not on a million built rows.
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it('leaves variants alone when the payload does not mention them', async () => {
     const created = await createProduct({
       title: 'Partial Update Tee',
