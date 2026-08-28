@@ -101,7 +101,31 @@ export const createProductInput = productSchema
   });
 export type CreateProductInput = z.infer<typeof createProductInput>;
 
-export const updateProductInput = createProductInput.partial();
+/**
+ * A variant inside a product update. `id` is optional because the admin form
+ * regenerates the variant table from the option matrix and does not always
+ * carry ids back; the API matches a payload variant to an existing row by id
+ * when given one and by option values otherwise, so editing options preserves
+ * the rows B4's inventory levels hang off.
+ */
+export const upsertVariantInput = createVariantInput.extend({ id: idSchema.optional() });
+
+/**
+ * Every field is optional and `undefined` means "leave it alone" — in
+ * particular, omitting `variants` keeps the existing variants rather than
+ * deleting them. Send `variants: []` to reset to the default variant.
+ */
+export const updateProductInput = createProductInput
+  .partial()
+  .extend({ variants: z.array(upsertVariantInput).optional() });
+export type UpdateProductInput = z.infer<typeof updateProductInput>;
+
+/** Inline edits from the variants table (price, sku, …) — one variant at a time. */
+export const updateVariantInput = createVariantInput.partial();
+export type UpdateVariantInput = z.infer<typeof updateVariantInput>;
+
+/** Path params for `/admin/api/products/:id/variants/:variantId`. */
+export const variantParams = z.object({ id: idSchema, variantId: idSchema });
 
 export const listProductsQuery = paginationQuery.merge(searchQuery).merge(sortQuery).extend({
   status: productStatusSchema.optional(),

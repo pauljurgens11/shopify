@@ -13,6 +13,7 @@ export const ID_PREFIXES = {
   user: 'usr',
   product: 'prod',
   variant: 'var',
+  option: 'opt',
   collection: 'col',
   location: 'loc',
   inventory: 'inv',

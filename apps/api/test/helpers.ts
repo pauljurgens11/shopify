@@ -100,6 +100,8 @@ export async function createApiToken(shopId: string): Promise<string> {
 export async function deleteTestShops(shopIds: string[]): Promise<void> {
   if (shopIds.length === 0) return;
   const where = { shopId: { in: shopIds } };
+  // Options, variants and images cascade from the product row.
+  await dbAdmin.product.deleteMany({ where });
   await dbAdmin.app.deleteMany({ where });
   await dbAdmin.staffUser.deleteMany({ where });
   await dbAdmin.orderSequence.deleteMany({ where: { shopId: { in: shopIds } } });
