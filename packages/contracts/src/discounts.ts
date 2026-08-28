@@ -75,6 +75,17 @@ export const discountListResponse = paginated(discountSchema);
 
 /* --- engine I/O (SPEC §14.3 tests target exactly these shapes) ------------- */
 
+/**
+ * The current customer's redemption counts, keyed by discount id — how the
+ * engine enforces `oncePerCustomer` without doing I/O. The caller (checkout)
+ * counts `DiscountRedemption` rows for the customer and passes the result in.
+ * Optional everywhere on purpose: a guest checkout, or a caller that has not
+ * loaded redemptions, simply omits it and `oncePerCustomer` is not enforced —
+ * exactly the pre-existing behaviour, so the contract stays backward-compatible.
+ */
+export const discountPriorUsageSchema = z.record(z.string(), z.number().int().nonnegative());
+export type DiscountPriorUsage = z.infer<typeof discountPriorUsageSchema>;
+
 export const discountableLineSchema = z.object({
   lineId: z.string(),
   productId: idSchema,
