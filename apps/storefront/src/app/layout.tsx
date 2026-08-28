@@ -12,8 +12,10 @@
  */
 import { googleFontsHref, themeCssVariables } from '@merchant/theme-engine/render';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { StorefrontHeader } from '../components/storefront-header.tsx';
 import { currentCart, shopContext } from '../lib/shop.ts';
+import { PATHNAME_HEADER } from '../middleware.ts';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,6 +28,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { shop, theme } = await shopContext();
+
+  // Checkout is Shopify's checkout, not our storefront: a clean white page with
+  // the shop name as a logotype and no navigation at all (PARITY.md). It opts
+  // out of the theme chrome rather than fighting it from inside.
+  const pathname = (await headers()).get(PATHNAME_HEADER) ?? '';
+  if (pathname.startsWith('/checkouts')) {
+    return (
+      <html lang="en">
+        <body className="bg-white text-neutral-900 antialiased">{children}</body>
+      </html>
+    );
+  }
+
   const cart = await currentCart(shop.slug);
 
   return (

@@ -11,6 +11,7 @@
  * forgeable revenue, and `createOrder` records the real one server-side.
  */
 import { useEffect } from 'react';
+import { randomId } from '../lib/random-id.ts';
 
 const SESSION_KEY = 'merchant_session_id';
 
@@ -18,13 +19,13 @@ function sessionId(): string {
   try {
     const existing = window.sessionStorage.getItem(SESSION_KEY);
     if (existing) return existing;
-    const created = `ses_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+    const created = `ses_${randomId(12)}`;
     window.sessionStorage.setItem(SESSION_KEY, created);
     return created;
   } catch {
     // Private mode, or storage disabled. One session per page view is a worse
     // number than a stable one, but it is better than losing the event.
-    return `ses_${Math.random().toString(36).slice(2, 14)}`;
+    return `ses_${randomId(12)}`;
   }
 }
 
