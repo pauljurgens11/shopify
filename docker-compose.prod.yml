@@ -1,0 +1,293 @@
+# Production stack (A5, SPEC §17): the full platform behind one reverse proxy.
+#
+#   BASE_DOMAIN=localhost docker compose -f docker-compose.prod.yml up -d --build
+#
+# then https://admin.localhost (owner@demo.dev / password123) and
+# https://demo.localhost. Certs come from Caddy's internal CA, so curl needs
+# -k and a browser shows a one-time warning — swap to Let's Encrypt in
+# deploy/caddy/Caddyfile for a real domain.
+#
+# Configuration comes from the same single root `.env` as dev (env_file).
+# Everything network-shaped is overridden below to the compose-internal
+# hostnames, so the dev `.env` works unedited; secrets (SESSION_SECRET,
+# VAULT_MASTER_KEY, SMTP/Stripe/Anthropic credentials) are read from `.env`
+# only and MUST be regenerated for anything public-facing.
+#
+# Scale path: api, worker and storefront hold no container state — sessions
+# live in Redis, files in MinIO/S3, queues in BullMQ — so
+# `docker compose -f docker-compose.prod.yml up -d --scale api=3 --scale worker=2`
+# just works. No published ports or container_name on any app service, on
+# purpose.
+#
+# NOTE for the admin/storefront images: the admin bakes NEXT_PUBLIC_* URLs at
+# BUILD time (next.config.ts), so its image is domain-specific — changing
+# BASE_DOMAIN means rebuilding it (`--build`). The GHCR images CI pushes are
+# built with the defaults and suit same-domain deploys only.
+
+name: merchant-prod
+
+# The one environment every app shares: compose-internal endpoints + the
+# public URL scheme. `environment` beats `env_file`, so these win over the
+# dev-flavoured values in `.env`.
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://merchant:${POSTGRES_PASSWORD:-merchant}@postgres:5432/merchant?schema=public
+  REDIS_URL: redis://redis:6379
+  API_URL: https://api.${BASE_DOMAIN:-localhost}
+  ADMIN_URL: https://admin.${BASE_DOMAIN:-localhost}
+  STOREFRONT_BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+  STOREFRONT_PROTOCOL: https
+  S3_ENDPOINT: https://assets.${BASE_DOMAIN:-localhost}
+  S3_PUBLIC_URL: https://assets.${BASE_DOMAIN:-localhost}/merchant-assets
+  S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-merchantminio}
+  S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-merchantminio}
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+  # Server-side fetches cross Caddy (S3 presigning, storefront → api on the
+  # shop's public hostname), so Node must trust Caddy's internal CA. With
+  # real certificates the file simply never exists and Node warns once.
+  NODE_EXTRA_CA_CERTS: /caddy-data/caddy/pki/authorities/local/root.crt
+
+x-caddy-ca: &caddy-ca
+  - caddy-data:/caddy-data:ro
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: merchant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-merchant}
+      POSTGRES_DB: merchant
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U merchant -d merchant"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-merchantminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-merchantminio}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Same one-shot bucket setup as dev: assets bucket, anonymous reads.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-merchantminio} ${MINIO_ROOT_PASSWORD:-merchantminio} &&
+      mc mb --ignore-existing local/merchant-assets &&
+      mc anonymous set download local/merchant-assets &&
+      echo 'minio ready'
+      "
+
+  # Mail is an optional profile: `--profile mail` runs Mailpit and the order
+  # emails land in its UI. Without it the worker's email jobs fail and retry —
+  # nothing else cares.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    profiles: ["mail"]
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      # 443 only binds after the TLS app provisioned, i.e. after the internal
+      # CA root the apps mount exists.
+      test: ["CMD", "nc", "-z", "127.0.0.1", "443"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks:
+      default:
+        # In-network DNS for the hostnames the apps dial *by public name*:
+        # server-side storefront → api travels as {slug}.{BASE_DOMAIN} (the
+        # Host header is the tenant — SPEC §6), and S3 presigning signs the
+        # public assets host. Real deployments resolve these through real DNS;
+        # these aliases make BASE_DOMAIN=localhost work with none. Additional
+        # shops resolve in the browser regardless — only server-side calls
+        # for extra local shops would need an alias added here.
+        aliases:
+          - api.${BASE_DOMAIN:-localhost}
+          - admin.${BASE_DOMAIN:-localhost}
+          - assets.${BASE_DOMAIN:-localhost}
+          - demo.${BASE_DOMAIN:-localhost}
+
+  # One-shot: migrate, then seed only if the database is empty. Every app
+  # waits for it, so replicas never race migrations.
+  db-setup:
+    image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: "no"
+    env_file: .env
+    environment:
+      <<: *app-env
+    command:
+      [
+        "sh",
+        "-c",
+        "pnpm --filter @merchant/db exec prisma migrate deploy && pnpm --filter @merchant/db exec tsx prisma/seed/seed-if-empty.ts",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    volumes: *caddy-ca
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      caddy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  worker:
+    image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/worker:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    volumes: *caddy-ca
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      caddy:
+        condition: service_healthy
+
+  admin:
+    image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/admin:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        API_URL: https://api.${BASE_DOMAIN:-localhost}
+        STOREFRONT_PROTOCOL: https
+        STOREFRONT_BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    volumes: *caddy-ca
+    depends_on:
+      caddy:
+        condition: service_healthy
+    healthcheck:
+      # Distroless: no shell, no curl — node itself is the probe.
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then((r)=>process.exit(r.status<500?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  storefront:
+    image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/storefront:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/storefront/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    volumes: *caddy-ca
+    depends_on:
+      api:
+        condition: service_healthy
+      caddy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "fetch('http://127.0.0.1:3002').then((r)=>process.exit(r.status<500?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  caddy-data:
+  caddy-config:

@@ -17,6 +17,7 @@ import rateLimit from '@fastify/rate-limit';
 import { RATE_LIMITS } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { shopForCustomDomain } from './lib/custom-domains.ts';
 import { rateLimited } from './lib/errors.ts';
 import csrf from './plugins/csrf.ts';
 import errorHandler from './plugins/error-handler.ts';
@@ -68,7 +69,25 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(cors, {
     // Admin and storefront are separate origins in dev; cookies must survive.
-    origin: [config.ADMIN_URL, storefrontOrigin],
+    // A function rather than a static list because storefronts also serve on
+    // registered custom domains (A5): those origins must be admitted too, or
+    // the beacon and the checkout's /vault/tokenize POST die on those shops.
+    origin: (origin, done) => {
+      if (!origin) return done(null, false);
+      if (origin === config.ADMIN_URL || storefrontOrigin.test(origin)) {
+        return done(null, true);
+      }
+      let hostname: string;
+      try {
+        hostname = new URL(origin).hostname;
+      } catch {
+        return done(null, false);
+      }
+      shopForCustomDomain(hostname).then(
+        (shop) => done(null, shop !== null),
+        (error) => done(error as Error, false),
+      );
+    },
     credentials: true,
   });
 

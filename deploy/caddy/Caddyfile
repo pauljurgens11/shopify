@@ -1,0 +1,70 @@
+# Caddy — the production stack's front door (A5, SPEC §17).
+#
+# Wildcard tenant routing, exactly the SPEC's shape:
+#   admin.{BASE_DOMAIN}   → admin:3000
+#   api.{BASE_DOMAIN}     → api:3001
+#   assets.{BASE_DOMAIN}  → minio:9000   (public bucket reads + presigned PUTs)
+#   everything else       → storefront:3002, with the browser-facing API paths
+#                           (/storefront/api/*, /vault/*) peeled off to api
+#
+# Tenancy keys off the Host header (SPEC §6); reverse_proxy passes Host
+# through untouched by default, which is the property everything relies on.
+#
+# TLS: `local_certs` issues from Caddy's internal CA so the whole stack can be
+# verified on BASE_DOMAIN=localhost with no real DNS. For a real domain:
+#   1. Remove `local_certs` and set `email` below — explicit hosts get
+#      Let's Encrypt automatically.
+#   2. `*.{BASE_DOMAIN}` needs either a DNS-challenge plugin for a wildcard
+#      cert, or leave the catch-all's `on_demand` to issue per-hostname certs
+#      as shops are visited (add an `on_demand_tls ask` endpoint to stop
+#      strangers minting certs against your rate limits).
+
+{
+	local_certs
+	# email admin@example.com
+	# on_demand_tls {
+	#	ask http://api:3001/health
+	# }
+}
+
+# One set of shopper-facing routes, shared by the wildcard-subdomain site and
+# the custom-domain catch-all: same shop, two hostnames.
+(storefront_routes) {
+	# The browser talks to the platform on the shop's own origin: the
+	# analytics beacon and cart/checkout calls post to /storefront/api/*,
+	# and the hosted card fields post the PAN to /vault/tokenize (SPEC §11)
+	# — none of that may terminate at the Next server.
+	@api path /storefront/api/* /vault/*
+	handle @api {
+		reverse_proxy api:3001
+	}
+	handle {
+		reverse_proxy storefront:3002
+	}
+}
+
+admin.{$BASE_DOMAIN} {
+	reverse_proxy admin:3000
+}
+
+api.{$BASE_DOMAIN} {
+	reverse_proxy api:3001
+}
+
+assets.{$BASE_DOMAIN} {
+	reverse_proxy minio:9000
+}
+
+*.{$BASE_DOMAIN} {
+	import storefront_routes
+}
+
+# Custom domains (CustomDomain table): any host the sites above did not claim
+# is a storefront, resolved by the API against the registered hostname. Certs
+# are minted on demand — internal CA locally, ACME when configured above.
+https:// {
+	tls {
+		on_demand
+	}
+	import storefront_routes
+}

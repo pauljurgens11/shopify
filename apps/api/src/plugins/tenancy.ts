@@ -22,6 +22,7 @@ import { dbAdmin } from '@merchant/db/client';
 import { dbForShop, type TenantClient } from '@merchant/db/tenant';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import { clearCustomDomainCache, shopForCustomDomain } from '../lib/custom-domains.ts';
 import { notFound, unauthorized } from '../lib/errors.ts';
 import { shopSlugFromHost } from '../lib/host.ts';
 import { getSession, sessionIdFromRequest, setSessionCookie } from '../lib/sessions.ts';
@@ -60,6 +61,7 @@ const shopBySlug = ttlCache<{ id: string; slug: string }>(30_000);
 /** Exported so A2's suite and A4's settings pages can invalidate after a write. */
 export function clearTenantCaches(): void {
   shopBySlug.clear();
+  clearCustomDomainCache();
 }
 
 function pathOf(request: FastifyRequest): string {
@@ -98,7 +100,18 @@ export async function resolveFromSession(
 
 async function resolveFromHost(request: FastifyRequest): Promise<void> {
   const slug = shopSlugFromHost(request.headers.host, env().STOREFRONT_BASE_DOMAIN);
-  if (!slug) throw notFound('Store');
+
+  // A host outside `{slug}.{base}` can still be a merchant's own domain (A5,
+  // SPEC §17) — the CustomDomain table decides. Hosts *under* the base domain
+  // never take this path: they are slug-or-nothing.
+  if (!slug) {
+    const shop = await shopForCustomDomain(request.headers.host);
+    if (!shop) throw notFound('Store');
+    request.shopId = shop.id;
+    request.shopSlug = shop.slug;
+    request.authKind = 'host';
+    return;
+  }
 
   let shop = shopBySlug.get(slug);
   if (!shop) {
