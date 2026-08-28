@@ -19,9 +19,9 @@ export const monochrome: ThemeDocInput = {
   },
   navigation: {
     links: [
+      // No 'Search' link — the header chrome already renders one (see aurora).
       { label: 'Shop', url: '/collections/featured' },
       { label: 'New', url: '/collections/featured?sort=created-desc' },
-      { label: 'Search', url: '/search' },
     ],
   },
   pages: {

@@ -19,9 +19,10 @@ export const aurora: ThemeDocInput = {
   },
   navigation: {
     links: [
+      // No 'Search' link here: the storefront header chrome always renders
+      // Search and Cart on the right, so a nav copy shows twice side by side.
       { label: 'Shop', url: '/collections/featured' },
       { label: 'New arrivals', url: '/collections/featured?sort=created-desc' },
-      { label: 'Search', url: '/search' },
     ],
   },
   pages: {
