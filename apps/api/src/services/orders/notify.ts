@@ -27,7 +27,10 @@ export type OrderSummary = {
 
 export type OrderNotification = {
   shopId: string;
-  topic: Extract<WebhookTopic, 'orders/create' | 'orders/paid' | 'orders/cancelled'>;
+  topic: Extract<
+    WebhookTopic,
+    'orders/create' | 'orders/paid' | 'orders/cancelled' | 'orders/fulfilled' | 'refunds/create'
+  >;
   order: OrderSummary;
 };
 

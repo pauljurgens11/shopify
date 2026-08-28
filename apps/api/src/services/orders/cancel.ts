@@ -16,28 +16,23 @@ import {
 } from '@merchant/contracts/orders';
 import type { TenantClient } from '@merchant/db/tenant';
 import { conflict, notFound } from '../../lib/errors.ts';
+import { adjustMany } from '../inventory/adjust.ts';
+import { loadOrderDetail } from './detail.ts';
 import { notifyOrder } from './notify.ts';
-import { toOrderDetail } from './serialize.ts';
 
 /** Money has already changed hands; C3's refund flow is the only way out. */
 const NEEDS_REFUND_FIRST = new Set(['paid', 'partially_refunded', 'refunded']);
 
-type Tx = Parameters<Parameters<TenantClient['$transaction']>[0]>[0];
-
 /**
- * Put the ordered quantities back, with an `InventoryAdjustment` for each —
- * a level that moves without history is a bug (CLAUDE.md §9).
+ * Put the ordered quantities back, through B4's adjustment service so every
+ * level change carries its history (CLAUDE.md §9).
  *
- * B4 owns `services/inventory` and its adjust service does not exist yet; when
- * it lands this function becomes a call to it. The invariant it must preserve
- * is the one enforced here: never write a level without writing its adjustment.
- *
- * Stock goes back to the location it is tracked at. Once C3 lands, a line that
- * was actually fulfilled should return to the location that shipped it instead.
+ * Stock returns to the location the variant is tracked at. Once a line has
+ * actually shipped, the fulfillment records where from — C3 restocks a refund
+ * the same way, and both should follow the fulfillment when one exists.
  */
 async function restockLines(
-  tx: Tx,
-  shopId: string,
+  db: TenantClient,
   order: { id: string; lineItems: Array<{ variantId: string | null; quantity: number }> },
   actor: string | null,
 ): Promise<void> {
@@ -48,37 +43,30 @@ async function restockLines(
   }
   if (wanted.size === 0) return;
 
-  const levels = await tx.inventoryLevel.findMany({
+  const levels = await db.inventoryLevel.findMany({
     where: { variantId: { in: [...wanted.keys()] } },
     orderBy: [{ variantId: 'asc' }, { locationId: 'asc' }],
   });
 
   const seen = new Set<string>();
+  const adjustments = [];
   for (const level of levels) {
-    // One location per variant: the first one it is stocked at, deterministically.
+    // One location per variant: the first it is stocked at, deterministically.
     if (seen.has(level.variantId)) continue;
     seen.add(level.variantId);
-
     const quantity = wanted.get(level.variantId);
     if (!quantity) continue;
-
-    await tx.inventoryLevel.update({
-      where: { id: level.id },
-      data: { available: { increment: quantity } },
-    });
-    await tx.inventoryAdjustment.create({
-      data: {
-        id: newId('inventory'),
-        shopId,
-        variantId: level.variantId,
-        locationId: level.locationId,
-        delta: quantity,
-        reason: 'restocked',
-        referenceId: order.id,
-        actor,
-      },
+    adjustments.push({
+      variantId: level.variantId,
+      locationId: level.locationId,
+      delta: quantity,
+      reason: 'restock' as const,
+      referenceId: order.id,
+      actor,
     });
   }
+
+  if (adjustments.length > 0) await adjustMany(db, adjustments);
 }
 
 export async function cancelOrder(
@@ -100,11 +88,14 @@ export async function cancelOrder(
     throw conflict('Refund this order before cancelling it.', 'financialStatus');
   }
 
-  const order = await db.$transaction(async (tx) => {
-    if (options.restock) {
-      await restockLines(tx, shopId, existing, actor);
-    }
+  // Before the order transaction, not inside it: the adjustment service runs
+  // its own transaction (it has to — the row locks are what make concurrent
+  // decrements safe), and it is also the step that can legitimately refuse.
+  if (options.restock) {
+    await restockLines(db, existing, actor);
+  }
 
+  const order = await db.$transaction(async (tx) => {
     return tx.order.update({
       where: { id: orderId },
       data: {
@@ -143,5 +134,5 @@ export async function cancelOrder(
     },
   });
 
-  return toOrderDetail(order);
+  return loadOrderDetail(db, orderId);
 }

@@ -16,10 +16,12 @@ import {
   orderSummarySchema,
 } from '@merchant/contracts/orders';
 import type {
+  Fulfillment as FulfillmentRow,
   OrderLineItem as LineRow,
   OrderEvent as OrderEventRow,
   Order as OrderRow,
   Payment as PaymentRow,
+  Refund as RefundRow,
 } from '@merchant/db/client';
 
 const money = (amount: number, currencyCode: string) => ({ amount, currencyCode });
@@ -36,6 +38,8 @@ export type OrderWithLines = OrderRow & { lineItems: LineRow[] };
 export type OrderWithDetail = OrderWithLines & {
   events?: OrderEventRow[];
   customer?: CustomerRow | null;
+  fulfillments?: FulfillmentRow[];
+  refunds?: RefundRow[];
 };
 
 function line(row: LineRow, currencyCode: string) {
@@ -66,6 +70,38 @@ function event(row: OrderEventRow) {
     actor: row.actor,
     payload: row.payload ?? {},
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function fulfillment(row: FulfillmentRow) {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    locationId: row.locationId,
+    status: row.status,
+    trackingNumber: row.trackingNumber,
+    trackingUrl: row.trackingUrl,
+    trackingCompany: row.trackingCompany,
+    lineItems: row.lineItems ?? [],
+    notifyCustomer: row.notifyCustomer,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function refund(row: RefundRow, currencyCode: string) {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    amount: money(row.amount, currencyCode),
+    shippingAmount: money(row.shippingAmount, currencyCode),
+    reason: row.reason,
+    note: row.note,
+    lineItems: row.lineItems ?? [],
+    restock: row.restock,
+    paymentRefundId: row.paymentRefundId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -138,9 +174,8 @@ export function toOrderDetail(
 ): OrderDetail {
   return orderDetailSchema.parse({
     ...base(order),
-    // C3 fills these in; until then an order simply has none.
-    fulfillments: [],
-    refunds: [],
+    fulfillments: (order.fulfillments ?? []).map(fulfillment),
+    refunds: (order.refunds ?? []).map((r) => refund(r, order.currencyCode)),
     events: (order.events ?? []).map(event),
     customer: order.customer ?? null,
     payments: (extras.payments ?? []).map(payment),
