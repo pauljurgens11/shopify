@@ -19,7 +19,7 @@
     "reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "dotenv -e ../../.env -- vitest run",
     "validate": "dotenv -e ../../.env -- prisma validate"
   },
   "dependencies": {
@@ -28,6 +28,8 @@
     "@prisma/client": "^6.3.0"
   },
   "devDependencies": {
+    "@merchant/contracts": "workspace:*",
+    "@merchant/theme-engine": "workspace:*",
     "@types/node": "^22.10.7",
     "dotenv-cli": "^8.0.0",
     "prisma": "^6.3.0",
