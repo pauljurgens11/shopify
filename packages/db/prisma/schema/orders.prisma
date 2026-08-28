@@ -117,12 +117,18 @@ model Refund {
   lineItems       Json    @default("[]")
   restock         Boolean @default(true)
   paymentRefundId String?
+  // The client's idempotency key (or the refund's own id when none was sent).
+  // `refundOrder` looks a replayed key up here BEFORE touching the processor,
+  // so a double-clicked Refund button cannot create a second Refund row —
+  // the unique index below is the backstop for two requests racing on one key.
+  idempotencyKey  String?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
+  @@unique([shopId, idempotencyKey])
   @@index([shopId])
   @@index([orderId])
   @@map("refunds")

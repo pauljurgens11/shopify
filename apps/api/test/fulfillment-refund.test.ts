@@ -18,6 +18,7 @@ import { tokenizeCard } from '@merchant/pay/vault';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeRedis } from '../src/lib/redis.ts';
+import { adjustMany } from '../src/services/inventory/adjust.ts';
 import { createOrder } from '../src/services/orders/create.ts';
 import { buildTestApp, createTestShop, deleteTestShops, sessionCookie } from './helpers.ts';
 
@@ -213,6 +214,73 @@ describe('POST /admin/api/orders/:id/fulfillments', () => {
     expect(events.filter((t: string) => t === 'fulfillment_created')).toHaveLength(2);
   });
 
+  it('is stock-neutral for units checkout already reserved (no double decrement)', async () => {
+    // A storefront order arrives with its stock already decremented: E3
+    // reserves with reason `sold` referencing the order before any fulfillment
+    // exists. Fulfilling must then move NOTHING — the sale was counted once.
+    const jacket = await stockedVariant(10, 2500);
+    const order = await placeOrder([{ variant: jacket, quantity: 2, price: 2500 }]);
+    const lineId = order.lineItems[0]?.id;
+
+    await adjustMany(db, [
+      {
+        variantId: jacket.variantId,
+        locationId,
+        delta: -2,
+        reason: 'sold',
+        referenceId: order.id,
+      },
+    ]);
+    expect(await availableAt(jacket.variantId)).toBe(8);
+
+    const partial = await post(`/admin/api/orders/${order.id}/fulfillments`, {
+      locationId,
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+    });
+    expect(partial.statusCode).toBe(201);
+    expect(await availableAt(jacket.variantId)).toBe(8);
+
+    const rest = await post(`/admin/api/orders/${order.id}/fulfillments`, {
+      locationId,
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+    });
+    expect(rest.statusCode).toBe(201);
+    expect(rest.json().fulfillmentStatus).toBe('fulfilled');
+    expect(await availableAt(jacket.variantId)).toBe(8);
+
+    // Exactly one decrement in the ledger: the reservation.
+    const sold = await dbAdmin.inventoryAdjustment.findMany({
+      where: { variantId: jacket.variantId, reason: 'sold' },
+    });
+    expect(sold).toHaveLength(1);
+    expect(sold[0]?.delta).toBe(-2);
+  });
+
+  it('treats refunded units as settled, not still waiting to ship', async () => {
+    // Refund 1 of 2, ship the other: the order is fulfilled, and the refunded
+    // unit cannot be fulfilled again (which would take stock for nothing).
+    const jacket = await stockedVariant(10, 2500);
+    const order = await placeOrder([{ variant: jacket, quantity: 2, price: 2500 }]);
+    const lineId = order.lineItems[0]?.id;
+    await payFor(order);
+
+    await refund(order.id, { lineItems: [{ lineItemId: lineId, quantity: 1 }] });
+
+    const both = await post(`/admin/api/orders/${order.id}/fulfillments`, {
+      locationId,
+      lineItems: [{ lineItemId: lineId, quantity: 2 }],
+    });
+    expect(both.statusCode).toBe(409);
+
+    const rest = await post(`/admin/api/orders/${order.id}/fulfillments`, {
+      locationId,
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+    });
+    expect(rest.statusCode).toBe(201);
+    expect(rest.json().fulfillmentStatus).toBe('fulfilled');
+    expect(await availableAt(jacket.variantId)).toBe(9);
+  });
+
   it('refuses to fulfil more than the line has left', async () => {
     const jacket = await stockedVariant(10, 2500);
     const order = await placeOrder([{ variant: jacket, quantity: 2, price: 2500 }]);
@@ -358,5 +426,86 @@ describe('refund proration', () => {
     });
     expect(adjustment.delta).toBe(1);
     expect(adjustment.referenceId).toBe(returned.refunds.at(-1).id);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Refund idempotency                                                           */
+/* -------------------------------------------------------------------------- */
+
+describe('refund idempotency', () => {
+  it('replays the same key as a no-op: one Refund row, totals unchanged', async () => {
+    const jacket = await stockedVariant(10, 2500);
+    const order = await placeOrder([{ variant: jacket, quantity: 2, price: 2500 }]);
+    const lineId = order.lineItems[0]?.id;
+    const payment = await payFor(order);
+
+    const key = `refund-once-${order.id}`;
+    const first = await refund(order.id, {
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+      restock: true,
+      idempotencyKey: key,
+    });
+    expect(first.refundedTotal).toEqual(usd(2500));
+    expect(first.refunds).toHaveLength(1);
+    expect(await availableAt(jacket.variantId)).toBe(11);
+
+    // The replay: same key, same body. Nothing may move a second time — not
+    // the Refund row, not the totals, not the stock, not the processor.
+    const replay = await refund(order.id, {
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+      restock: true,
+      idempotencyKey: key,
+    });
+    expect(replay.refundedTotal).toEqual(usd(2500));
+    expect(replay.refunds).toHaveLength(1);
+    expect(replay.financialStatus).toBe('partially_refunded');
+    expect(await availableAt(jacket.variantId)).toBe(11);
+
+    const paymentRefunds = await dbAdmin.paymentRefund.findMany({
+      where: { paymentId: payment.id },
+    });
+    expect(paymentRefunds).toHaveLength(1);
+    expect(paymentRefunds[0]?.amount).toBe(2500);
+
+    const line = await dbAdmin.orderLineItem.findFirstOrThrow({ where: { id: lineId } });
+    expect(line.refundedQuantity).toBe(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Cancelling a refunded order                                                  */
+/* -------------------------------------------------------------------------- */
+
+describe('POST /admin/api/orders/:id/cancel after a full refund', () => {
+  it('cancels, stays refunded, and does not restock what the refund returned', async () => {
+    const jacket = await stockedVariant(10, 2500);
+    const order = await placeOrder([{ variant: jacket, quantity: 2, price: 2500 }]);
+    const lineId = order.lineItems[0]?.id;
+    await payFor(order);
+
+    const refunded = await refund(order.id, {
+      lineItems: [{ lineItemId: lineId, quantity: 2 }],
+      restock: true,
+    });
+    expect(refunded.financialStatus).toBe('refunded');
+    expect(await availableAt(jacket.variantId)).toBe(12);
+
+    const cancelled = await post(`/admin/api/orders/${order.id}/cancel`, {
+      reason: 'customer',
+      restock: true,
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json().cancelledAt).not.toBeNull();
+    // The money went back — the order was refunded, not voided.
+    expect(cancelled.json().financialStatus).toBe('refunded');
+    // The refund already restocked both units; cancel must not re-add them.
+    expect(await availableAt(jacket.variantId)).toBe(12);
+
+    const again = await post(`/admin/api/orders/${order.id}/cancel`, {
+      reason: 'customer',
+      restock: true,
+    });
+    expect(again.statusCode).toBe(409);
   });
 });
