@@ -100,7 +100,17 @@ export default function RefundPage() {
   }, [detail, id, lineItems, shippingAmount, restock]);
 
   if (order.isPending) return <PageSkeleton />;
-  if (!detail) return null;
+  // A bare `return null` here paints a blank white page, which reads as a
+  // crash rather than a missing order.
+  if (!detail) {
+    return (
+      <Page title="Refund" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
+        <Card>
+          <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
+        </Card>
+      </Page>
+    );
+  }
 
   const refundable = detail.lineItems.filter((line) => remainingToRefund(line) > 0);
   const total = calculation?.total ?? { amount: 0, currencyCode };

@@ -15,6 +15,7 @@ import { apiGet, storefrontApiUrl } from '../../../lib/api.ts';
 import { resolveThemeReferences } from '../../../lib/page-data.ts';
 import { sectionData } from '../../../lib/render.tsx';
 import { currentCart, shopContext } from '../../../lib/shop.ts';
+import { resolveShopSlug } from '../../../lib/tenant.ts';
 
 type Params = { handle: string };
 
@@ -27,30 +28,48 @@ interface CollectionProductsResponse {
 const single = (value: string | string[] | undefined): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const { handle } = await params;
-  return { title: handle.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
-}
-
-export default async function CollectionPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<Params>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const [{ handle }, query] = await Promise.all([params, searchParams]);
-  const { slug, shop, theme, isPreview } = await shopContext();
-
+/**
+ * The API's collection query for this URL. Metadata and the page build the same
+ * request on purpose: Next memoizes identical fetches inside one render, so the
+ * title costs no extra round trip — and it is the merchant's real collection
+ * title rather than a title-cased handle ("Sale: 20% Off" ≠ "Sale 20 Off").
+ */
+function collectionQuery(query: Record<string, string | string[] | undefined>): URLSearchParams {
   const sort = single(query.sort);
   const cursor = single(query.cursor);
   const search = new URLSearchParams({ limit: '24' });
   if (sort) search.set('sort', sort);
   if (cursor) search.set('cursor', cursor);
+  return search;
+}
+
+type PageProps = {
+  params: Promise<Params>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const [{ handle }, query] = await Promise.all([params, searchParams]);
+  const slug = await resolveShopSlug();
+  const page = slug
+    ? await apiGet<CollectionProductsResponse>(
+        slug,
+        `/collections/${encodeURIComponent(handle)}/products?${collectionQuery(query)}`,
+      )
+    : null;
+  return page ? { title: page.collection.title } : {};
+}
+
+export default async function CollectionPage({ params, searchParams }: PageProps) {
+  const [{ handle }, query] = await Promise.all([params, searchParams]);
+  const { slug, shop, theme, isPreview } = await shopContext();
+
+  const sort = single(query.sort);
+  const cursor = single(query.cursor);
 
   const page = await apiGet<CollectionProductsResponse>(
     slug,
-    `/collections/${encodeURIComponent(handle)}/products?${search}`,
+    `/collections/${encodeURIComponent(handle)}/products?${collectionQuery(query)}`,
   );
   if (!page) notFound();
 

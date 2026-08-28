@@ -21,15 +21,18 @@ import {
   Card,
   IndexFilters,
   IndexTable,
+  Modal,
   Page,
   Text,
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
-import { useApiQuery } from '../../../../lib/api.ts';
+import { useToast } from '../../../../components/shell/toast-provider.tsx';
+import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
 
@@ -41,6 +44,37 @@ const TABS = [
   { label: 'Abandoned checkouts', segment: 'abandoned-checkout' },
 ] as const;
 
+/**
+ * A segment tab can be empty without anything being wrong — "Abandoned
+ * checkouts" is empty on a freshly seeded shop by construction, and
+ * "No customers found. Try changing the filters" would be a lie there. Each
+ * tab explains its own emptiness instead (CLAUDE.md §8, real empty states).
+ */
+const SEGMENT_EMPTY: Record<string, { heading: string; body: string }> = {
+  new: {
+    heading: 'No new customers',
+    body: 'Customers who placed their first order in the last 30 days show up here.',
+  },
+  returning: {
+    heading: 'No returning customers yet',
+    body: 'Customers appear here once they have placed more than one order.',
+  },
+  'abandoned-checkout': {
+    heading: 'No abandoned checkouts',
+    body: 'Checkouts started in the last 72 hours but never completed show up here.',
+  },
+};
+
+/** The sort keys `listCustomers` actually honours (C4). */
+const SORT_OPTIONS = [
+  { label: 'Date added', value: 'createdAt desc' as const, directionLabel: 'Newest first' },
+  { label: 'Date added', value: 'createdAt asc' as const, directionLabel: 'Oldest first' },
+  { label: 'Last name', value: 'lastName asc' as const, directionLabel: 'A–Z' },
+  { label: 'Last name', value: 'lastName desc' as const, directionLabel: 'Z–A' },
+  { label: 'Email', value: 'email asc' as const, directionLabel: 'A–Z' },
+  { label: 'Email', value: 'email desc' as const, directionLabel: 'Z–A' },
+];
+
 function customerName(customer: Customer): string {
   const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ').trim();
   return name === '' ? customer.email : name;
@@ -49,10 +83,15 @@ function customerName(customer: Customer): string {
 export default function CustomersPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
+  const toast = useToast();
+  const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<string[]>(['createdAt desc']);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { mode, setMode } = useSetIndexFiltersMode();
 
   const cursor = cursorStack.at(-1);
@@ -62,22 +101,49 @@ export default function CustomersPage() {
     const search = new URLSearchParams({ limit: String(PAGE_SIZE) });
     if (segment) search.set('segment', segment);
     if (query.trim() !== '') search.set('query', query.trim());
+    const [sortKey, sortOrder] = (sort[0] ?? '').split(' ');
+    if (sortKey) search.set('sortKey', sortKey);
+    if (sortOrder) search.set('sortOrder', sortOrder);
     if (cursor) search.set('cursor', cursor);
     return `/admin/api/customers?${search.toString()}`;
-  }, [segment, query, cursor]);
+  }, [segment, query, sort, cursor]);
 
   const customers = useApiQuery<Paginated<Customer>>(['customers', path], path);
   const rows = customers.data?.data ?? [];
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(
-    rows as unknown as Array<{ [key: string]: unknown; id: string }>,
-  );
+  const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
+    useIndexResourceState(rows as unknown as Array<{ [key: string]: unknown; id: string }>);
 
   const resetPaging = () => setCursorStack([]);
+
+  /**
+   * The checkbox column has to lead somewhere — a bulk bar with no actions in
+   * it is a dead control (CLAUDE.md §8).
+   */
+  const deleteSelected = async () => {
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        selectedResources.map((id) => apiFetch(`/admin/api/customers/${id}`, { method: 'DELETE' })),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.show('Customers deleted');
+      clearSelection();
+    } catch (cause) {
+      toast.error((cause as ApiError).message);
+    } finally {
+      setBulkBusy(false);
+      setConfirmingDelete(false);
+    }
+  };
 
   if (customers.isPending) return <PageSkeleton />;
 
   const empty = rows.length === 0 && query.trim() === '' && !segment && cursorStack.length === 0;
+
+  // An unfiltered segment that is simply empty explains itself; a search that
+  // found nothing gets the "change the filters" line instead.
+  const segmentEmpty = query.trim() === '' && segment ? SEGMENT_EMPTY[segment] : undefined;
 
   return (
     <Page
@@ -129,6 +195,12 @@ export default function CustomersPage() {
                 resetPaging();
               }}
               filters={[]}
+              sortOptions={SORT_OPTIONS}
+              sortSelected={sort}
+              onSort={(value) => {
+                setSort(value);
+                resetPaging();
+              }}
               onClearAll={() => {
                 setQuery('');
                 resetPaging();
@@ -151,6 +223,9 @@ export default function CustomersPage() {
                 { title: 'Orders' },
                 { title: 'Amount spent' },
               ]}
+              promotedBulkActions={[
+                { content: 'Delete customers', onAction: () => setConfirmingDelete(true) },
+              ]}
               pagination={{
                 hasPrevious: cursorStack.length > 0,
                 hasNext: Boolean(customers.data?.nextCursor),
@@ -161,11 +236,16 @@ export default function CustomersPage() {
                 },
               }}
               emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
-                    No customers found. Try changing the search or filters.
-                  </Text>
-                </div>
+                <Box padding="800">
+                  <BlockStack gap="200" inlineAlign="center">
+                    <Text as="h2" variant="headingMd">
+                      {segmentEmpty?.heading ?? 'No customers found'}
+                    </Text>
+                    <Text as="p" tone="subdued" alignment="center">
+                      {segmentEmpty?.body ?? 'Try changing the search or filters.'}
+                    </Text>
+                  </BlockStack>
+                </Box>
               }
             >
               {rows.map((customer, index) => (
@@ -200,6 +280,25 @@ export default function CustomersPage() {
           </>
         )}
       </Card>
+
+      <Modal
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title={`Delete ${selectedResources.length} customer${selectedResources.length === 1 ? '' : 's'}?`}
+        primaryAction={{
+          content: 'Delete',
+          destructive: true,
+          loading: bulkBusy,
+          onAction: deleteSelected,
+        }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            This can’t be undone. Orders these customers already placed keep their details.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

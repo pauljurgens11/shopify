@@ -6,10 +6,28 @@
  * One request feeds every card — G2 returns the whole dashboard in a single
  * `analyticsDashboardResponse`, so the page has one loading state rather than
  * six racing spinners. `Live view` is the exception: it polls on its own.
+ *
+ * The controls sit at the TOP LEFT of the content, not in the page header:
+ * Shopify's analytics puts the range button and the compare toggle above the
+ * cards they filter, and a range control in `primaryAction` reads as a save
+ * button (PARITY.md).
  */
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
-import { BlockStack, Card, Grid, InlineStack, Layout, Page, Select, Text } from '@shopify/polaris';
+import {
+  ActionList,
+  BlockStack,
+  Box,
+  Button,
+  Card,
+  Grid,
+  InlineStack,
+  Layout,
+  Page,
+  Popover,
+  Text,
+} from '@shopify/polaris';
+import { CalendarIcon } from '@shopify/polaris-icons';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
@@ -17,8 +35,8 @@ import { FunnelCard } from './funnel-card.tsx';
 import { LiveCard } from './live-card.tsx';
 import { MetricCard } from './metric-card.tsx';
 import {
+  averageOrderValueOf,
   deltaPercent,
-  formatPercent,
   RANGE_OPTIONS,
   type RangePreset,
   rangeQueryString,
@@ -28,6 +46,8 @@ import { TopProductsCard } from './top-products-card.tsx';
 
 export default function AnalyticsPage() {
   const [preset, setPreset] = useState<RangePreset>('30d');
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [compare, setCompare] = useState(true);
 
   // Pinned per preset so the range does not slide under the user mid-session,
   // and so the query key stays stable across re-renders.
@@ -38,38 +58,71 @@ export default function AnalyticsPage() {
     `/admin/api/analytics?${query}`,
   );
 
+  const rangeLabel = RANGE_OPTIONS.find((option) => option.value === preset)?.label ?? 'Today';
+
+  const controls = (
+    <InlineStack gap="200" blockAlign="center">
+      <Popover
+        active={rangeOpen}
+        onClose={() => setRangeOpen(false)}
+        preferredAlignment="left"
+        activator={
+          <Button icon={CalendarIcon} disclosure onClick={() => setRangeOpen((open) => !open)}>
+            {rangeLabel}
+          </Button>
+        }
+      >
+        <ActionList
+          actionRole="menuitem"
+          items={RANGE_OPTIONS.map((option) => ({
+            content: option.label,
+            active: option.value === preset,
+            onAction: () => {
+              setPreset(option.value);
+              setRangeOpen(false);
+            },
+          }))}
+        />
+      </Popover>
+      <Button pressed={compare} onClick={() => setCompare((on) => !on)}>
+        Compare to previous period
+      </Button>
+    </InlineStack>
+  );
+
   if (isLoading) return <PageSkeleton />;
 
   if (error || !data) {
     return (
       <Page title="Analytics">
-        <Card>
-          <Text as="p" tone="subdued">
-            {error?.message ?? 'Analytics are unavailable right now.'}
-          </Text>
-        </Card>
+        <BlockStack gap="400">
+          {controls}
+          <Card>
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Analytics are unavailable
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  {error?.message ?? 'We could not load this report. Try again in a moment.'}
+                </Text>
+              </BlockStack>
+            </Box>
+          </Card>
+        </BlockStack>
       </Page>
     );
   }
 
   const { summary, funnel } = data;
   const currencyCode = summary.totalSales.currencyCode;
-  const comparison = summary.comparison;
+  const comparison = compare ? summary.comparison : null;
 
   return (
-    <Page
-      title="Analytics"
-      primaryAction={
-        <Select
-          label="Date range"
-          labelHidden
-          options={RANGE_OPTIONS}
-          value={preset}
-          onChange={(value) => setPreset(value as RangePreset)}
-        />
-      }
-    >
+    <Page title="Analytics">
       <BlockStack gap="400">
+        {controls}
+
         <Grid>
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
@@ -91,16 +144,25 @@ export default function AnalyticsPage() {
           </Grid.Cell>
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
-              label="Conversion rate"
-              value={formatPercent(summary.conversionRate)}
-              delta={null}
+              label="Sessions"
+              value={summary.sessionCount.toLocaleString('en-US')}
+              delta={
+                comparison ? deltaPercent(summary.sessionCount, comparison.sessionCount) : null
+              }
             />
           </Grid.Cell>
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
               label="Average order value"
               value={format(summary.averageOrderValue)}
-              delta={null}
+              delta={
+                comparison
+                  ? deltaPercent(
+                      summary.averageOrderValue.amount,
+                      averageOrderValueOf(comparison.totalSales.amount, comparison.orderCount),
+                    )
+                  : null
+              }
             />
           </Grid.Cell>
         </Grid>
@@ -120,23 +182,29 @@ export default function AnalyticsPage() {
                   <Text as="h3" variant="headingMd">
                     Sales by channel
                   </Text>
-                  {data.salesByChannel.map((channel) => (
-                    <InlineStack key={channel.channel} align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        {channel.channel}
-                      </Text>
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {format(channel.revenue)}
-                      </Text>
-                    </InlineStack>
-                  ))}
+                  {data.salesByChannel.length === 0 ? (
+                    <Text as="p" tone="subdued">
+                      No sales in this period yet.
+                    </Text>
+                  ) : (
+                    data.salesByChannel.map((channel) => (
+                      <InlineStack key={channel.channel} align="space-between">
+                        <Text as="span" variant="bodyMd">
+                          {channel.channel}
+                        </Text>
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {format(channel.revenue)}
+                        </Text>
+                      </InlineStack>
+                    ))
+                  )}
                 </BlockStack>
               </Card>
             </BlockStack>
           </Layout.Section>
           <Layout.Section variant="oneHalf">
             <BlockStack gap="400">
-              <FunnelCard funnel={funnel} />
+              <FunnelCard funnel={funnel} conversionRate={summary.conversionRate} />
               <LiveCard />
             </BlockStack>
           </Layout.Section>

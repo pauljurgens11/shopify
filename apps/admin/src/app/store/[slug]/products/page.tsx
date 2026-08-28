@@ -136,9 +136,8 @@ export default function ProductsPage() {
   };
 
   const setStatus = (next: Product['status']) =>
-    applyToSelection(
-      next === 'active' ? 'Products set to active' : `Products set to ${next}`,
-      (id) => apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
+    applyToSelection(next === 'archived' ? 'Products archived' : `Products set to ${next}`, (id) =>
+      apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
     );
 
   if (products.isPending) return <PageSkeleton />;
@@ -159,8 +158,7 @@ export default function ProductsPage() {
         {empty ? (
           // Hand-built rather than Polaris `EmptyState`, which requires an
           // `image`: the only on-brand illustrations are Shopify's own CDN
-          // assets, and PARITY.md forbids rendering those (A3 hit the same wall
-          // in `ComingOnline`).
+          // assets, and PARITY.md forbids rendering those.
           <Box padding="800">
             <BlockStack gap="200" inlineAlign="center">
               <Text as="h2" variant="headingMd">
@@ -284,11 +282,11 @@ export default function ProductsPage() {
                 },
               }}
               emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
+                <Box padding="800">
+                  <Text as="p" tone="subdued" alignment="center">
                     No products found. Try changing the search or filters.
                   </Text>
-                </div>
+                </Box>
               }
             >
               {rows.map((product, index) => (

@@ -10,7 +10,7 @@
  * decimal *strings* only because that is what a text input is; conversion is
  * `fromDecimal`/`toDecimal`, never `parseFloat`.
  */
-import { format, fromDecimal, toDecimal } from '@merchant/config/money';
+import { format, fromDecimal, minorUnitFactor, toDecimal } from '@merchant/config/money';
 import type { ShippingRate } from '@merchant/contracts/shops';
 import {
   BlockStack,
@@ -39,11 +39,15 @@ type Draft = { name: string; price: string; min: string; max: string };
 
 const EMPTY: Draft = { name: '', price: '', min: '', max: '' };
 
+/** "10.50", not `String(toDecimal())`'s "10.5" — a price field shows its cents. */
+const amountString = (m: ShippingRate['price']): string =>
+  toDecimal(m).toFixed(minorUnitFactor(m.currencyCode) === 1 ? 0 : 2);
+
 const toDraft = (rate: ShippingRate): Draft => ({
   name: rate.name,
-  price: String(toDecimal(rate.price)),
-  min: rate.minOrderSubtotal ? String(toDecimal(rate.minOrderSubtotal)) : '',
-  max: rate.maxOrderSubtotal ? String(toDecimal(rate.maxOrderSubtotal)) : '',
+  price: amountString(rate.price),
+  min: rate.minOrderSubtotal ? amountString(rate.minOrderSubtotal) : '',
+  max: rate.maxOrderSubtotal ? amountString(rate.maxOrderSubtotal) : '',
 });
 
 function conditionText(rate: ShippingRate): string {
@@ -68,6 +72,8 @@ export default function ShippingSettingsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<ShippingRate | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const open = (rate: ShippingRate | null) => {
     setEditing(rate);
@@ -116,12 +122,15 @@ export default function ShippingSettingsPage() {
   };
 
   const remove = (rate: ShippingRate) => {
+    setRemoving(true);
     apiFetch(`${PATH}/${rate.id}`, { method: 'DELETE' })
       .then(() => {
         toast.show('Shipping rate deleted');
+        setDeleting(null);
         return refresh();
       })
-      .catch((cause: ApiError) => toast.error(cause.message));
+      .catch((cause: ApiError) => toast.error(cause.message))
+      .finally(() => setRemoving(false));
   };
 
   return (
@@ -169,14 +178,21 @@ export default function ShippingSettingsPage() {
                     </BlockStack>
                     <InlineStack gap="300" blockAlign="center">
                       <Text as="span">{format(rate.price)}</Text>
-                      <Button
-                        variant="plain"
-                        tone="critical"
-                        onClick={() => remove(rate)}
-                        accessibilityLabel={`Delete ${rate.name}`}
-                      >
-                        Delete
-                      </Button>
+                      {/* ResourceItem's row click fires for anything inside it, so
+                          without this Delete also opens the edit modal behind the
+                          confirmation. Same containment as the inventory table. */}
+                      {/** biome-ignore lint/a11y/noStaticElementInteractions: containment only */}
+                      {/** biome-ignore lint/a11y/useKeyWithClickEvents: containment only */}
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <Button
+                          variant="plain"
+                          tone="critical"
+                          onClick={() => setDeleting(rate)}
+                          accessibilityLabel={`Delete ${rate.name}`}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </InlineStack>
                   </InlineStack>
                 </ResourceItem>
@@ -185,6 +201,27 @@ export default function ShippingSettingsPage() {
           </BlockStack>
         )}
       </Card>
+
+      {/* Deleting a rate is immediate and unrecoverable, so it asks first — the
+          same confirmation every other destructive action in Settings uses. */}
+      <Modal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={deleting ? `Delete ${deleting.name}?` : 'Delete rate?'}
+        primaryAction={{
+          content: 'Delete',
+          destructive: true,
+          loading: removing,
+          onAction: () => (deleting ? remove(deleting) : undefined),
+        }}
+        secondaryActions={[
+          { content: 'Cancel', onAction: () => setDeleting(null), disabled: removing },
+        ]}
+      >
+        <Modal.Section>
+          <Text as="p">Customers stop seeing this rate at checkout immediately.</Text>
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={draft !== null}

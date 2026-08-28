@@ -11,11 +11,12 @@
  * Which controls appear depends on the type, which is why the index's create
  * button is a split menu rather than a plain "New".
  */
-import { format } from '@merchant/config/money';
+import { format, fromDecimal } from '@merchant/config/money';
 import type { Discount } from '@merchant/contracts/discounts';
 import {
   BlockStack,
   Button,
+  ButtonGroup,
   Card,
   Checkbox,
   ChoiceList,
@@ -24,6 +25,7 @@ import {
   InlineError,
   InlineStack,
   Layout,
+  Modal,
   Page,
   Text,
   TextField,
@@ -45,6 +47,19 @@ const TYPE_TITLES: Record<Discount['type'], string> = {
   free_shipping: 'Free shipping',
 };
 
+/** What a half-typed money field looks like: "", "19", "19.", "19.99". */
+const DECIMAL = /^\d+(\.\d*)?$/;
+
+/**
+ * Format a dollars-as-typed field for the summary. Goes through `fromDecimal`
+ * like `draftToInput` does, so the summary and the saved discount agree — and
+ * so a zero-decimal currency is not silently multiplied by 100 (CLAUDE.md §5).
+ */
+function typedMoney(value: string, currencyCode: string): string {
+  const trimmed = value.trim();
+  return format(fromDecimal(DECIMAL.test(trimmed) ? trimmed : '0', currencyCode));
+}
+
 /** The summary card's bullets — the same sentences Shopify uses. */
 function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
   const lines: string[] = [];
@@ -55,11 +70,7 @@ function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
     const target = draft.type === 'amount_off_products' ? 'the selected products' : 'the order';
     lines.push(`${draft.value || '0'}% off ${target}`);
   } else {
-    const amount = format({
-      amount: Math.round(Number(draft.value || '0') * 100),
-      currencyCode,
-    });
-    lines.push(`${amount} off`);
+    lines.push(`${typedMoney(draft.value, currencyCode)} off`);
   }
 
   if (draft.appliesToScope === 'collections') {
@@ -73,7 +84,7 @@ function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
   }
 
   if (draft.minimumKind === 'subtotal' && draft.minimumSubtotal !== '') {
-    lines.push(`Minimum purchase of ${draft.minimumSubtotal}`);
+    lines.push(`Minimum purchase of ${typedMoney(draft.minimumSubtotal, currencyCode)}`);
   }
   if (draft.minimumKind === 'quantity' && draft.minimumQuantity !== '') {
     lines.push(`Minimum quantity of ${draft.minimumQuantity} items`);
@@ -114,6 +125,8 @@ export function DiscountForm({
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<'products' | 'collections' | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const set = <K extends keyof DiscountDraft>(key: K, value: DiscountDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -153,6 +166,7 @@ export function DiscountForm({
 
   const remove = async () => {
     if (!discountId) return;
+    setDeleting(true);
     try {
       await apiFetch(`/admin/api/discounts/${discountId}`, { method: 'DELETE' });
       await queryClient.invalidateQueries({ queryKey: ['discounts'] });
@@ -160,6 +174,8 @@ export function DiscountForm({
       router.push(`/store/${slug}/discounts`);
     } catch (cause) {
       toast.error((cause as ApiError).message);
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -169,7 +185,15 @@ export function DiscountForm({
       title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
       subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
       secondaryActions={
-        discountId ? [{ content: 'Delete', destructive: true, onAction: remove }] : undefined
+        discountId
+          ? [
+              {
+                content: 'Delete',
+                destructive: true,
+                onAction: () => setConfirmingDelete(true),
+              },
+            ]
+          : undefined
       }
     >
       <SaveBar
@@ -208,9 +232,12 @@ export function DiscountForm({
                         value={draft.code}
                         onChange={(value) => set('code', value.toUpperCase())}
                         error={shown.code}
-                        connectedRight={
-                          <Button onClick={() => set('code', generateCode())}>Generate</Button>
-                        }
+                        // Shopify puts Generate on the label row as a link, not
+                        // as a button welded to the field (PARITY.md → C6).
+                        labelAction={{
+                          content: 'Generate',
+                          onAction: () => set('code', generateCode()),
+                        }}
                         helpText="Customers enter this code at checkout."
                       />
                     </FormLayout>
@@ -243,30 +270,39 @@ export function DiscountForm({
                     <Text as="h2" variant="headingMd">
                       Value
                     </Text>
-                    <FormLayout>
-                      <ChoiceList
-                        title="Value type"
-                        titleHidden
-                        choices={[
-                          { label: 'Percentage', value: 'percentage' },
-                          { label: 'Fixed amount', value: 'fixed' },
-                        ]}
-                        selected={[draft.valueType]}
-                        onChange={([value]) =>
-                          set('valueType', value as DiscountDraft['valueType'])
-                        }
-                      />
-                      <TextField
-                        label="Value"
-                        type="number"
-                        autoComplete="off"
-                        value={draft.value}
-                        onChange={(value) => set('value', value)}
-                        error={shown.value}
-                        prefix={draft.valueType === 'fixed' ? symbol : undefined}
-                        suffix={draft.valueType === 'percentage' ? '%' : undefined}
-                      />
-                    </FormLayout>
+                    {/* Segmented control + field on one row, which is how
+                        Shopify's value picker reads (PARITY.md → C6). Aligned
+                        to the start so a validation message growing under the
+                        field does not drag the buttons down with it. */}
+                    <InlineStack gap="300" blockAlign="start" wrap={false}>
+                      <ButtonGroup variant="segmented">
+                        <Button
+                          pressed={draft.valueType === 'percentage'}
+                          onClick={() => set('valueType', 'percentage')}
+                        >
+                          Percentage
+                        </Button>
+                        <Button
+                          pressed={draft.valueType === 'fixed'}
+                          onClick={() => set('valueType', 'fixed')}
+                        >
+                          Fixed amount
+                        </Button>
+                      </ButtonGroup>
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label="Value"
+                          labelHidden
+                          type="number"
+                          autoComplete="off"
+                          value={draft.value}
+                          onChange={(value) => set('value', value)}
+                          error={shown.value}
+                          prefix={draft.valueType === 'fixed' ? symbol : undefined}
+                          suffix={draft.valueType === 'percentage' ? '%' : undefined}
+                        />
+                      </div>
+                    </InlineStack>
                   </BlockStack>
                 </Card>
               )}
@@ -460,6 +496,25 @@ export function DiscountForm({
           setPicker(null);
         }}
       />
+
+      <Modal
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title="Delete discount?"
+        primaryAction={{
+          content: 'Delete',
+          destructive: true,
+          loading: deleting,
+          onAction: remove,
+        }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            This can’t be undone. Orders that already used this discount keep their totals.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

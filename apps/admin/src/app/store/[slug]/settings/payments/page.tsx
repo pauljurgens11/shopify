@@ -556,7 +556,11 @@ export default function PaymentsSettingsPage() {
               </Text>
             </BlockStack>
 
-            {drafts.length === 0 ? (
+            {processors.length === 0 ? (
+              <Text as="p" tone="subdued">
+                Connect a payment provider above to start routing charges between them.
+              </Text>
+            ) : drafts.length === 0 ? (
               <Text as="p" tone="subdued">
                 No routing rules. All charges go to your connected providers in the order they were
                 connected.
@@ -581,14 +585,18 @@ export default function PaymentsSettingsPage() {
               </BlockStack>
             )}
 
-            <InlineStack>
-              <Button
-                onClick={() => setEdited([...drafts, newRuleDraft(processors[0]?.id ?? '')])}
-                disabled={processors.length === 0}
-              >
-                Add rule
-              </Button>
-            </InlineStack>
+            {/* Not rendered rather than disabled: with no provider connected the
+                button can do nothing, and a dead control is worse than none
+                (CLAUDE.md §8). */}
+            {processors.length === 0 ? null : (
+              <InlineStack>
+                <Button
+                  onClick={() => setEdited([...drafts, newRuleDraft(processors[0]?.id ?? '')])}
+                >
+                  Add rule
+                </Button>
+              </InlineStack>
+            )}
           </BlockStack>
         </Card>
       </BlockStack>

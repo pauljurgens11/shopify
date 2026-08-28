@@ -23,33 +23,38 @@ export function AuthCard({
 }) {
   return (
     <Box background="bg-surface-secondary" minHeight="100vh" padding="800">
-      <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-        <BlockStack gap="400">
-          <InlineStack align="center">
-            {/* SPEC §1: the brand is "Merchant". Never the Shopify name or logo. */}
-            <Text as="h1" variant="headingLg">
-              Merchant
-            </Text>
-          </InlineStack>
+      {/* `margin: auto` on a flex item centres it on both axes, and — unlike
+          `align-items: center` — a form taller than the viewport still starts
+          at the top instead of having its head clipped off. */}
+      <div style={{ display: 'flex', minHeight: 'calc(100vh - 2 * var(--p-space-800))' }}>
+        <div style={{ width: '100%', maxWidth: '400px', margin: 'auto' }}>
+          <BlockStack gap="400">
+            <InlineStack align="center">
+              {/* SPEC §1: the brand is "Merchant". Never the Shopify name or logo. */}
+              <Text as="h1" variant="headingLg">
+                Merchant
+              </Text>
+            </InlineStack>
 
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">
-                  {title}
-                </Text>
-                {subtitle ? (
-                  <Text as="p" tone="subdued">
-                    {subtitle}
+            <Card>
+              <BlockStack gap="400">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingMd">
+                    {title}
                   </Text>
-                ) : null}
+                  {subtitle ? (
+                    <Text as="p" tone="subdued">
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </BlockStack>
+                {children}
               </BlockStack>
-              {children}
-            </BlockStack>
-          </Card>
+            </Card>
 
-          {footer ? <InlineStack align="center">{footer}</InlineStack> : null}
-        </BlockStack>
+            {footer ? <InlineStack align="center">{footer}</InlineStack> : null}
+          </BlockStack>
+        </div>
       </div>
     </Box>
   );

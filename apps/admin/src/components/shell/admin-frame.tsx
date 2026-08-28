@@ -15,6 +15,7 @@ import { setUnauthorizedHandler, useApiQuery } from '../../lib/api.ts';
 import { useSession } from '../../lib/session.ts';
 import { AdminNavigation } from './admin-navigation.tsx';
 import { AdminTopBar } from './admin-top-bar.tsx';
+import { PageSkeleton } from './page-skeleton.tsx';
 import { ToastProvider } from './toast-provider.tsx';
 
 export function loginHref(next?: string): string {
@@ -67,7 +68,9 @@ export function AdminFrame({
   if (error && error.status !== 401) {
     return (
       <Frame>
-        <Page title="Merchant">
+        {/* No page title: "Merchant" as an H1 reads like a page someone forgot
+            to name. The banner is the whole screen here. */}
+        <Page>
           <Banner tone="critical" title="Can’t reach your store">
             <p>{error.message}</p>
             <Button onClick={() => refetch()}>Try again</Button>
@@ -77,10 +80,13 @@ export function AdminFrame({
     );
   }
 
+  // PARITY.md: "Skeleton page on load, never a spinner-only screen" — the very
+  // first paint of the admin is the one most likely to be seen.
   if (isPending || !session) {
     return (
       <Frame>
         <Loading />
+        <PageSkeleton />
       </Frame>
     );
   }

@@ -66,7 +66,17 @@ export default function FulfillPage() {
 
   if (order.isPending || locations.isPending) return <PageSkeleton />;
   const detail = order.data;
-  if (!detail) return null;
+  // A bare `return null` here paints a blank white page, which reads as a
+  // crash rather than a missing order.
+  if (!detail) {
+    return (
+      <Page title="Fulfill items" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
+        <Card>
+          <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
+        </Card>
+      </Page>
+    );
+  }
 
   const fulfillable = detail.lineItems.filter((line) => remainingToFulfil(line) > 0);
   const lineItems = fulfillable

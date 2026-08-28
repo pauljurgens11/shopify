@@ -42,9 +42,9 @@ export interface ShopContext {
  * be cached — E1 already answers it `no-store`, and asking for a fresh fetch
  * here keeps Next's own cache out of the way too.
  */
-export const shopContext = cache(async (): Promise<ShopContext> => {
+const loadShopContext = cache(async (): Promise<ShopContext | null> => {
   const slug = await resolveShopSlug();
-  if (!slug) notFound();
+  if (!slug) return null;
 
   // From the middleware, so the layout and every page agree on which theme they
   // are rendering — a page previewing a draft inside published-theme colours
@@ -59,7 +59,7 @@ export const shopContext = cache(async (): Promise<ShopContext> => {
   ]);
 
   // A shop with no published theme cannot render at all; 404 beats a blank page.
-  if (!shop || !theme) notFound();
+  if (!shop || !theme) return null;
 
   return {
     slug,
@@ -69,6 +69,24 @@ export const shopContext = cache(async (): Promise<ShopContext> => {
     isPreview: theme.isPreview,
   };
 });
+
+/**
+ * The shop context, or `null` on a host that resolves no shop.
+ *
+ * Only the ROOT LAYOUT should use this. `notFound()` thrown from a root layout
+ * is a Next error (E192), not a 404 — the not-found page it wants to render
+ * lives inside that very layout — so an unknown subdomain would blow up instead
+ * of showing `not-found.tsx`. The layout therefore degrades to a bare shell and
+ * lets the page below it call `notFound()`, which renders properly.
+ */
+export const optionalShopContext = loadShopContext;
+
+/** The shop context, or the 404 page. What every page uses. */
+export async function shopContext(): Promise<ShopContext> {
+  const context = await loadShopContext();
+  if (!context) notFound();
+  return context;
+}
 
 /**
  * The shopper's cart, or null. Never creates one: a bot hitting the home page

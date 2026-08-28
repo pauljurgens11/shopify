@@ -11,8 +11,8 @@
 import { format } from '@merchant/config/money';
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { OrderDetail } from '@merchant/contracts/orders';
-import { BlockStack, Box, Button, Card, Divider, InlineStack, Text } from '@shopify/polaris';
-import { capturedTotal } from './status.ts';
+import { BlockStack, Box, Card, Divider, InlineStack, Text } from '@shopify/polaris';
+import { capturedTotal, financialBadge } from './status.ts';
 
 function Row({
   label,
@@ -44,7 +44,7 @@ function Row({
   );
 }
 
-export function PaymentCard({ order, refundHref }: { order: OrderDetail; refundHref: string }) {
+export function PaymentCard({ order }: { order: OrderDetail }) {
   const currencyCode = order.total.currencyCode;
   const paid = {
     amount: order.total.amount - order.refundedTotal.amount,
@@ -57,14 +57,13 @@ export function PaymentCard({ order, refundHref }: { order: OrderDetail; refundH
   return (
     <Card>
       <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="h2" variant="headingMd">
-            {refunded ? 'Partially refunded' : 'Paid'}
-          </Text>
-          {order.cancelledAt || order.refundedTotal.amount >= order.total.amount ? null : (
-            <Button url={refundHref}>Refund</Button>
-          )}
-        </InlineStack>
+        {/* The heading is the payment status in PARITY.md's exact wording —
+            "Paid" on a pending order, or "Partially refunded" on a fully
+            refunded one, both read as bugs to anyone who knows Shopify.
+            `Refund` lives top-right on the page, not in this card. */}
+        <Text as="h2" variant="headingMd">
+          {financialBadge(order.financialStatus).label}
+        </Text>
 
         <BlockStack gap="200">
           <Row
