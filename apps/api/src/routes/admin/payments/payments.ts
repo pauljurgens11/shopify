@@ -11,7 +11,13 @@
  * cap and the refund row are computed in exactly one place.
  */
 import { paginationQuery } from '@merchant/contracts/common';
-import { capturePaymentInput, chargeSavedCardInput, paymentSchema } from '@merchant/contracts/pay';
+import {
+  capturePaymentInput,
+  chargeSavedCardInput,
+  listPaymentMethodsQuery,
+  paymentMethodSchema,
+  paymentSchema,
+} from '@merchant/contracts/pay';
 import { capturePayment, chargeSavedCard, PaymentError, voidPayment } from '@merchant/pay/router';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -108,6 +114,28 @@ export default async function routes(app: FastifyInstance) {
   app.post('/:id/void', { preHandler: requirePermission('orders') }, async (request) => {
     const { id } = request.params as { id: string };
     return run(() => voidPayment(request.db, id));
+  });
+
+  /**
+   * The saved cards the order page offers to charge (D4). A short unpaginated
+   * list on purpose: a customer holds a handful of cards, and a cursor here
+   * would buy nothing. `orders` permission to match charge-saved-card below.
+   */
+  app.get('/payment-methods', { preHandler: requirePermission('orders') }, async (request) => {
+    const { customerId } = listPaymentMethodsQuery.parse(request.query ?? {});
+    const rows = await request.db.paymentMethod.findMany({
+      where: { customerId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return {
+      data: rows.map((row) =>
+        paymentMethodSchema.parse({
+          ...row,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        }),
+      ),
+    };
   });
 
   /**
