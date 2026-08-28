@@ -60,7 +60,7 @@ const availableAt = async (variantId: string) =>
 type LineSpec = { variant: Variant; quantity: number; price: number; discount?: number };
 
 /** An order whose totals balance, so createOrder accepts it (C2's guard). */
-async function placeOrder(lines: LineSpec[], shipping = 0) {
+async function placeOrder(lines: LineSpec[], shipping = 0, tax = 0) {
   const subtotal = lines.reduce((n, l) => n + l.price * l.quantity, 0);
   const discountTotal = lines.reduce((n, l) => n + (l.discount ?? 0), 0);
   return createOrder(db, shop.shopId, {
@@ -83,8 +83,8 @@ async function placeOrder(lines: LineSpec[], shipping = 0) {
       subtotal: usd(subtotal),
       discountTotal: usd(discountTotal),
       shippingTotal: usd(shipping),
-      taxTotal: usd(0),
-      total: usd(subtotal - discountTotal + shipping),
+      taxTotal: usd(tax),
+      total: usd(subtotal - discountTotal + shipping + tax),
     },
     financialStatus: 'pending',
   });
@@ -263,6 +263,38 @@ describe('refund proration', () => {
 
     // The whole point: the halves add up to the whole.
     expect(second.refundedTotal).toEqual(usd(4001));
+    expect(second.financialStatus).toBe('refunded');
+  });
+
+  it('brings a unit’s tax share back with it, so a full refund reaches refunded', async () => {
+    // Tax lives on the order, not the lines, so refunds allocate it: 2 × $10.00
+    // with $1.71 tax splits 86¢ / 85¢ across the units. Without this, items +
+    // shipping alone strand the tax and a fully-returned order sticks at
+    // partially_refunded — H2's smoke flow (b) found that live.
+    const jacket = await stockedVariant(10, 1000);
+    const order = await placeOrder([{ variant: jacket, quantity: 2, price: 1000 }], 500, 171);
+    const lineId = order.lineItems[0]?.id;
+    await payFor(order);
+
+    const preview = await post(`/admin/api/orders/${order.id}/refunds/calculate`, {
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json().taxAmount).toEqual(usd(86));
+    expect(preview.json().total).toEqual(usd(1086));
+
+    const first = await refund(order.id, { lineItems: [{ lineItemId: lineId, quantity: 1 }] });
+    expect(first.refunds.at(-1).amount).toEqual(usd(1086));
+    expect(first.financialStatus).toBe('partially_refunded');
+
+    // Second unit + shipping: 1000 + 85 + 500. The cents add up to the order
+    // total exactly, which is what flips the status to refunded.
+    const second = await refund(order.id, {
+      lineItems: [{ lineItemId: lineId, quantity: 1 }],
+      shippingAmount: usd(500),
+    });
+    expect(second.refunds.at(-1).amount).toEqual(usd(1585));
+    expect(second.refundedTotal).toEqual(usd(2671));
     expect(second.financialStatus).toBe('refunded');
   });
 

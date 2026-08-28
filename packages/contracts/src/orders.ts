@@ -208,6 +208,8 @@ export const refundCalculationSchema = z.object({
   ),
   shippingAmount: moneySchema,
   subtotal: moneySchema,
+  /** The refunded units' share of the order's tax — Shopify refunds tax with the items. */
+  taxAmount: moneySchema,
   total: moneySchema,
   /** `order.total - order.refundedTotal`. The form caps its inputs at this. */
   maximumRefundable: moneySchema,
