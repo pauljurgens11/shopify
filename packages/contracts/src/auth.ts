@@ -30,14 +30,21 @@ export const loginInput = z.object({
   shopSlug: z.string().optional(),
 });
 
-/** Shop + owner created in one transaction (SPEC §8). */
+/**
+ * Shop + owner created in one transaction (SPEC §8).
+ *
+ * `shopSlug` is optional: Shopify's signup asks only for a store name and
+ * derives the URL from it. Supplying one explicitly is still honoured, and then
+ * a collision is a 409 rather than a silent rename.
+ */
 export const signupInput = z.object({
   shopName: z.string().min(1).max(255),
   shopSlug: z
     .string()
     .min(3)
     .max(63)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and hyphens only'),
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and hyphens only')
+    .optional(),
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().max(255).optional(),

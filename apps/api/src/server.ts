@@ -1,6 +1,7 @@
 /** Entrypoint. Owner: WS-A. */
 import { env } from '@merchant/config/env';
 import { buildApp } from './app.ts';
+import { closeRedis } from './lib/redis.ts';
 
 const config = env();
 const app = await buildApp();
@@ -9,7 +10,10 @@ const app = await buildApp();
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     app.log.info(`${signal} received, closing`);
-    void app.close().then(() => process.exit(0));
+    void app
+      .close()
+      .then(closeRedis)
+      .then(() => process.exit(0));
   });
 }
 

@@ -22,7 +22,12 @@ const schema = z.object({
   REDIS_URL: z.string().url(),
 
   // --- public URLs ---
-  API_URL: z.string().url().default('http://localhost:3001'),
+  // `api.lvh.me`, not `localhost`: the staff session cookie is SameSite=Lax, so
+  // the browser only sends it to the API if the API shares a site with the
+  // admin (`*.lvh.me`). A `localhost` API silently drops the cookie on every
+  // XHR and the admin looks logged out (SPEC §8). The server binds 0.0.0.0 and
+  // lvh.me resolves to 127.0.0.1, so this is a hostname choice, not a setup step.
+  API_URL: z.string().url().default('http://api.lvh.me:3001'),
   ADMIN_URL: z.string().url().default('http://admin.lvh.me:3000'),
   STOREFRONT_BASE_DOMAIN: z.string().default('lvh.me:3002'),
   STOREFRONT_PROTOCOL: z.enum(['http', 'https']).default('http'),
