@@ -8,8 +8,11 @@ export { compareAtFor, formatMoney, Price } from './price.tsx';
 export { ProductCard } from './product-card.tsx';
 export { RichHtml } from './rich-html.tsx';
 export { sanitizeRichText } from './sanitize.ts';
+export { SNAP_TRACK } from './scroll.ts';
 export { cx, SectionShell } from './section-shell.tsx';
+export { CardSkeletonGrid, ProductSkeletonGrid } from './skeleton.tsx';
 export { ThemeButton } from './theme-button.tsx';
+export { ThemeImage } from './theme-image.tsx';
 export {
   CART_PATH,
   CHECKOUT_PATH,

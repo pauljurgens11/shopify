@@ -3,6 +3,7 @@ import type { SectionProps } from '../context.ts';
 import { compareAtFor, Price } from '../shared/price.tsx';
 import { ProductCard } from '../shared/product-card.tsx';
 import { RichHtml } from '../shared/rich-html.tsx';
+import { SNAP_TRACK } from '../shared/scroll.ts';
 import { cx, SectionShell } from '../shared/section-shell.tsx';
 
 /**
@@ -97,10 +98,7 @@ function Gallery({
 
   if (layout === 'carousel') {
     return (
-      <div
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
-        data-gallery="carousel"
-      >
+      <div className={cx(SNAP_TRACK, 'gap-3')} data-gallery="carousel">
         {images.map((image, index) => (
           <img
             // biome-ignore lint/suspicious/noArrayIndexKey: a product may repeat an image URL; the list is static settings data that never reorders
