@@ -151,7 +151,7 @@ beforeAll(async () => {
     handle: 'alpine-merino-crewneck',
     title: 'Alpine Merino Crewneck',
     price: 14800,
-    tags: ['knitwear'],
+    tags: ['knitwear', 'new'],
     variants: [
       { key: 'alpineS', title: 'S', stock: 3 },
       { key: 'alpineM', title: 'M', price: 15200, stock: 0 },
@@ -221,6 +221,24 @@ beforeAll(async () => {
         position: 1,
       },
     ],
+  });
+
+  await dbAdmin.collection.create({
+    data: {
+      id: newId('collection'),
+      shopId: shop.shopId,
+      title: 'New Arrivals',
+      handle: 'new-arrivals',
+      type: 'smart',
+      descriptionHtml: '<p>Just landed</p>',
+      sortOrder: 'created-desc',
+      // Deliberately NO CollectionProduct rows: B3 resolves smart membership on
+      // read from the rule set, so anything that reads join rows sees nothing.
+      ruleSet: {
+        appliedDisjunctively: false,
+        rules: [{ column: 'tag', relation: 'equals', condition: 'new' }],
+      },
+    },
   });
 
   publishedThemeId = newId('theme');
@@ -304,6 +322,20 @@ describe('product visibility', () => {
     const response = await get('/storefront/api/collections/featured/products');
     const handles = response.json().data.map((p: { handle: string }) => p.handle);
     expect(handles).toEqual(['alpine-merino-crewneck']);
+  });
+
+  it('resolves a smart collection from its rules, not from join rows', async () => {
+    // B3 materializes nothing — membership is a `where` evaluated on read. A
+    // storefront that reads CollectionProduct would show an empty collection
+    // page for every smart collection a merchant creates.
+    const response = await get('/storefront/api/collections/new-arrivals/products');
+    expect(response.statusCode).toBe(200);
+
+    const handles = response.json().data.map((p: { handle: string }) => p.handle);
+    expect(handles).toContain('alpine-merino-crewneck');
+    // The draft carries no `new` tag, and would be filtered by status anyway.
+    expect(handles).not.toContain('quarry-shearling-coat');
+    expect(response.json().collection.productCount).toBe(handles.length);
   });
 
   it('scopes `?query=` to this tenant', async () => {
