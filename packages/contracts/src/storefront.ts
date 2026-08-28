@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { handleSchema, idSchema, moneySchema, paginated, paginationQuery } from './common.ts';
+import { themeDocSchema } from './theme.ts';
 
 export const storefrontVariantSchema = z.object({
   id: idSchema,
@@ -40,8 +41,10 @@ export const storefrontCollectionSchema = z.object({
   handle: handleSchema,
   descriptionHtml: z.string(),
   imageUrl: z.string().url().nullable(),
+  /** Live products only — a count that disagrees with the grid reads as a bug. */
   productCount: z.number().int().nonnegative(),
 });
+export type StorefrontCollection = z.infer<typeof storefrontCollectionSchema>;
 
 export const listStorefrontProductsQuery = paginationQuery.extend({
   collection: handleSchema.optional(),
@@ -69,4 +72,24 @@ export const storefrontShopResponse = z.object({
   currencyCode: z.string().length(3),
   /** Published ThemeVersion id, or the preview id when `?preview=` is signed. */
   themeVersionId: idSchema,
+});
+
+/**
+ * `GET /storefront/api/theme` — the whole published ThemeDoc, so E2 renders a
+ * page in one hop rather than fetching the shop and then the theme.
+ *
+ * `isPreview` is true when a signed `?preview=` token overrode the published
+ * version; the storefront uses it to show the builder's preview chrome and to
+ * keep the response out of any shared cache.
+ */
+export const storefrontThemeResponse = z.object({
+  themeVersionId: idSchema,
+  theme: themeDocSchema,
+  isPreview: z.boolean().default(false),
+});
+export type StorefrontThemeResponse = z.infer<typeof storefrontThemeResponse>;
+
+/** `GET /storefront/api/collections/:handle/products` — collection plus its page. */
+export const storefrontCollectionProductsResponse = paginated(storefrontProductSchema).extend({
+  collection: storefrontCollectionSchema,
 });

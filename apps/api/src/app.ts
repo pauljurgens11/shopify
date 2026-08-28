@@ -45,6 +45,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     // A per-request id makes a request traceable across api → worker → webhook delivery.
     genReqId: () => crypto.randomUUID(),
+    // Fastify's 10s default is a boot-time budget, and autoload spends it
+    // dynamically importing every route file. Under Vitest on a cold cache —
+    // which is exactly what CI does after `pnpm install` — transpiling the
+    // route tree alone can take most of that, and the whole suite then fails
+    // with "Plugin did not start in time" rather than anything diagnostic.
+    // Raised as the route tree grows; it bounds startup only, never a request.
+    pluginTimeout: 60_000,
     trustProxy: config.NODE_ENV === 'production',
   });
 
