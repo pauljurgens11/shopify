@@ -1,0 +1,115 @@
+'use client';
+
+/**
+ * The payment card (PARITY.md → Order detail): Subtotal / Discount / Shipping /
+ * Tax rows, bold Total, then what the customer actually paid — and what is
+ * still owed or has gone back. Owner: WS-C.
+ *
+ * Every figure is an integer from the API rendered through `format()`. Nothing
+ * here is recomputed in the browser (CLAUDE.md §5).
+ */
+import { format } from '@merchant/config/money';
+import type { MoneyDto } from '@merchant/contracts/common';
+import type { OrderDetail } from '@merchant/contracts/orders';
+import { BlockStack, Box, Button, Card, Divider, InlineStack, Text } from '@shopify/polaris';
+import { capturedTotal } from './status.ts';
+
+function Row({
+  label,
+  value,
+  detail,
+  strong,
+}: {
+  label: string;
+  value: MoneyDto;
+  detail?: string;
+  strong?: boolean;
+}) {
+  return (
+    <InlineStack align="space-between" blockAlign="center" gap="400">
+      <InlineStack gap="200">
+        <Text as="span" variant="bodyMd" fontWeight={strong ? 'semibold' : 'regular'}>
+          {label}
+        </Text>
+        {detail ? (
+          <Text as="span" variant="bodySm" tone="subdued">
+            {detail}
+          </Text>
+        ) : null}
+      </InlineStack>
+      <Text as="span" variant="bodyMd" numeric fontWeight={strong ? 'semibold' : 'regular'}>
+        {format(value)}
+      </Text>
+    </InlineStack>
+  );
+}
+
+export function PaymentCard({ order, refundHref }: { order: OrderDetail; refundHref: string }) {
+  const currencyCode = order.total.currencyCode;
+  const paid = {
+    amount: order.total.amount - order.refundedTotal.amount,
+    currencyCode,
+  };
+  const refunded = order.refundedTotal.amount > 0;
+  const captured = capturedTotal(order.payments, currencyCode);
+  const outstanding = { amount: order.total.amount - captured.amount, currencyCode };
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h2" variant="headingMd">
+            {refunded ? 'Partially refunded' : 'Paid'}
+          </Text>
+          {order.cancelledAt || order.refundedTotal.amount >= order.total.amount ? null : (
+            <Button url={refundHref}>Refund</Button>
+          )}
+        </InlineStack>
+
+        <BlockStack gap="200">
+          <Row
+            label="Subtotal"
+            value={order.subtotal}
+            detail={`${order.lineItems.reduce((n, l) => n + l.quantity, 0)} items`}
+          />
+          {order.discountTotal.amount > 0 ? (
+            <Row
+              label="Discount"
+              value={{ amount: -order.discountTotal.amount, currencyCode }}
+              detail={order.discountCodes.map((d) => d.code).join(', ') || undefined}
+            />
+          ) : null}
+          <Row
+            label="Shipping"
+            value={order.shippingTotal}
+            detail={order.shippingLine?.title ?? undefined}
+          />
+          <Row label="Tax" value={order.taxTotal} />
+          <Divider />
+          <Row label="Total" value={order.total} strong />
+        </BlockStack>
+
+        <Divider />
+
+        <BlockStack gap="200">
+          <Row label="Paid by customer" value={captured} />
+          {refunded ? (
+            <Row label="Refunded" value={{ amount: -order.refundedTotal.amount, currencyCode }} />
+          ) : null}
+          {outstanding.amount > 0 ? <Row label="Outstanding" value={outstanding} strong /> : null}
+          {refunded ? <Row label="Net payment" value={paid} strong /> : null}
+        </BlockStack>
+
+        {order.payments.length > 0 ? (
+          <Box>
+            <Text as="p" variant="bodySm" tone="subdued">
+              {order.payments.length === 1
+                ? `Paid with ${order.payments[0]?.processor ?? 'card'}`
+                : `${order.payments.length} payments`}
+            </Text>
+          </Box>
+        ) : null}
+      </BlockStack>
+    </Card>
+  );
+}
