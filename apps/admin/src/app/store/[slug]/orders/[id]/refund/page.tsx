@@ -8,9 +8,11 @@
  * the way Shopify's does, so the merchant reads what they are about to send
  * back before they send it.
  */
-import { format } from '@merchant/config/money';
+import { format, fromDecimal, toDecimal } from '@merchant/config/money';
+import type { MoneyDto } from '@merchant/contracts/common';
 import type { OrderDetail, RefundCalculation } from '@merchant/contracts/orders';
 import {
+  Banner,
   BlockStack,
   Button,
   Card,
@@ -26,23 +28,20 @@ import {
 import { ImageIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageSkeleton } from '../../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../../lib/api.ts';
 import { remainingToRefund } from '../../_components/status.ts';
 
-/** Decimal string → integer minor units, without ever touching a float. */
-function toMinorUnits(value: string, currencyCode: string): number {
-  const trimmed = value.trim();
-  if (trimmed === '') return 0;
-  const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(trimmed);
-  if (!match) return 0;
-  const whole = match[1] ?? '0';
-  const fraction = (match[2] ?? '').padEnd(2, '0');
-  // Currency-agnostic enough for the currencies in scope; the authoritative
-  // amount still comes back from `refunds/calculate`.
-  return Number(`${whole || '0'}${currencyCode === 'JPY' ? '' : fraction}`);
+/**
+ * One nonce per submit ATTEMPT. `crypto.randomUUID` is gated to secure
+ * contexts and the documented dev admin is plain-HTTP `admin.lvh.me`;
+ * `getRandomValues` has no such restriction (same call the storefront makes).
+ */
+function attemptNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export default function RefundPage() {
@@ -57,7 +56,19 @@ export default function RefundPage() {
   const [restock, setRestock] = useState(true);
   const [reason, setReason] = useState('');
   const [calculation, setCalculation] = useState<RefundCalculation | null>(null);
+  const [calcError, setCalcError] = useState<ApiError | null>(null);
   const [saving, setSaving] = useState(false);
+
+  /**
+   * The idempotency key is a NONCE per submit attempt, never derived from the
+   * form: two refunds with the same shape (1 of 2 units now, 1 later) are
+   * different refunds, and a content-derived key made the second one replay
+   * the first — money did not move but the admin recorded it. The ref keeps
+   * the key stable across retries of ONE click: if the request dies on the
+   * network after the server already created the refund, the retry replays
+   * the same key instead of refunding twice.
+   */
+  const nonceRef = useRef<string>(attemptNonce());
 
   const detail = order.data;
   const currencyCode = detail?.total.currencyCode ?? 'USD';
@@ -70,15 +81,29 @@ export default function RefundPage() {
     [quantities],
   );
 
-  const shippingAmount = useMemo(
-    () => ({ amount: toMinorUnits(shipping, currencyCode), currencyCode }),
-    [shipping, currencyCode],
-  );
+  // Parse, never guess: the old hand-rolled parser sent $0.00 for input it
+  // could not read. Unparseable input is a field error and blocks the refund.
+  const { shippingAmount, shippingError } = useMemo((): {
+    shippingAmount: MoneyDto;
+    shippingError: string | null;
+  } => {
+    const trimmed = shipping.trim();
+    const zero = { amount: 0, currencyCode };
+    if (trimmed === '') return { shippingAmount: zero, shippingError: null };
+    try {
+      const money = fromDecimal(trimmed, currencyCode);
+      if (money.amount < 0)
+        return { shippingAmount: zero, shippingError: 'Enter a positive amount' };
+      return { shippingAmount: money, shippingError: null };
+    } catch {
+      return { shippingAmount: zero, shippingError: 'Enter a valid amount' };
+    }
+  }, [shipping, currencyCode]);
 
   // The server owns the arithmetic; this just asks it again whenever the form
   // changes. Nothing on screen is derived locally.
   useEffect(() => {
-    if (!detail) return;
+    if (!detail || shippingError) return;
     let cancelled = false;
     // Debounced: the shipping field would otherwise POST once per keystroke.
     const timer = window.setTimeout(() => {
@@ -87,17 +112,23 @@ export default function RefundPage() {
         body: { lineItems, shippingAmount, restock },
       })
         .then((result) => {
-          if (!cancelled) setCalculation(result);
+          if (cancelled) return;
+          setCalculation(result);
+          setCalcError(null);
         })
-        .catch(() => {
-          if (!cancelled) setCalculation(null);
+        .catch((cause) => {
+          if (cancelled) return;
+          // Keep the error: silently blanking the summary to $0.00 told the
+          // merchant a valid-looking refund was worth nothing.
+          setCalcError(cause as ApiError);
+          setCalculation(null);
         });
     }, 300);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [detail, id, lineItems, shippingAmount, restock]);
+  }, [detail, id, lineItems, shippingAmount, restock, shippingError]);
 
   if (order.isPending) return <PageSkeleton />;
   // A bare `return null` here paints a blank white page, which reads as a
@@ -114,17 +145,7 @@ export default function RefundPage() {
 
   const refundable = detail.lineItems.filter((line) => remainingToRefund(line) > 0);
   const total = calculation?.total ?? { amount: 0, currencyCode };
-  const canRefund = total.amount > 0 && !saving;
-
-  /**
-   * Derived from what is being refunded, NOT regenerated per attempt: if a
-   * request times out after the server already created the refund, retrying
-   * must replay the same key — a fresh one would refund the customer twice.
-   * Changing the form changes the key, because that is a different refund.
-   */
-  const idempotencyKey = `refund-${id}-${JSON.stringify({ lineItems, shippingAmount, restock })}`
-    .replace(/[^a-zA-Z0-9_-]/g, '')
-    .slice(0, 128);
+  const canRefund = total.amount > 0 && !saving && !shippingError && !calcError;
 
   const submit = async () => {
     setSaving(true);
@@ -135,16 +156,25 @@ export default function RefundPage() {
           lineItems,
           shippingAmount,
           restock,
-          idempotencyKey,
+          idempotencyKey: `refund-${id}-${nonceRef.current}`,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         },
       });
+      // This attempt is spent — a later refund from this page is a new one.
+      nonceRef.current = attemptNonce();
       await queryClient.invalidateQueries({ queryKey: ['order', id] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['open-orders-count'] });
       toast.show('Refund issued');
       router.push(`/store/${slug}/orders/${id}`);
     } catch (cause) {
-      toast.error((cause as ApiError).message);
+      const error = cause as ApiError;
+      // The server ANSWERED (status > 0), so this attempt is complete and its
+      // key must never be reused — a corrected resubmit is a different refund.
+      // status 0 means the request may or may not have landed: keep the key so
+      // a retry of the same click cannot refund twice.
+      if (error.status !== 0) nonceRef.current = attemptNonce();
+      toast.error(error.message);
     } finally {
       setSaving(false);
     }
@@ -228,11 +258,13 @@ export default function RefundPage() {
                   type="number"
                   min={0}
                   step={0.01}
-                  max={detail.shippingTotal.amount / 100}
+                  // Display-layer conversion through the money helper — never `/ 100`.
+                  max={toDecimal(detail.shippingTotal)}
                   prefix="$"
                   autoComplete="off"
                   value={shipping}
                   onChange={setShipping}
+                  error={shippingError ?? undefined}
                   helpText={`${format(detail.shippingTotal)} was charged for shipping.`}
                 />
               </BlockStack>
@@ -262,6 +294,15 @@ export default function RefundPage() {
               <Text as="h2" variant="headingMd">
                 Summary
               </Text>
+
+              {calcError ? (
+                <Banner tone="critical" title="Couldn’t calculate this refund">
+                  <Text as="p">
+                    {calcError.field ? `${calcError.field}: ` : ''}
+                    {calcError.message}
+                  </Text>
+                </Banner>
+              ) : null}
 
               <BlockStack gap="200">
                 <InlineStack align="space-between">

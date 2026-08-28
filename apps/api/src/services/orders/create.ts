@@ -185,10 +185,18 @@ export async function createOrder(
     // Redemptions, not just a counter: `oncePerCustomer` and a cancelled order's
     // give-back both need to know WHO used the code (schema note on the model).
     for (const applied of data.discountCodes) {
+      // A code that took nothing off (minimum not met, zero-value line) must
+      // not burn one of its limited uses.
+      if (applied.amount.amount === 0) continue;
       // updateMany rather than update: a discount deleted between pricing and
-      // payment must not roll back a paid order.
+      // payment must not roll back a paid order. The usedCount guard compares
+      // against the row's own usageLimit column, so two checkouts racing for
+      // the last use cannot push the counter past the limit.
       await tx.discount.updateMany({
-        where: { id: applied.discountId },
+        where: {
+          id: applied.discountId,
+          OR: [{ usageLimit: null }, { usedCount: { lt: tx.discount.fields.usageLimit } }],
+        },
         data: { usedCount: { increment: 1 } },
       });
       await tx.discountRedemption.createMany({

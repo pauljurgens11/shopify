@@ -53,6 +53,13 @@ export function PaymentCard({ order }: { order: OrderDetail }) {
   const refunded = order.refundedTotal.amount > 0;
   const captured = capturedTotal(order.payments, currencyCode);
   const outstanding = { amount: order.total.amount - captured.amount, currencyCode };
+  // Nothing is outstanding on an order the merchant closed out: cancelled,
+  // voided, or fully refunded. Showing "Outstanding $427.49" there is a lie.
+  const showOutstanding =
+    outstanding.amount > 0 &&
+    !order.cancelledAt &&
+    order.financialStatus !== 'voided' &&
+    order.financialStatus !== 'refunded';
 
   return (
     <Card>
@@ -95,7 +102,7 @@ export function PaymentCard({ order }: { order: OrderDetail }) {
           {refunded ? (
             <Row label="Refunded" value={{ amount: -order.refundedTotal.amount, currencyCode }} />
           ) : null}
-          {outstanding.amount > 0 ? <Row label="Outstanding" value={outstanding} strong /> : null}
+          {showOutstanding ? <Row label="Outstanding" value={outstanding} strong /> : null}
           {refunded ? <Row label="Net payment" value={paid} strong /> : null}
         </BlockStack>
 

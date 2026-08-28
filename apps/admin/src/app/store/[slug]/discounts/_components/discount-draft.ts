@@ -48,7 +48,9 @@ export function emptyDraft(type: Discount['type']): DiscountDraft {
     method: 'code',
     code: '',
     type,
-    valueType: type === 'free_shipping' ? 'percentage' : 'percentage',
+    // Free shipping is stored as a 100% percentage discount (draftToInput pins
+    // value to 100), so 'percentage' is right for every type here.
+    valueType: 'percentage',
     value: type === 'free_shipping' ? '100' : '',
     appliesToScope: 'all',
     collectionIds: [],
@@ -137,7 +139,20 @@ export function draftToInput(draft: DiscountDraft, currencyCode: string) {
   };
 }
 
-export function validate(draft: DiscountDraft): Record<string, string> {
+/** True for "3", false for "", "0", "2.5", "1e5", "-1". */
+const isPositiveInteger = (value: string) => /^\d+$/.test(value.trim()) && Number(value) > 0;
+
+/** True when `fromDecimal` will accept it — validate must reject what save would throw on. */
+function isParseableAmount(value: string, currencyCode: string): boolean {
+  try {
+    fromDecimal(value.trim(), currencyCode);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function validate(draft: DiscountDraft, currencyCode = 'USD'): Record<string, string> {
   const errors: Record<string, string> = {};
   if (draft.title.trim() === '') errors.title = 'Add a title so you can find this discount later.';
   if (draft.method === 'code' && draft.code.trim() === '') {
@@ -149,7 +164,22 @@ export function validate(draft: DiscountDraft): Record<string, string> {
       errors.value = 'Enter a value greater than zero.';
     } else if (draft.valueType === 'percentage' && value > 100) {
       errors.value = 'A percentage cannot be more than 100.';
+    } else if (draft.valueType === 'fixed' && !isParseableAmount(draft.value, currencyCode)) {
+      errors.value = 'Enter a valid amount.';
     }
+  }
+  if (
+    draft.minimumKind === 'subtotal' &&
+    draft.minimumSubtotal.trim() !== '' &&
+    !isParseableAmount(draft.minimumSubtotal, currencyCode)
+  ) {
+    errors.minimumSubtotal = 'Enter a valid amount.';
+  }
+  if (draft.minimumKind === 'quantity' && !isPositiveInteger(draft.minimumQuantity)) {
+    errors.minimumQuantity = 'Enter a whole number greater than zero.';
+  }
+  if (draft.hasUsageLimit && !isPositiveInteger(draft.usageLimit)) {
+    errors.usageLimit = 'Enter a whole number greater than zero.';
   }
   if (draft.appliesToScope === 'collections' && draft.collectionIds.length === 0) {
     errors.appliesTo = 'Choose at least one collection.';
@@ -161,6 +191,19 @@ export function validate(draft: DiscountDraft): Record<string, string> {
     errors.endsAt = 'The end date cannot be before the start date.';
   }
   return errors;
+}
+
+/**
+ * Map an API validation error's field path (zod paths joined with '.', e.g.
+ * `minimumRequirement.value`) onto the draft key whose input renders the error.
+ * The form falls back to a toast for anything this cannot place.
+ */
+export function serverFieldToDraftKey(field: string, draft: DiscountDraft): string {
+  if (field === 'minimumRequirement' || field.startsWith('minimumRequirement.')) {
+    return draft.minimumKind === 'quantity' ? 'minimumQuantity' : 'minimumSubtotal';
+  }
+  if (field === 'appliesTo' || field.startsWith('appliesTo.')) return 'appliesTo';
+  return field;
 }
 
 /** Shopify's Generate button: an unambiguous, shoutable code. */

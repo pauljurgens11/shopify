@@ -91,7 +91,14 @@ export default function OrderDetailPage() {
   const query = useApiQuery<OrderDetail>(['order', id], `/admin/api/orders/${id}`);
   const order = query.data;
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['order', id] });
+  // Cancel (and any other mutation here) changes what the orders index and the
+  // nav's open-orders badge show, so those caches go stale together.
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['order', id] }),
+      queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      queryClient.invalidateQueries({ queryKey: ['open-orders-count'] }),
+    ]);
 
   if (query.isPending) return <PageSkeleton />;
   if (!order) {
@@ -112,7 +119,11 @@ export default function OrderDetailPage() {
     minute: '2-digit',
   });
 
-  /** Cancel is unavailable once money has been captured — refund it first. */
+  /**
+   * Shopify disables Cancel while the merchant still holds the customer's
+   * money — refund first, then cancel. A FULLY refunded order is cancellable
+   * (the server accepts it), which is exactly the "refund, then cancel" path.
+   */
   const paid = order.financialStatus === 'paid' || order.financialStatus === 'partially_refunded';
   const alreadyCancelled = Boolean(order.cancelledAt);
   /** Nothing left to send back once the order is cancelled or fully refunded. */

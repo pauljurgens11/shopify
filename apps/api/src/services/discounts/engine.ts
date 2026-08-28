@@ -32,6 +32,7 @@ import type {
   DiscountAppliesTo,
   DiscountableLine,
   DiscountEngineResult,
+  DiscountPriorUsage,
   DiscountRejectionReason,
 } from '@merchant/contracts/discounts';
 
@@ -42,6 +43,12 @@ export type DiscountEngineInput = {
   discounts: Discount[];
   /** Exactly what the shopper typed. Matched case-insensitively. */
   enteredCode?: string | null;
+  /**
+   * The current customer's redemption counts by discount id, so
+   * `oncePerCustomer` can be enforced without the engine doing I/O. Omitted
+   * (guest checkout, caller without customer context) → not enforced.
+   */
+  priorUsage?: DiscountPriorUsage;
   now: Date;
 };
 
@@ -87,6 +94,7 @@ function rejectionReason(
   cartIsEmpty: boolean,
   currency: string,
   now: Date,
+  priorUsage: DiscountPriorUsage | undefined,
 ): DiscountRejectionReason | null {
   if (discount.status === 'disabled') return 'invalid';
 
@@ -104,6 +112,15 @@ function rejectionReason(
     return 'usage_limit';
   }
 
+  // `oncePerCustomer` is a usage limit of one, per customer — so it reports as
+  // 'usage_limit' ("has reached its limit"), which is also what keeps the
+  // rejection-reason contract unchanged. Enforced only when the caller supplied
+  // the customer's redemption counts; without that context (guest checkout)
+  // there is nothing to enforce against.
+  if (discount.oncePerCustomer && priorUsage !== undefined && (priorUsage[discount.id] ?? 0) > 0) {
+    return 'usage_limit';
+  }
+
   // "Not valid for the items in your cart" — the same shopper-facing bucket as a
   // missed minimum. An empty cart is not a mismatch, it is an empty cart.
   if (!cartIsEmpty && eligible.length === 0 && discount.appliesTo.scope !== 'all') {
@@ -111,10 +128,16 @@ function rejectionReason(
   }
 
   const minimum = discount.minimumRequirement;
-  if (minimum.type === 'subtotal') {
+  if (minimum.type === 'subtotal' && discount.type !== 'free_shipping') {
     // Pre-discount, so an automatic cannot knock the cart under the bar.
     // Compared by amount: the shop is single-currency (SPEC §2), so a stray
     // currency code on the requirement row must not throw mid-checkout.
+    //
+    // `free_shipping` is the one exception, checked at apply time instead (see
+    // applyDiscounts): its threshold means "free over $X actually paid" — the
+    // same rule WS-E uses to drop a free shipping RATE on the discounted
+    // subtotal (DECISIONS.md) — so a coupon that takes the cart under the bar
+    // must also take the free-shipping DISCOUNT with it.
     const eligibleSubtotal = sum(
       eligible.map((l) => l.lineTotal),
       currency,
@@ -175,14 +198,32 @@ export function applyDiscounts(input: DiscountEngineInput): DiscountEngineResult
   const candidates: Discount[] = [];
   for (const discount of [...automatics, ...(entered ? [entered] : [])]) {
     const eligible = working.filter((l) => matches(l.line, discount.appliesTo));
-    const reason = rejectionReason(discount, eligible, cartIsEmpty, currency, input.now);
+    const reason = rejectionReason(
+      discount,
+      eligible,
+      cartIsEmpty,
+      currency,
+      input.now,
+      input.priorUsage,
+    );
     if (reason === null) {
       candidates.push(discount);
     } else if (discount.code !== null) {
       rejected.push({ code: discount.code, reason });
     }
   }
-  candidates.sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type]);
+  // Sequential stacking means order changes cents (10%-then-20% of 1005 is 282
+  // off; 20%-then-10% is 281), so the order must be a business rule, not the
+  // caller's array order (which for checkout is DB heap order). Within a type,
+  // oldest discount first — the promotion the merchant set up first has first
+  // claim on the line — with the ULID id as the total-order tiebreak. Same
+  // discounts, any input order → identical totals.
+  candidates.sort(
+    (a, b) =>
+      TYPE_ORDER[a.type] - TYPE_ORDER[b.type] ||
+      (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
 
   /* --- apply them, each to what the previous ones left behind -------------- */
 
@@ -194,6 +235,24 @@ export function applyDiscounts(input: DiscountEngineInput): DiscountEngineResult
     const lineAllocations: AppliedDiscount['lineAllocations'] = [];
 
     if (discount.type === 'free_shipping') {
+      // The deferred half of the subtotal minimum (see rejectionReason):
+      // free_shipping sorts last, so by now `remaining` reflects every line
+      // discount, and the threshold is judged on what the shopper actually
+      // pays — a coupon can price the cart out of free shipping.
+      const minimum = discount.minimumRequirement;
+      if (minimum.type === 'subtotal') {
+        const eligible = working.filter((l) => matches(l.line, discount.appliesTo));
+        const discountedSubtotal = sum(
+          eligible.map((l) => l.remaining),
+          currency,
+        );
+        if (discountedSubtotal.amount < minimum.value.amount) {
+          if (discount.code !== null) {
+            rejected.push({ code: discount.code, reason: 'minimum_not_met' });
+          }
+          continue;
+        }
+      }
       amount = shippingRemaining;
       shippingRemaining = zero(shippingRemaining.currencyCode);
     } else {

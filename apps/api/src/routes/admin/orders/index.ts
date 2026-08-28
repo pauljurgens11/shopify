@@ -75,6 +75,28 @@ export default async function routes(app: FastifyInstance) {
     });
     if (count === 0) throw notFound('Order');
 
+    // Every mutation leaves a timeline entry (C2). The event-type enum in
+    // contracts is closed and has no `order_updated`, so this rides on
+    // `note_added` — the freeform-timeline-entry kind — with the edited
+    // fields in the payload.
+    const updatedFields = (['note', 'tags', 'email', 'shippingAddress'] as const).filter(
+      (field) => input[field] !== undefined,
+    );
+    if (updatedFields.length > 0) {
+      await request.db.orderEvent.create({
+        data: {
+          id: newId('event'),
+          // Stamped by the tenant client at runtime; Prisma's types still want it.
+          shopId: request.shopId as string,
+          orderId: id,
+          type: 'note_added',
+          message: `Order details updated (${updatedFields.join(', ')}).`,
+          actor: await actorFor(request),
+          payload: { updatedFields: [...updatedFields] },
+        },
+      });
+    }
+
     return loadOrderDetail(request.db, id);
   });
 

@@ -15,6 +15,7 @@ import type { Paginated } from '@merchant/contracts/common';
 import type { Customer } from '@merchant/contracts/customers';
 import {
   Badge,
+  Banner,
   BlockStack,
   Box,
   Button,
@@ -138,6 +139,25 @@ export default function CustomersPage() {
   };
 
   if (customers.isPending) return <PageSkeleton />;
+
+  // A failed load must never read as "no customers yet" — that empty state
+  // invites the merchant to re-add customers they already have.
+  if (customers.isError) {
+    return (
+      <Page
+        title="Customers"
+        primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
+      >
+        <Banner
+          tone="critical"
+          title="Customers could not be loaded"
+          action={{ content: 'Try again', onAction: () => customers.refetch() }}
+        >
+          <p>{customers.error.message}</p>
+        </Banner>
+      </Page>
+    );
+  }
 
   const empty = rows.length === 0 && query.trim() === '' && !segment && cursorStack.length === 0;
 
