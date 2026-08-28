@@ -1,12 +1,21 @@
 ---
 name: repo-review
-description: Whole-repo health check of the parallel build — click through the running app, verify what the swarm claims is done, find what is broken between workstreams, fix the small stuff, and report it all in chat. Use when asked "how is it going", "look at the repo", "are the completed issues any good", "what would you improve", or for any review whose scope is the project rather than one module. For a deep audit of ONE workstream, module or PR, use critical-review instead.
+description: Survey the WHOLE build — drive the running app in a browser, verify what the swarm claims is done, find what broke between workstreams, fix the small stuff, report in chat. Use when no single scope is named: "how is it going", "look at the repo", "are the completed issues any good", "what would you improve", "is this demoable". For one named workstream, module or PR, use critical-review instead. To build an issue rather than judge one, use resolve-issue.
 ---
 
 # Reviewing the whole repo
 
 Ten agents land PRs into `main` all day, each only seeing its own slice. Nobody
 looks at the whole thing. That is this skill.
+
+**This skill vs the others:** `repo-review` goes *wide* — every page, every seam,
+every claim — and lands the small fixes itself.
+[`critical-review`](../critical-review/SKILL.md) goes *deep on one named scope*
+and only reports. [`resolve-issue`](../resolve-issue/SKILL.md) builds one issue
+into a merged PR.
+
+**The bar:** you clicked through the running app, you can say of every finding
+whether you *ran* it or only *read* it, and the small stuff is already pushed.
 
 Read [CLAUDE.md](../../../CLAUDE.md), [SPEC.md](../../../SPEC.md),
 [docs/issues/INDEX.md](../../../docs/issues/INDEX.md),
@@ -139,3 +148,18 @@ No report file. Talk to the user, worst thing first:
 Lead with problems. Skip the summary of what works. Every finding cites
 `file:line` or a screenshot. If it's in worse shape than the log makes it sound,
 say that plainly — a review that flatters this codebase is worthless.
+
+---
+
+## Checklist
+
+- [ ] App actually opened via `dev-localhost` and clicked through — admin, storefront, checkout
+- [ ] Every page held against PARITY.md; cross-agent inconsistencies noted, not just individual bugs
+- [ ] Contracts swept for producer/consumer drift; dead seams verified end to end, not read
+- [ ] Every "stubbed, moved on" in DECISIONS.md / AGENT-LOG.md checked against current main
+- [ ] Money / `dbForShop` / inventory / error-shape / decline-cascade rules swept
+- [ ] `pnpm verify`, tenancy, pay, discount math and `pnpm e2e` run, with real output quoted
+- [ ] Every issue claimed DONE checked against main: solid / skin deep / broken
+- [ ] Each finding labelled ran-it or read-it — and most are ran-it
+- [ ] Small fixes landed as `ws-qa/*` PRs; everything else filed as issues + AGENT-LOG lines
+- [ ] Reported in chat, worst first, no report file, no summary of what works
