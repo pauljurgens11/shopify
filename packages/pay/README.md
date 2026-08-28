@@ -8,6 +8,13 @@ adapters, merchant-configurable routing. Owner: WS-D.
 Nothing outside this package may decrypt a card blob or import a processor SDK.
 The rest of the monorepo speaks `@merchant/contracts/pay` and nothing more.
 
+`CardMaterial` (`src/adapter.ts`) is what an adapter needs to reach a processor,
+and with `VaultedCard` (`src/vault.ts`, which satisfies it) it is one of the two
+PAN-bearing types in the repo. Both live here rather than in `contracts`
+precisely so the api, admin and storefront cannot reach them. A PAN travels one
+hop — `getCard` → adapter, wired by the router — and belongs in no log line,
+error message or `raw` payload.
+
 ## PAN isolation
 
 The browser posts card data straight to `/vault/tokenize`; the checkout server
@@ -33,13 +40,46 @@ packed string, because that is the shape `VaultCard` already has.
 A real deployment of this would be in PCI-DSS scope (SAQ-D); handling raw PANs
 in your own infrastructure is out of scope for this project and deliberately so.
 
+## The one distinction
+
+`AuthResult` is `approved | declined | hard_failure`, and the difference between
+the last two is the whole design:
+
+| | meaning | router |
+|---|---|---|
+| `declined` | the card, the account or the request was rejected | **terminal** — never cascade |
+| `hard_failure` | we never got an answer, or the answer was about our credentials | may fail over |
+
+Cascading a decline is how a platform gets flagged for card testing. Every
+adapter maps its outcomes onto this union deliberately; see
+`classifyStripeError` and `mapMaverickAuthResponse`, which are the two places it
+would be easy to get wrong.
+
+## Test cards
+
+`src/adapters/test-cards.ts` — Stripe's own numbers, so a card behaves the same
+on `mock` as on Stripe test keys.
+
+| Card | Outcome |
+|---|---|
+| `4242424242424242` | approved |
+| `4000000000000002` | declined |
+| `4000000000009995` | declined, insufficient funds |
+| `4000000000000119` | hard failure on `mock` — **approves on `maverick`**, so failover is demoable |
+| anything else | approved |
+
 ## Adding a processor
 
 One new file in `src/adapters/`, one line in `src/index.ts`. If a change needs
 more than that, the `ProcessorAdapter` interface is wrong — fix the interface.
+Adapters return outcomes, never throw: the router reads results, not exceptions.
+
+`mock` and credential-less `maverick` share `SimulatedProcessor`
+(`src/adapters/simulated.ts`), which enforces the transaction state machine —
+capture once, never refund past the capture, never void a captured charge.
 
 ## Mandatory tests (SPEC §14.2, blocking)
 
-Luhn / tokenize / encrypt-decrypt roundtrip; router weighted selection;
-failover on hard failure; **no cascade on decline**; refund math; idempotency-key
-dedupe.
+Luhn / tokenize / encrypt-decrypt roundtrip; adapter outcome mapping and the
+simulated transaction ledger; router weighted selection; failover on hard
+failure; **no cascade on decline**; refund math; idempotency-key dedupe.
