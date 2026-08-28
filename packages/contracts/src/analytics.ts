@@ -33,8 +33,6 @@ export const ingestEventsInput = z.object({
 export const analyticsRangeQuery = z.object({
   from: z.string().datetime({ offset: true }),
   to: z.string().datetime({ offset: true }),
-  /** Bucket size for the time series. */
-  granularity: z.enum(['hour', 'day']).default('day'),
 });
 
 export const analyticsSummarySchema = z.object({

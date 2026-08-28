@@ -213,4 +213,19 @@ describe('producer payload', () => {
     const b = buildWebhookEventJob(envelope.shopId, 'orders/paid', {});
     expect(a.eventId).not.toBe(b.eventId);
   });
+
+  it('carries the targeting subscriptionId through the schema, and omits it by default', () => {
+    const targeted = webhookEventJobSchema.parse(
+      buildWebhookEventJob(envelope.shopId, 'orders/create', {}, new Date(), {
+        subscriptionId: 'wh_01J8ZC3K4M5N6P7Q8R9S0T1V2Z',
+      }),
+    );
+    expect(targeted.subscriptionId).toBe('wh_01J8ZC3K4M5N6P7Q8R9S0T1V2Z');
+
+    // Absent, not null: events queued before the field existed parse the same way.
+    const broadcast = webhookEventJobSchema.parse(
+      buildWebhookEventJob(envelope.shopId, 'orders/create', {}),
+    );
+    expect(broadcast.subscriptionId).toBeUndefined();
+  });
 });

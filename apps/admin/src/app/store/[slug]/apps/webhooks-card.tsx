@@ -142,7 +142,7 @@ export function WebhooksCard({ appId, onDelivery }: { appId: string; onDelivery:
         {revealedSecret ? (
           <RevealOnceCard
             title="Signing secret"
-            description="Verify the x-merchant-hmac-sha256 header with this secret. It is stored hashed, so this is the only time we can show it to you."
+            description="Verify the x-merchant-hmac-sha256 header with this secret. This is the only time we will show it to you — if you lose it, delete the subscription and create it again."
             value={revealedSecret}
             onDismiss={() => setRevealedSecret(null)}
           />

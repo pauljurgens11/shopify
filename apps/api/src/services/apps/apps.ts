@@ -186,7 +186,7 @@ function toWebhook(row: WebhookRow) {
 export async function listAppWebhooks(db: TenantClient, appId: string) {
   await getApp(db, appId);
   const rows = await db.webhookSubscription.findMany({
-    where: { appId },
+    where: { appId, deletedAt: null },
     select: WEBHOOK_SELECT,
     orderBy: { id: 'desc' },
   });
@@ -203,8 +203,9 @@ export async function createAppWebhook(
   await getApp(db, appId);
   const secret = `whsec_${newSecret(24)}`;
 
+  // Live rows only: after a soft delete the same topic + URL may come back.
   const existing = await db.webhookSubscription.findFirst({
-    where: { appId, topic: input.topic, url: input.url },
+    where: { appId, topic: input.topic, url: input.url, deletedAt: null },
     select: { id: true },
   });
   if (existing) throw conflict('That app already subscribes to this topic at this URL.', 'url');
@@ -225,17 +226,25 @@ export async function createAppWebhook(
   return { subscription: toWebhook(row), secret };
 }
 
+/**
+ * Soft delete: `WebhookDelivery` cascades on a hard delete, and the delete
+ * dialog promises "Past deliveries stay in the log" — so the row is kept and
+ * only stops matching (worker and lists both filter on `deletedAt`).
+ */
 export async function deleteAppWebhook(
   db: TenantClient,
   appId: string,
   webhookId: string,
 ): Promise<void> {
   const row = await db.webhookSubscription.findFirst({
-    where: { id: webhookId, appId },
+    where: { id: webhookId, appId, deletedAt: null },
     select: { id: true },
   });
   if (!row) throw notFound('Webhook subscription');
-  await db.webhookSubscription.delete({ where: { id: webhookId } });
+  await db.webhookSubscription.updateMany({
+    where: { id: webhookId },
+    data: { deletedAt: new Date() },
+  });
 }
 
 /* --- delivery log ----------------------------------------------------------- */
@@ -247,6 +256,8 @@ export async function listAppDeliveries(
   cursor?: string,
 ) {
   await getApp(db, appId);
+  // Deliberately includes soft-deleted subscriptions: their history is the
+  // whole reason the delete is soft.
   const subscriptions = await db.webhookSubscription.findMany({
     where: { appId },
     select: { id: true },

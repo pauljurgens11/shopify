@@ -118,11 +118,14 @@ export default async function routes(app: FastifyInstance) {
     const subscription = subscriptions.find((row) => row.id === webhookId);
     if (!subscription) throw notFound('Webhook subscription');
 
-    const eventId = await emitWebhookEvent(request.shopId as string, subscription.topic, {
-      id: webhookId,
-      test: true,
-      message: 'Test event from Merchant.',
-    });
+    // Targeted at this one subscription: a test must not POST at every other
+    // endpoint (or other app) that happens to share the topic.
+    const eventId = await emitWebhookEvent(
+      request.shopId as string,
+      subscription.topic,
+      { id: webhookId, test: true, message: 'Test event from Merchant.' },
+      { subscriptionId: webhookId },
+    );
 
     // The real event id, so the UI can point at the delivery row this produced.
     return sendTestEventResponse.parse({ eventId, queued: eventId !== null });
