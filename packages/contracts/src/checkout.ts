@@ -66,6 +66,12 @@ export const checkoutSchema = z
       .default(null),
     totals: checkoutTotalsSchema,
     completedOrderId: idSchema.nullable().default(null),
+    /**
+     * The order's per-shop number, once completed. The thank-you page shows it
+     * ("Confirmation #1041") and is reachable by refresh long after the
+     * complete response is gone, so it has to come back with the checkout.
+     */
+    completedOrderNumber: z.number().int().nullable().default(null),
   })
   .merge(timestampsSchema);
 export type Checkout = z.infer<typeof checkoutSchema>;
