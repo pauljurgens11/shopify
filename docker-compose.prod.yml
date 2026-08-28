@@ -44,12 +44,14 @@ x-app-env: &app-env
   SMTP_HOST: mailpit
   SMTP_PORT: 1025
   # Server-side fetches cross Caddy (S3 presigning, storefront → api on the
-  # shop's public hostname), so Node must trust Caddy's internal CA. With
-  # real certificates the file simply never exists and Node warns once.
-  NODE_EXTRA_CA_CERTS: /caddy-data/caddy/pki/authorities/local/root.crt
+  # shop's public hostname), so Node must trust Caddy's internal CA. The cert
+  # comes via the caddy-ca-export one-shot — Caddy keeps its PKI dir 0600
+  # root-only, so the public root is copied out world-readable. With real
+  # certificates the file simply never exists and Node warns once.
+  NODE_EXTRA_CA_CERTS: /caddy-ca/root.crt
 
 x-caddy-ca: &caddy-ca
-  - caddy-data:/caddy-data:ro
+  - caddy-ca:/caddy-ca:ro
 
 services:
   postgres:
@@ -130,7 +132,9 @@ services:
     environment:
       BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
     volumes:
-      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The directory, not the file: a single-file bind mount pins the inode,
+      # so an edited Caddyfile silently keeps serving its pre-edit content.
+      - ./deploy/caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     healthcheck:
@@ -155,6 +159,23 @@ services:
           - assets.${BASE_DOMAIN:-localhost}
           - demo.${BASE_DOMAIN:-localhost}
 
+  # One-shot: publish Caddy's internal CA root (cert only, never a key) where
+  # the app containers can read it. A real-cert deployment has no root.crt —
+  # the copy is skipped and the apps run with an empty trust extra.
+  caddy-ca-export:
+    image: caddy:2-alpine
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      cp /data/caddy/pki/authorities/local/root.crt /ca/root.crt 2>/dev/null && chmod 644 /ca/root.crt && echo 'internal CA exported' || echo 'no internal CA (real certs?) — nothing to export'
+      "
+    volumes:
+      - caddy-data:/data:ro
+      - caddy-ca:/ca
+    depends_on:
+      caddy:
+        condition: service_healthy
+
   # One-shot: migrate, then seed only if the database is empty. Every app
   # waits for it, so replicas never race migrations.
   db-setup:
@@ -166,6 +187,7 @@ services:
     env_file: .env
     environment:
       <<: *app-env
+      NODE_EXTRA_CA_CERTS: ""
     command:
       [
         "sh",
@@ -195,6 +217,8 @@ services:
         condition: service_completed_successfully
       caddy:
         condition: service_healthy
+      caddy-ca-export:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -225,6 +249,8 @@ services:
         condition: service_healthy
       caddy:
         condition: service_healthy
+      caddy-ca-export:
+        condition: service_completed_successfully
 
   admin:
     image: ${IMAGE_REPO:-ghcr.io/pauljurgens11/shopify}/admin:${IMAGE_TAG:-latest}
@@ -243,6 +269,8 @@ services:
     depends_on:
       caddy:
         condition: service_healthy
+      caddy-ca-export:
+        condition: service_completed_successfully
     healthcheck:
       # Distroless: no shell, no curl — node itself is the probe.
       test:
@@ -272,6 +300,8 @@ services:
         condition: service_healthy
       caddy:
         condition: service_healthy
+      caddy-ca-export:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -291,3 +321,4 @@ volumes:
   minio-data:
   caddy-data:
   caddy-config:
+  caddy-ca:

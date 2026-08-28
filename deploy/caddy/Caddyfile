@@ -14,10 +14,13 @@
 # verified on BASE_DOMAIN=localhost with no real DNS. For a real domain:
 #   1. Remove `local_certs` and set `email` below — explicit hosts get
 #      Let's Encrypt automatically.
-#   2. `*.{BASE_DOMAIN}` needs either a DNS-challenge plugin for a wildcard
-#      cert, or leave the catch-all's `on_demand` to issue per-hostname certs
-#      as shops are visited (add an `on_demand_tls ask` endpoint to stop
-#      strangers minting certs against your rate limits).
+#   2. Shop hostnames (subdomains and custom domains alike) go through the
+#      catch-all's `on_demand`, one exact cert per hostname as it is first
+#      visited (add an `on_demand_tls ask` endpoint to stop strangers minting
+#      certs against your rate limits). Deliberately NOT a `*.{BASE_DOMAIN}`
+#      wildcard cert: with a real domain that needs a DNS-challenge plugin,
+#      and on a single-label base like `localhost` a `*.tld` wildcard is
+#      rejected by Node and most clients outright.
 
 {
 	local_certs
@@ -55,15 +58,12 @@ assets.{$BASE_DOMAIN} {
 	reverse_proxy minio:9000
 }
 
-*.{$BASE_DOMAIN} {
-	import storefront_routes
-}
-
-# Custom domains (CustomDomain table): any host the sites above did not claim
-# is a storefront, resolved by the API against the registered hostname. Certs
-# are minted on demand — internal CA locally, ACME when configured above.
+# Every host the sites above did not claim is a storefront: wildcard shop
+# subdomains and registered custom domains alike, resolved by the API from the
+# Host header. Certs are minted on demand per hostname — internal CA locally,
+# ACME when configured above.
 https:// {
-	tls {
+	tls internal {
 		on_demand
 	}
 	import storefront_routes
