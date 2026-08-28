@@ -47,7 +47,11 @@ export default function AppsPage() {
   const empty = rows.length === 0 && !paging.hasPrevious;
 
   return (
-    <Page title="Apps" primaryAction={{ content: 'Create app', onAction: () => setCreating(true) }}>
+    <Page
+      title="Apps"
+      primaryAction={{ content: 'Create app', onAction: () => setCreating(true) }}
+      fullWidth
+    >
       <Card padding="0">
         {empty ? (
           // Hand-built rather than Polaris `EmptyState`, which requires an

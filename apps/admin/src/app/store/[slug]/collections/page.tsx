@@ -98,6 +98,7 @@ export default function CollectionsPage() {
 
   return (
     <Page
+      fullWidth
       title="Collections"
       primaryAction={{ content: 'Create collection', url: `/store/${slug}/collections/new` }}
     >

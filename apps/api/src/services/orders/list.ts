@@ -101,7 +101,9 @@ export async function listOrders(
     where,
     orderBy,
     take: query.limit,
-    include: { lineItems: true },
+    // The name renders the index's Customer column; the count and spend that
+    // `orderDetailSchema` carries would be a per-row join the index never shows.
+    include: { lineItems: true, customer: { select: { firstName: true, lastName: true } } },
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
   });
 

@@ -289,7 +289,20 @@ export type CreateOrderInput = z.input<typeof createOrderInput>;
 /* --- responses ------------------------------------------------------------ */
 
 /** What the index table needs. Fulfillments and refunds are detail-only. */
-export const orderSummarySchema = orderSchema.omit({ fulfillments: true, refunds: true });
+export const orderSummarySchema = orderSchema.omit({ fulfillments: true, refunds: true }).extend({
+  /**
+   * Just enough of the customer to render Shopify's Customer column, which
+   * shows a name and not an email. Null for a guest order, which has no
+   * customer row at all — the admin falls back to the order's email.
+   *
+   * Deliberately narrower than `orderDetailSchema.customer`: the index needs a
+   * name, not a customer's order count and lifetime spend.
+   */
+  customer: z
+    .object({ firstName: z.string().nullable(), lastName: z.string().nullable() })
+    .nullable()
+    .default(null),
+});
 export type OrderSummary = z.infer<typeof orderSummarySchema>;
 
 /**

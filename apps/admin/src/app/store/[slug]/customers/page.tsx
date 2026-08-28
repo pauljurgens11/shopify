@@ -147,6 +147,7 @@ export default function CustomersPage() {
 
   return (
     <Page
+      fullWidth
       title="Customers"
       primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
     >

@@ -61,8 +61,14 @@ function orderDate(iso: string): string {
     .replace(',', ' at');
 }
 
+/**
+ * Shopify's Customer column shows a name. A guest order has no customer row,
+ * and a customer can exist with neither name set, so the email stays the
+ * fallback rather than rendering an empty cell.
+ */
 function customerName(order: OrderSummary): string {
-  return order.email;
+  const full = [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ');
+  return full || order.email;
 }
 
 export default function OrdersPage() {

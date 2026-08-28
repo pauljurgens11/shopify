@@ -151,6 +151,7 @@ export default function ProductsPage() {
 
   return (
     <Page
+      fullWidth
       title="Products"
       primaryAction={{ content: 'Add product', url: `/store/${slug}/products/new` }}
     >
