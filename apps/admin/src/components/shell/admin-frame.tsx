@@ -11,7 +11,7 @@
 import { Banner, Button, Frame, Loading, Page } from '@shopify/polaris';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { setUnauthorizedHandler } from '../../lib/api.ts';
+import { setUnauthorizedHandler, useApiQuery } from '../../lib/api.ts';
 import { useSession } from '../../lib/session.ts';
 import { AdminNavigation } from './admin-navigation.tsx';
 import { AdminTopBar } from './admin-top-bar.tsx';
@@ -32,6 +32,15 @@ export function AdminFrame({
   const pathname = usePathname();
   const { data: session, isPending, error, refetch } = useSession();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Shopify shows the open-order count beside Orders. The list endpoint is
+  // cursor-paginated with no total (SPEC §5), so this counts a page and says
+  // "50+" beyond it rather than inventing a number. Owner: WS-C (C5).
+  const openOrders = useApiQuery<{ data: unknown[] }>(
+    ['open-orders-count'],
+    '/admin/api/orders?tab=open&limit=50',
+    { enabled: Boolean(session) },
+  );
 
   // Any 401 from any page, not just this query — a session can expire between
   // two clicks and the resulting failure should not be a silent empty table.
@@ -81,7 +90,7 @@ export function AdminFrame({
       topBar={
         <AdminTopBar session={session} onNavigationToggle={() => setMobileNavOpen((o) => !o)} />
       }
-      navigation={<AdminNavigation session={session} />}
+      navigation={<AdminNavigation session={session} openOrders={openOrders.data?.data.length} />}
       showMobileNavigation={mobileNavOpen}
       onNavigationDismiss={() => setMobileNavOpen(false)}
     >

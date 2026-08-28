@@ -49,7 +49,9 @@ export function AdminNavigation({
       // linkComponent, so routing is already client-side. Pushing here too
       // would navigate twice.
       // Shopify shows the open-order count beside Orders, and nothing at zero.
-      ...(item.badge === 'openOrders' && openOrders ? { badge: String(openOrders) } : {}),
+      ...(item.badge === 'openOrders' && openOrders
+        ? { badge: openOrders >= 50 ? '50+' : String(openOrders) }
+        : {}),
       ...(subItems.length > 0
         ? {
             subNavigationItems: subItems.map((sub) => ({
