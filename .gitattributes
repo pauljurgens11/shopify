@@ -25,4 +25,4 @@ packages/db/generated/**  linguist-generated=true
 
 # Prisma migrations are immutable once written. A conflict here means two agents
 # claimed the same migration number — resolve by renaming, never by merging.
-packages/db/prisma/migrations/**  -merge
+packages/db/prisma/schema/migrations/**  -merge
