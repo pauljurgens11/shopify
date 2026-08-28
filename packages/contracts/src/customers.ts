@@ -13,6 +13,7 @@ import {
   tagsSchema,
   timestampsSchema,
 } from './common.ts';
+import { financialStatusSchema, fulfillmentStatusSchema } from './orders.ts';
 
 export const customerAddressSchema = addressSchema.extend({
   id: idSchema,
@@ -78,3 +79,61 @@ export const customerRegisterInput = customerLoginInput.extend({
   lastName: z.string().max(255).optional(),
   acceptsMarketing: z.boolean().default(false),
 });
+
+/* --- storefront account surface (E5) -------------------------------------- */
+
+/**
+ * What the account pages and E4's checkout pre-fill see. Deliberately smaller
+ * than `customerSchema`: no note/tags/metadata (merchant-facing), no
+ * ordersCount/totalSpent (the order list is the source of truth here), and
+ * `defaultAddress` pulled out so consumers never re-derive "the" address.
+ */
+export const storefrontCustomerSchema = z.object({
+  id: idSchema,
+  email: z.string().email(),
+  firstName: z.string().max(255).nullable().default(null),
+  lastName: z.string().max(255).nullable().default(null),
+  phone: z.string().max(64).nullable().default(null),
+  acceptsMarketing: z.boolean().default(false),
+  addresses: z.array(customerAddressSchema).default([]),
+  defaultAddress: customerAddressSchema.nullable().default(null),
+  createdAt: z.string().datetime({ offset: true }),
+});
+export type StorefrontCustomer = z.infer<typeof storefrontCustomerSchema>;
+
+/** `GET|PUT /storefront/api/customers/me`, and login/register responses. */
+export const storefrontCustomerResponse = z.object({ customer: storefrontCustomerSchema });
+export type StorefrontCustomerResponse = z.infer<typeof storefrontCustomerResponse>;
+
+/**
+ * The account page's one edit form (SPEC §8 keeps this surface minimal —
+ * default address only, no address book). `defaultAddress` replaces the
+ * default address; omitting it leaves addresses untouched.
+ */
+export const updateStorefrontCustomerInput = z.object({
+  firstName: z.string().max(255).nullable().optional(),
+  lastName: z.string().max(255).nullable().optional(),
+  phone: z.string().max(64).nullable().optional(),
+  acceptsMarketing: z.boolean().optional(),
+  defaultAddress: addressSchema.optional(),
+});
+
+/**
+ * One row of the account order-history table: number, date, total, status.
+ * A subset of C2's `orderSummarySchema` — shoppers never see cost-side fields.
+ */
+export const storefrontOrderSummarySchema = z.object({
+  id: idSchema,
+  /** Display as `#${orderNumber}`. */
+  orderNumber: z.number().int(),
+  createdAt: z.string().datetime({ offset: true }),
+  total: moneySchema,
+  financialStatus: financialStatusSchema,
+  fulfillmentStatus: fulfillmentStatusSchema,
+  cancelledAt: z.string().datetime({ offset: true }).nullable().default(null),
+  itemCount: z.number().int().nonnegative(),
+});
+export type StorefrontOrderSummary = z.infer<typeof storefrontOrderSummarySchema>;
+
+/** `GET /storefront/api/customers/me/orders`. */
+export const storefrontCustomerOrdersResponse = paginated(storefrontOrderSummarySchema);
