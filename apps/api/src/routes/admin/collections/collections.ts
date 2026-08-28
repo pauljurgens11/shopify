@@ -17,6 +17,7 @@ import {
   createCollectionInput,
   listCollectionProductsQuery,
   listCollectionsQuery,
+  previewCollectionInput,
   updateCollectionInput,
   updateCollectionProductsInput,
 } from '@merchant/contracts/collections';
@@ -30,6 +31,7 @@ import {
   getCollection,
   listCollectionProducts,
   listCollections,
+  previewSmartCollection,
   updateCollection,
   updateCollectionProducts,
 } from '../../../services/catalog/collections.ts';
@@ -58,6 +60,14 @@ export default async function routes(app: FastifyInstance) {
     const input = createCollectionInput.parse(request.body);
     const collection = await createCollection(request.db, shopIdOf(request), input);
     return reply.status(201).send(collection);
+  });
+
+  /* --------------------------------------------------------------- preview */
+  // Declared before `/:id` so "preview" is never read as a collection id.
+  // B6's condition builder calls this on every edit; nothing is written.
+  app.post('/preview', async (request) => {
+    const { ruleSet, limit } = previewCollectionInput.parse(request.body);
+    return previewSmartCollection(request.db, await shopCurrency(request), ruleSet, limit);
   });
 
   /* ------------------------------------------------------------------- get */

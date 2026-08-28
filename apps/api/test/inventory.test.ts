@@ -235,6 +235,19 @@ describe('locations', () => {
       'Aurora Retail',
     ]);
 
+    // A location holding units cannot go — its levels would cascade away and
+    // the stock would silently vanish from the shop's totals.
+    const held = await write('DELETE', `/admin/api/locations/${store}`);
+    expect(held.statusCode).toBe(409);
+    expect(held.json().errors[0].message).toMatch(/still holds stock/i);
+
+    // Emptied, it deletes.
+    for (const level of await dbAdmin.inventoryLevel.findMany({
+      where: { locationId: store, NOT: { available: 0 } },
+      select: { variantId: true },
+    })) {
+      await setAvailable(db, { variantId: level.variantId, locationId: store, available: 0 });
+    }
     expect((await write('DELETE', `/admin/api/locations/${store}`)).statusCode).toBe(200);
     // One location must survive: a shop with nowhere to hold stock cannot fulfil.
     const last = await write('DELETE', `/admin/api/locations/${warehouse}`);
@@ -242,6 +255,38 @@ describe('locations', () => {
 
     // Restore the second location for whatever runs after this file.
     store = await createLocation('Aurora Retail');
+  });
+});
+
+describe('locations report their stock', () => {
+  // B6's Locations settings page disables Delete for a location that still
+  // holds units, so the count has to come back with the location — the
+  // alternative is the page paging the whole inventory to find out.
+  it('counts the variants stocked at each location', async () => {
+    const { variantId } = await createVariant('Stock Counter');
+    await adjust(db, { variantId, locationId: warehouse, delta: 4, reason: 'received' });
+
+    const byId = Object.fromEntries(
+      (await get('/admin/api/locations')).json().data.map((l: { id: string }) => [l.id, l]),
+    );
+
+    expect(byId[warehouse].stockedVariantCount).toBeGreaterThan(0);
+    expect(byId[store].stockedVariantCount).toBe(0);
+  });
+
+  it('stops counting a variant once its stock is gone', async () => {
+    const { variantId } = await createVariant('Drains To Zero');
+    await adjust(db, { variantId, locationId: store, delta: 3, reason: 'received' });
+    const before = (await get('/admin/api/locations'))
+      .json()
+      .data.find((l: { id: string }) => l.id === store).stockedVariantCount;
+
+    await setAvailable(db, { variantId, locationId: store, available: 0 });
+
+    const after = (await get('/admin/api/locations'))
+      .json()
+      .data.find((l: { id: string }) => l.id === store).stockedVariantCount;
+    expect(after).toBe(before - 1);
   });
 });
 

@@ -692,3 +692,63 @@ describe('handles and the index', () => {
     expect(await memberTitles(collection.id)).not.toContain('Stratus Tee');
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* Rule preview (B6's condition builder)                                        */
+/* -------------------------------------------------------------------------- */
+
+describe('rule preview', () => {
+  // The admin's smart-collection form shows what a rule set will match BEFORE
+  // it is saved. Without this the form would have to re-implement the rule
+  // translator in the browser, and the two would drift.
+  const preview = (body: Record<string, unknown>) => write('POST', `${COLLECTIONS}/preview`, body);
+
+  it('resolves an unsaved rule set without creating anything', async () => {
+    const before = (await get(`${COLLECTIONS}?limit=250`)).json().data.length;
+
+    const response = await preview({
+      ruleSet: { rules: [{ column: 'vendor', relation: 'equals', condition: 'Northwind' }] },
+    });
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().data.map((p: ProductDto) => p.title)).toEqual([
+      'Cirrus Down Vest',
+      'Nimbus Wool Beanie',
+    ]);
+    // Nothing was persisted — a preview is a read.
+    expect((await get(`${COLLECTIONS}?limit=250`)).json().data.length).toBe(before);
+  });
+
+  it('applies the same disjunction the saved collection would', async () => {
+    const rules = [
+      { column: 'vendor', relation: 'equals', condition: 'Northwind' },
+      { column: 'tag', relation: 'equals', condition: 'new' },
+    ];
+
+    const all = (await preview({ ruleSet: { appliedDisjunctively: false, rules } })).json();
+    const any = (await preview({ ruleSet: { appliedDisjunctively: true, rules } })).json();
+
+    expect(any.data.length).toBeGreaterThan(all.data.length);
+  });
+
+  it('refuses an impossible column/relation pair, like saving does', async () => {
+    const response = await preview({
+      ruleSet: { rules: [{ column: 'tag', relation: 'contains', condition: 'new' }] },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().errors[0].code).toBe('invalid_request');
+  });
+
+  it('never previews another shop’s products', async () => {
+    const response = await preview({
+      ruleSet: { rules: [{ column: 'vendor', relation: 'equals', condition: 'Northwind' }] },
+    });
+    const titles = response.json().data.map((p: ProductDto) => p.title);
+    // The neighbour owns a product with the same vendor (fixture below).
+    expect(new Set(titles).size).toBe(titles.length);
+    for (const title of titles) {
+      expect(CATALOG.some((c) => c.title === title)).toBe(true);
+    }
+  });
+});

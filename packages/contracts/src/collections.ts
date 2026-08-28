@@ -110,6 +110,19 @@ export const listCollectionProductsQuery = paginationQuery.extend({
   sortOrder: collectionSortOrderSchema.optional(),
 });
 
+/**
+ * What an UNSAVED rule set would match (`POST /admin/api/collections/preview`).
+ *
+ * The admin's condition builder needs this: without it the form would have to
+ * re-implement the rule translator in the browser, and the two would drift the
+ * first time a relation was added.
+ */
+export const previewCollectionInput = z.object({
+  ruleSet: collectionRuleSetSchema,
+  limit: z.number().int().min(1).max(50).default(10),
+});
+export type PreviewCollectionInput = z.infer<typeof previewCollectionInput>;
+
 /* -------------------------------------------------------------------------- */
 /* Types                                                                        */
 /* -------------------------------------------------------------------------- */
