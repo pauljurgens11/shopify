@@ -12,6 +12,7 @@
  * No payout schedules, no fraud settings, no Shopify branding — this page is
  * "Merchant Pay".
  */
+import { minorUnitFactor } from '@merchant/config/money';
 import type { ProcessorConfig, ProcessorKey, RoutingRule } from '@merchant/contracts/pay';
 import {
   Badge,
@@ -50,6 +51,8 @@ import {
 
 const PROCESSORS_KEY = ['payments', 'processors'];
 const RULES_KEY = ['payments', 'routing-rules'];
+
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
 
 /** The three adapters SPEC §11 ships. `mock` connects with one click. */
 const PROVIDERS: Array<{ key: ProcessorKey; name: string; description: string }> = [
@@ -334,6 +337,8 @@ function RuleRow({
   index,
   count,
   processors,
+  currencySymbol,
+  amountStep,
   error,
   onChange,
   onMove,
@@ -343,6 +348,8 @@ function RuleRow({
   index: number;
   count: number;
   processors: ProcessorConfig[];
+  currencySymbol: string;
+  amountStep: number;
   error?: string;
   onChange: (patch: Partial<RuleDraft>) => void;
   onMove: (direction: -1 | 1) => void;
@@ -442,9 +449,9 @@ function RuleRow({
             labelHidden
             placeholder="Min amount"
             type="number"
-            prefix="$"
+            prefix={currencySymbol}
             min={0}
-            step={0.01}
+            step={amountStep}
             autoComplete="off"
             value={draft.minAmount}
             onChange={(minAmount) => onChange({ minAmount })}
@@ -456,9 +463,9 @@ function RuleRow({
             labelHidden
             placeholder="Max amount"
             type="number"
-            prefix="$"
+            prefix={currencySymbol}
             min={0}
-            step={0.01}
+            step={amountStep}
             autoComplete="off"
             value={draft.maxAmount}
             onChange={(maxAmount) => onChange({ maxAmount })}
@@ -534,6 +541,36 @@ export default function PaymentsSettingsPage() {
     queryClient.invalidateQueries({ queryKey: RULES_KEY });
   };
 
+  // A failed load must not render as a healthy empty page: with live Connect
+  // buttons and "No routing rules" copy it invites the merchant to rebuild a
+  // config that exists — and the routing PUT replaces the table wholesale, so
+  // saving from a false-empty draft would wipe their real rules.
+  if (processorsQuery.isError || rulesQuery.isError) {
+    return (
+      <SettingsPage title="Payments" loading={false}>
+        <Banner
+          tone="critical"
+          title="Payment settings couldn’t be loaded"
+          action={{
+            content: 'Retry',
+            onAction: () => {
+              processorsQuery.refetch();
+              rulesQuery.refetch();
+            },
+          }}
+        >
+          <Text as="p">
+            {(processorsQuery.error ?? rulesQuery.error)?.message ??
+              'Something went wrong loading your payment providers and routing rules.'}
+          </Text>
+        </Banner>
+      </SettingsPage>
+    );
+  }
+
+  const currencySymbol = CURRENCY_SYMBOLS[currency] ?? currency;
+  const amountStep = minorUnitFactor(currency) === 1 ? 1 : 0.01;
+
   return (
     <SettingsPage
       title="Payments"
@@ -570,6 +607,8 @@ export default function PaymentsSettingsPage() {
                     index={index}
                     count={drafts.length}
                     processors={processors}
+                    currencySymbol={currencySymbol}
+                    amountStep={amountStep}
                     error={showErrors ? validation.byKey[draft.key] : undefined}
                     onChange={(patch) =>
                       setEdited(drafts.map((d) => (d.key === draft.key ? { ...d, ...patch } : d)))
