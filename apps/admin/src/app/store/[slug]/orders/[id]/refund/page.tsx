@@ -261,6 +261,12 @@ export default function RefundPage() {
                   </Text>
                 </InlineStack>
                 <InlineStack align="space-between">
+                  <Text as="span">Tax</Text>
+                  <Text as="span" numeric>
+                    {format(calculation?.taxAmount ?? { amount: 0, currencyCode })}
+                  </Text>
+                </InlineStack>
+                <InlineStack align="space-between">
                   <Text as="span">Shipping</Text>
                   <Text as="span" numeric>
                     {format(calculation?.shippingAmount ?? { amount: 0, currencyCode })}

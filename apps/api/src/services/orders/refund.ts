@@ -49,6 +49,30 @@ function unitValues(line: LineRow, currencyCode: string): number[] {
 }
 
 /**
+ * Tax lives on the order, not the lines (checkout prices it once over the
+ * discounted base), so a refund allocates it the same way: across taxable
+ * lines by net, then across a line's units — largest remainder both times.
+ * Refunding every unit therefore returns exactly `order.taxTotal`, which is
+ * what lets a fully-returned order reach `refunded` rather than sticking at
+ * `partially_refunded` one tax-total short.
+ */
+function unitTaxValues(order: OrderWithLines, currencyCode: string): Map<string, number[]> {
+  const weights = order.lineItems.map((line) =>
+    line.taxable ? Math.max(0, line.price * line.quantity - line.totalDiscount) : 0,
+  );
+  const perLine = allocate(money(order.taxTotal, currencyCode), weights);
+  return new Map(
+    order.lineItems.map((line, i) => [
+      line.id,
+      allocate(
+        perLine[i] ?? money(0, currencyCode),
+        Array.from({ length: line.quantity }, () => 1),
+      ).map((m) => m.amount),
+    ]),
+  );
+}
+
+/**
  * The suggested refund for a request, and the ceiling it has to fit under.
  * Pure: `POST /:id/refunds/calculate` returns this, and the refund itself is
  * computed from the same function, so the preview cannot disagree with the
@@ -60,6 +84,8 @@ export function calculateRefund(
 ): RefundCalculation {
   const currency = order.currencyCode;
   const byId = new Map(order.lineItems.map((l) => [l.id, l]));
+  const taxUnits = unitTaxValues(order, currency);
+  let taxAmount = 0;
 
   const lineItems = (input.lineItems ?? [])
     .filter((item) => item.quantity > 0)
@@ -74,6 +100,10 @@ export function calculateRefund(
 
       const units = unitValues(line, currency);
       const amount = units
+        .slice(line.refundedQuantity, line.refundedQuantity + item.quantity)
+        .reduce((total, unit) => total + unit, 0);
+
+      taxAmount += (taxUnits.get(line.id) ?? [])
         .slice(line.refundedQuantity, line.refundedQuantity + item.quantity)
         .reduce((total, unit) => total + unit, 0);
 
@@ -94,7 +124,8 @@ export function calculateRefund(
     lineItems,
     shippingAmount: money(shippingAmount, currency),
     subtotal: money(subtotal, currency),
-    total: money(subtotal + shippingAmount, currency),
+    taxAmount: money(taxAmount, currency),
+    total: money(subtotal + taxAmount + shippingAmount, currency),
     maximumRefundable: money(order.total - order.refundedTotal, currency),
   };
 }
