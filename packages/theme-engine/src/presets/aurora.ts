@@ -38,7 +38,8 @@ export const aurora: ThemeDocInput = {
           heading: 'Made for the long way round',
           subheading:
             'Merino, waxed canvas and honest hardware, cut in small runs in Portland, Oregon.',
-          image: 'https://picsum.photos/seed/aurora-hero/2400/1200',
+          image:
+            'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=2400&h=1200&fit=crop&q=80&auto=format',
           imagePosition: 'background',
           alignment: 'left',
           height: 'large',
@@ -63,7 +64,8 @@ export const aurora: ThemeDocInput = {
         settings: {
           heading: 'Small batches, built to outlast us',
           body: 'Every run is capped at 300 pieces so we can keep the mills close and the seams honest. What we make is meant to be repaired, not replaced.',
-          image: 'https://picsum.photos/seed/aurora-workshop/1400/1400',
+          image:
+            'https://images.unsplash.com/photo-1543076447-215ad9ba6923?w=1400&h=1400&fit=crop&q=80&auto=format',
           imageSide: 'left',
         },
       },

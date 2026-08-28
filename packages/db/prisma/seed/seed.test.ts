@@ -68,6 +68,11 @@ describe('shape of the demo store', () => {
       expect(p.handle, `${p.title} handle`).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
       expect(p.variants.length, `${p.title} variants`).toBeGreaterThan(0);
       expect(p.images.length, `${p.title} images`).toBeGreaterThan(0);
+      for (const image of p.images) {
+        // Curated photography only (data/images.ts): the placeholder fallback
+        // firing means someone added a product without picking its photos.
+        expect(image.url, `${p.title} uses a curated image`).toContain('images.unsplash.com');
+      }
       expect(p.descriptionHtml.length, `${p.title} description`).toBeGreaterThan(40);
       for (const v of p.variants) {
         // SPEC §5 / CLAUDE.md §9: money is integer minor units, in seeds too.
