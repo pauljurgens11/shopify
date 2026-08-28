@@ -166,6 +166,47 @@ describe('webhook subscriptions', () => {
     expect(second.json().errors[0].code).toBe('conflict');
   });
 
+  it('keeps delivery history on delete, and lets the same topic + URL come back', async () => {
+    const { app: created } = await createApp('Soft delete app');
+    const payload = { topic: 'orders/create', url: 'https://example.test/soft' };
+
+    const createdSub = await send('POST', `/admin/api/apps/${created.id}/webhooks`, { payload });
+    expect(createdSub.statusCode).toBe(201);
+    const subscriptionId = (createdSub.json() as { subscription: { id: string } }).subscription.id;
+
+    await dbAdmin.webhookDelivery.create({
+      data: {
+        id: newId('webhookDelivery'),
+        shopId: shop.shopId,
+        subscriptionId,
+        eventId: newId('event'),
+        topic: 'orders/create',
+        payload: {},
+        status: 'success',
+        attempts: 1,
+      },
+    });
+
+    const removed = await send(
+      'DELETE',
+      `/admin/api/apps/${created.id}/webhooks/${subscriptionId}`,
+    );
+    expect(removed.statusCode).toBe(200);
+
+    // Gone from the subscription list…
+    const list = await send('GET', `/admin/api/apps/${created.id}/webhooks`);
+    expect((list.json() as { data: unknown[] }).data).toHaveLength(0);
+
+    // …but the delete dialog promises "Past deliveries stay in the log".
+    const log = await send('GET', `/admin/api/apps/${created.id}/deliveries`);
+    const rows = (log.json() as { data: { subscriptionId: string }[] }).data;
+    expect(rows.some((row) => row.subscriptionId === subscriptionId)).toBe(true);
+
+    // And re-subscribing the same topic + URL is not a conflict.
+    const again = await send('POST', `/admin/api/apps/${created.id}/webhooks`, { payload });
+    expect(again.statusCode).toBe(201);
+  });
+
   it('rejects a topic outside the closed set', async () => {
     const { app: created } = await createApp('Bad topic app');
     const response = await send('POST', `/admin/api/apps/${created.id}/webhooks`, {

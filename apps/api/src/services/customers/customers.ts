@@ -21,6 +21,7 @@ import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import type { z } from 'zod';
 import { badRequest, conflict, notFound } from '../../lib/errors.ts';
+import { emitCustomerEvent } from './events.ts';
 
 type ListQuery = z.infer<typeof listCustomersQuery>;
 
@@ -298,6 +299,13 @@ export async function createCustomer(
     throw error;
   }
 
+  await emitCustomerEvent(shopId, 'customers/create', {
+    id,
+    email: normalizeEmail(data.email),
+    firstName: data.firstName ?? null,
+    lastName: data.lastName ?? null,
+  });
+
   return getCustomer(db, id);
 }
 
@@ -397,6 +405,14 @@ export async function findOrCreateByEmail(
         phone: input.phone ?? null,
         acceptsMarketing: input.acceptsMarketing ?? false,
       },
+    });
+    // Only when actually created — a checkout reusing an existing customer is
+    // not a customer creation.
+    await emitCustomerEvent(shopId, 'customers/create', {
+      id,
+      email,
+      firstName: input.firstName ?? null,
+      lastName: input.lastName ?? null,
     });
     return { id, email, created: true };
   } catch (error) {

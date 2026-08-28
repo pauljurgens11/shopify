@@ -28,7 +28,8 @@ import { useApiQuery } from '../../../../lib/api.ts';
 import { formatDateTime, topicLabel } from './format.ts';
 import { useCursorPaging } from './use-cursor-paging.ts';
 
-const PAGE_SIZE = 20;
+/** SPEC §5: admin tables page at 50. */
+const PAGE_SIZE = 50;
 
 /** Status → badge, per the delivery states the contract defines. */
 function StatusBadge({ status }: { status: AppDelivery['status'] }) {

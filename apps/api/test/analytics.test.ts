@@ -25,12 +25,16 @@ import {
 let app: FastifyInstance;
 let shop: TestShop;
 let neighbour: TestShop;
+let staleShop: TestShop;
 let cookie: string;
+let staleCookie: string;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Rollups cover closed days; "today" must come from raw events. */
 const today = new Date(Date.UTC(2026, 7, 28));
 const utcDay = (offset: number) => new Date(today.getTime() + offset * DAY_MS);
+const startOfUtcDay = (d: Date) =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 async function rollup(shopId: string, day: Date, metrics: Record<string, number>) {
   for (const [metric, value] of Object.entries(metrics)) {
@@ -131,14 +135,51 @@ beforeAll(async () => {
   // The neighbour is loud on every day in range.
   await rollup(neighbour.shopId, utcDay(-1), { sales: 999_999, orders: 99, sessions: 999 });
   await event(neighbour.shopId, 'purchase', 'ses_n', today, 999_999);
+
+  // A shop whose TODAY — the real clock's UTC day, not the fixed dates above —
+  // already has rollup rows. That is the normal case, not an edge: the worker
+  // upserts the current day every 5 minutes, so today's rollup exists and is
+  // up to 5 minutes stale. Its own shop, so the real clock never collides with
+  // the fixed-date seeds.
+  staleShop = await createTestShop();
+  staleCookie = await sessionCookie(app, {
+    shopId: staleShop.shopId,
+    staffUserId: staleShop.ownerId,
+  });
+  const now = new Date();
+  await rollup(staleShop.shopId, startOfUtcDay(now), {
+    sales: 0,
+    orders: 0,
+    sessions: 0,
+    product_views: 0,
+    add_to_carts: 0,
+    begin_checkouts: 0,
+    purchases: 0,
+  });
+  await event(staleShop.shopId, 'page_view', 'ses_now', now);
+  await event(staleShop.shopId, 'purchase', 'ses_now', now, 4_200);
+  await dbAdmin.order.create({
+    data: {
+      id: newId('order'),
+      shopId: staleShop.shopId,
+      orderNumber: 1001,
+      email: 'buyer@example.com',
+      currencyCode: 'USD',
+      subtotal: 4_200,
+      total: 4_200,
+      createdAt: now,
+    },
+  });
 });
 
 afterAll(async () => {
   await app.close();
   // Orders are not part of `deleteTestShops` (payments reference them), so this
   // suite clears its own.
-  await dbAdmin.order.deleteMany({ where: { shopId: { in: [shop.shopId, neighbour.shopId] } } });
-  await deleteTestShops([shop.shopId, neighbour.shopId]);
+  await dbAdmin.order.deleteMany({
+    where: { shopId: { in: [shop.shopId, neighbour.shopId, staleShop.shopId] } },
+  });
+  await deleteTestShops([shop.shopId, neighbour.shopId, staleShop.shopId]);
 });
 
 describe('GET /admin/api/analytics', () => {
@@ -210,6 +251,19 @@ describe('GET /admin/api/analytics', () => {
     expect(body.salesByChannel).toEqual([
       { channel: 'Online Store', revenue: { amount: 55_000, currencyCode: 'USD' } },
     ]);
+  });
+
+  it("reads today from raw data even though the worker's rollup row for it exists", async () => {
+    const utcToday = startOfUtcDay(new Date());
+    const query = `from=${utcToday.toISOString()}&to=${utcToday.toISOString()}`;
+    const body = (await get(`/admin/api/analytics?${query}`, { cookie: staleCookie })).json();
+
+    // The rollup for today says zero across the board — it is up to 5 minutes
+    // behind. The raw order and events are what the merchant must see.
+    expect(body.summary.totalSales).toEqual({ amount: 4_200, currencyCode: 'USD' });
+    expect(body.summary.orderCount).toBe(1);
+    expect(body.summary.sessionCount).toBe(1);
+    expect(body.salesOverTime).toEqual([{ bucket: utcToday.toISOString(), value: 4_200 }]);
   });
 
   it('never counts a neighbouring shop', async () => {
