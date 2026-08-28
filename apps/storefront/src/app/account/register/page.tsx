@@ -1,0 +1,35 @@
+/**
+ * `/account/register` (SPEC §8 — optional customer accounts). Owner: WS-E (E5).
+ * Registering with an email that already ordered as a guest claims that order
+ * history — the API sets the password on the existing customer row.
+ */
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import { resolveShopSlug } from '../../../lib/tenant.ts';
+import { RegisterForm } from '../forms.tsx';
+import { currentCustomer } from '../session.ts';
+
+export const metadata: Metadata = { title: 'Create account' };
+export const dynamic = 'force-dynamic';
+
+export default async function RegisterPage() {
+  const slug = await resolveShopSlug();
+  if (!slug) notFound();
+  if (await currentCustomer(slug)) redirect('/account');
+
+  return (
+    <main className="mx-auto w-full max-w-md px-6 py-16">
+      <h1 className="font-heading text-3xl tracking-tight">Create account</h1>
+      <p className="mt-2 text-sm text-text/60">Track orders and check out faster next time.</p>
+      <div className="mt-8">
+        <RegisterForm />
+      </div>
+      <p className="mt-6 text-sm text-text/70">
+        Already have an account?{' '}
+        <a href="/account/login" className="underline">
+          Sign in
+        </a>
+      </p>
+    </main>
+  );
+}
