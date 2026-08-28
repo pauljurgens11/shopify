@@ -1,4 +1,6 @@
-import type { Section } from '@merchant/contracts/theme';
+import type { SectionProps } from '../context.ts';
+import { SectionShell } from '../shared/section-shell.tsx';
+import { ThemeImage } from '../shared/theme-image.tsx';
 
 /**
  * `logo-list` section.
@@ -9,13 +11,37 @@ import type { Section } from '@merchant/contracts/theme';
  *
  * Owner: WS-F.
  */
-export type LogoListSettings = Extract<Section, { type: 'logo-list' }>['settings'];
+export type LogoListSettings = SectionProps<'logo-list'>['settings'];
 
-export function LogoList({ settings }: { settings: LogoListSettings }) {
-  // TODO(WS-F): implement. Keep it pure — no data fetching inside a section.
+export function LogoList({ settings }: SectionProps<'logo-list'>) {
+  const { heading, logos } = settings;
+
   return (
-    <section data-section="logo-list" className="w-full">
-      <pre className="hidden">{JSON.stringify(settings)}</pre>
-    </section>
+    <SectionShell type="logo-list" width="wide" padding="md">
+      {heading ? (
+        <h2 className="text-center text-text/60 text-xs uppercase tracking-[0.2em]">{heading}</h2>
+      ) : null}
+      <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-8">
+        {logos.map((logo, index) => (
+          <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: alt text is model-authored and not unique
+            key={`${index}-${logo.alt}`}
+            className="flex h-10 items-center opacity-60 transition-opacity hover:opacity-100"
+          >
+            <ThemeImage
+              src={logo.image}
+              alt={logo.alt}
+              fit="contain"
+              className="h-10 w-28 rounded-theme"
+              fallback={
+                <span className="px-2 text-center text-[10px] text-text/50 uppercase tracking-wider">
+                  {logo.alt}
+                </span>
+              }
+            />
+          </li>
+        ))}
+      </ul>
+    </SectionShell>
   );
 }

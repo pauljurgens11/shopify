@@ -12,7 +12,8 @@ export type ThemeButtonProps = {
   /** Renders an `<a>`. Omit for a `<button>` (forms owned by client islands). */
   href?: string;
   type?: 'button' | 'submit';
-  variant?: 'primary' | 'secondary';
+  /** `on-image` is the readable treatment for a button sitting on an overlay. */
+  variant?: 'primary' | 'secondary' | 'on-image';
   size?: 'sm' | 'md' | 'lg';
   block?: boolean;
   className?: string;
@@ -35,6 +36,7 @@ const VARIANTS = {
     'border-[var(--theme-button-border)] hover:bg-[var(--theme-button-bg-hover)] ' +
     'hover:text-[var(--theme-button-fg-hover)]',
   secondary: 'border-current bg-transparent text-text hover:bg-text/5',
+  'on-image': 'border-current bg-transparent text-background hover:bg-background/15',
 } as const;
 
 export function ThemeButton({

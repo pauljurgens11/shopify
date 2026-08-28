@@ -148,3 +148,166 @@ const MINIMAL_SETTINGS: Record<SectionType, Record<string, unknown>> = {
 export function defaultSettingsFor(type: SectionType): unknown {
   return settingsSchemaFor(type).parse(MINIMAL_SETTINGS[type]);
 }
+
+/**
+ * Every optional field populated — the other half of the render matrix. The AI
+ * emits both extremes, and a section that only survives its defaults is a
+ * section that breaks on real model output.
+ */
+const MAXIMAL_SETTINGS: Record<SectionType, Record<string, unknown>> = {
+  'announcement-bar': {
+    text: 'Free carbon-neutral shipping on every order over $75.',
+    link: { label: 'See the details', url: '/collections/featured' },
+    dismissible: true,
+  },
+  hero: {
+    heading: 'Made for the long way round',
+    subheading: 'Merino, waxed canvas and honest hardware, cut in small runs.',
+    image: 'https://picsum.photos/seed/hero/2400/1200',
+    imagePosition: 'left',
+    alignment: 'left',
+    height: 'full',
+    primaryButton: { label: 'Shop the collection', url: '/collections/featured' },
+    secondaryButton: { label: 'Read our story', url: '/collections/featured' },
+    overlayOpacity: 65,
+  },
+  'image-with-text': {
+    heading: 'Small batches, built to outlast us',
+    body: 'Every run is capped at 300 pieces so we can keep the mills close.',
+    image: 'https://picsum.photos/seed/story/1400/1400',
+    imageSide: 'right',
+    button: { label: 'How we make things', url: '/collections/featured' },
+  },
+  'featured-collection': {
+    heading: "This week's edit",
+    collectionHandle: 'featured',
+    productsToShow: 12,
+    columns: 5,
+    showViewAll: true,
+  },
+  'product-grid': {
+    heading: 'Just landed',
+    productHandles: ['alpine-merino-crewneck'],
+    columns: 5,
+    rows: 4,
+  },
+  'collection-list': {
+    heading: 'Shop by category',
+    collectionHandles: ['featured', 'does-not-exist'],
+    columns: 4,
+  },
+  'rich-text': {
+    heading: 'A note on how we make things',
+    body: '<p>We dye in <strong>small lots</strong>.</p><script>alert(1)</script>',
+    alignment: 'right',
+    width: 'wide',
+  },
+  'image-banner': {
+    image: 'https://picsum.photos/seed/banner/2400/900',
+    heading: 'Autumn/Winter',
+    body: 'Twelve pieces. One palette.',
+    button: { label: 'Shop the season', url: '/collections/featured' },
+    alignment: 'left',
+  },
+  slideshow: {
+    autoplay: true,
+    intervalSeconds: 15,
+    slides: [
+      {
+        image: 'https://picsum.photos/seed/slide-1/2400/1200',
+        heading: 'Soft season',
+        body: 'Washed linen and brushed cotton.',
+        button: { label: 'Shop new in', url: '/collections/featured' },
+      },
+      { image: null, heading: null, body: null, button: null },
+    ],
+  },
+  testimonials: {
+    heading: 'Worn and reported back on',
+    items: [
+      {
+        quote: 'Three winters on the crest and it still looks new.',
+        author: 'Marta O.',
+        role: 'Bend, OR',
+        rating: 5,
+      },
+      { quote: 'The fit notes were exact.', author: 'Dev P.', role: null, rating: 1 },
+    ],
+  },
+  'logo-list': {
+    heading: 'Stocked by',
+    logos: [
+      { image: 'https://picsum.photos/seed/logo-1/240/120', alt: 'Field & Forest' },
+      { image: null, alt: 'Northline Goods' },
+    ],
+  },
+  newsletter: {
+    heading: 'Field notes, once a month',
+    body: 'Restock alerts, repair guides, and nothing else.',
+    buttonLabel: 'Sign up',
+  },
+  faq: {
+    heading: 'Shipping & returns',
+    items: [
+      { question: 'How long does delivery take?', answer: 'Two business days to dispatch.' },
+      { question: 'Do you repair what you sell?', answer: 'Yes, at no charge.' },
+    ],
+  },
+  contact: {
+    heading: 'Not sure about the fit?',
+    body: 'Tell us your usual size and we will tell you what to order.',
+    email: 'hello@aurorasupply.example',
+    phone: '+1 (503) 555-0142',
+    showForm: true,
+  },
+  'product-detail': {
+    galleryLayout: 'grid',
+    showVendor: true,
+    showSku: true,
+    showQuantitySelector: true,
+    showShareButtons: true,
+    relatedProducts: true,
+  },
+  'collection-page': {
+    showFilters: true,
+    showSort: true,
+    columns: 5,
+    productsPerPage: 48,
+    showDescription: true,
+  },
+  'cart-page': {
+    showNoteField: true,
+    showShippingEstimate: true,
+    checkoutButtonLabel: 'Continue to checkout',
+  },
+  footer: {
+    columns: [
+      { heading: 'Shop', links: [{ label: 'Featured', url: '/collections/featured' }] },
+      { heading: 'Shop', links: [] },
+    ],
+    showNewsletter: true,
+    text: 'Aurora Supply Co. — Portland, Oregon.',
+    showPaymentIcons: true,
+  },
+};
+
+/** Settings for `type` with every optional field populated. */
+export function maximalSettingsFor(type: SectionType): unknown {
+  return settingsSchemaFor(type).parse(MAXIMAL_SETTINGS[type]);
+}
+
+/**
+ * Every image setting nulled — the state the AI produces most often, and the
+ * one that has to stay layout-stable rather than collapsing the section.
+ */
+export function imagelessSettingsFor(type: SectionType): unknown {
+  const base = structuredClone(MAXIMAL_SETTINGS[type]) as Record<string, unknown>;
+  if ('image' in base) base.image = null;
+  if (Array.isArray(base.slides)) {
+    base.slides = (base.slides as Record<string, unknown>[]).map((s) => ({ ...s, image: null }));
+  }
+  if (Array.isArray(base.logos)) {
+    base.logos = (base.logos as Record<string, unknown>[]).map((l) => ({ ...l, image: null }));
+  }
+  return settingsSchemaFor(type).parse(base);
+}

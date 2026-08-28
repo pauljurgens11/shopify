@@ -152,7 +152,10 @@ describe('token discipline', () => {
   const dirs = ['sections', 'shared'];
   const files = dirs.flatMap((dir) => {
     const abs = join(import.meta.dirname, dir);
-    return readdirSync(abs)
+    // Recursive: client islands live in `sections/client/` and are bound by the
+    // same rule — they render into the same page.
+    return readdirSync(abs, { recursive: true })
+      .map(String)
       .filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.test.ts') && !f.endsWith('.test.tsx'))
       .map((f) => [join(dir, f), readFileSync(join(abs, f), 'utf8')] as const);
   });
