@@ -54,34 +54,41 @@ export function OrderSummary({
           ))}
         </ul>
 
-        <form
-          className="mt-6 flex gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onApplyDiscount?.(code.trim());
-          }}
-        >
-          <input
-            aria-label="Discount code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder="Discount code"
-            autoComplete="off"
-            className="min-w-0 flex-1 rounded border border-neutral-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-900"
-          />
-          <button
-            type="submit"
-            disabled={busy || code.trim().length === 0}
-            className="rounded border border-neutral-300 bg-neutral-100 px-5 py-2.5 font-medium text-neutral-700 text-sm hover:bg-neutral-200 disabled:opacity-50"
-          >
-            Apply
-          </button>
-        </form>
+        {/* Only while the checkout is still editable: the thank-you page reuses
+            this sidebar without a handler, and Shopify shows no discount entry
+            after purchase. */}
+        {onApplyDiscount ? (
+          <>
+            <form
+              className="mt-6 flex gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onApplyDiscount(code.trim());
+              }}
+            >
+              <input
+                aria-label="Discount code"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="Discount code"
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded border border-neutral-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-900"
+              />
+              <button
+                type="submit"
+                disabled={busy || code.trim().length === 0}
+                className="rounded border border-neutral-300 bg-neutral-100 px-5 py-2.5 font-medium text-neutral-700 text-sm hover:bg-neutral-200 disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </form>
 
-        {checkout.rejectedDiscount ? (
-          <p role="alert" className="mt-2 text-red-600 text-sm">
-            {rejectionMessage(checkout.rejectedDiscount)}
-          </p>
+            {checkout.rejectedDiscount ? (
+              <p role="alert" className="mt-2 text-red-600 text-sm">
+                {rejectionMessage(checkout.rejectedDiscount)}
+              </p>
+            ) : null}
+          </>
         ) : null}
         {checkout.appliedDiscounts.map((applied) => (
           <p key={applied.discountId} className="mt-2 text-neutral-600 text-sm">
