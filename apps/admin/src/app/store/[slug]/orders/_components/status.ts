@@ -15,13 +15,14 @@ type Progress = 'incomplete' | 'partiallyComplete' | 'complete' | undefined;
 export type BadgeSpec = { label: string; tone: Tone; progress: Progress };
 
 /**
- * Shopify's payment badges: green once the money is in, yellow while it is
- * owed, and neutral once it has gone back out again.
+ * Shopify's payment badges: yellow while the money is owed, neutral subdued
+ * once it is in or has gone back out — `Paid` is grey in current Shopify,
+ * not green (PARITY.md badge table).
  */
 const FINANCIAL: Record<Order['financialStatus'], BadgeSpec> = {
   pending: { label: 'Payment pending', tone: 'attention', progress: 'incomplete' },
   authorized: { label: 'Authorized', tone: 'attention', progress: 'partiallyComplete' },
-  paid: { label: 'Paid', tone: 'success', progress: 'complete' },
+  paid: { label: 'Paid', tone: undefined, progress: 'complete' },
   partially_refunded: {
     label: 'Partially refunded',
     tone: undefined,
