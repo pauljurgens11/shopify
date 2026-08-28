@@ -36,7 +36,11 @@ gh pr merge --auto --squash --delete-branch
 
 # 5. LOG — append: ... | DONE B1 | PR #NN
 #    then immediately claim the next unblocked issue. Do NOT poll the PR;
-#    sweep `gh pr list --author @me --state open` at the start of your next loop.
+#    sweep it at the start of your next loop:
+gh pr list --author @me --state open --json number,title,mergeable,labels
+#    `mergeable: CONFLICTING`, a `needs-rebase` label, or NO CHECKS AT ALL all
+#    mean the same thing — GitHub cannot merge it, so pr-checks never started.
+pnpm sync    # rebases onto main and pushes; that is the whole fix
 ```
 
 Rules that make this safe with many agents in flight (full detail in
