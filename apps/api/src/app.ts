@@ -85,7 +85,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       }
       shopForCustomDomain(hostname).then(
         (shop) => done(null, shop !== null),
-        (error) => done(error as Error, false),
+        (error) => done(error instanceof Error ? error : new Error(String(error)), false),
       );
     },
     credentials: true,
