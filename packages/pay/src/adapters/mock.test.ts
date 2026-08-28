@@ -161,6 +161,21 @@ describe('mockAdapter.capture', () => {
 });
 
 describe('mockAdapter.refund', () => {
+  it('adopts a transaction from a previous process, because the seed writes those', async () => {
+    // `pnpm seed` writes captured Payment rows carrying processorTxnIds this
+    // process never issued, and the ledger is per-process. Rejecting them made
+    // the admin's Refund button fail on every seeded order. The Payment row is
+    // the authority on the amount, and refundPayment has already capped against
+    // it before an adapter is reached — so an adopted txn stays refundable
+    // rather than being held to a ceiling we would have to invent.
+    await expect(mockAdapter.refund('mock_ch_1040', usd(6400), {})).resolves.toMatchObject({
+      outcome: 'success',
+    });
+    await expect(mockAdapter.refund('mock_ch_1040', usd(3000), {})).resolves.toMatchObject({
+      outcome: 'success',
+    });
+  });
+
   it('accumulates partial refunds and rejects the one that exceeds the captured amount', async () => {
     const txnId = await authorizeOnly();
     await mockAdapter.capture(txnId, usd(2500), {});

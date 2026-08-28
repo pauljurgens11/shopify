@@ -22,6 +22,18 @@
       "name": "mail",
       "port": 8025,
       "url": "http://localhost:8025"
+    },
+    {
+      "name": "dev-localhost",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:localhost"],
+      "port": 3000,
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "storefront-localhost",
+      "port": 3002,
+      "url": "http://demo.localhost:3002"
     }
   ]
 }
