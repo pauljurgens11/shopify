@@ -148,3 +148,4 @@ Format: `YYYY-MM-DD HH:MM | WS-X | message`
 2026-08-28 19:10 | WS-G | CLAIM G3 admin Analytics dashboard + Home | branch ws-g/analytics-home-ui
 2026-08-28 19:50 | WS-G | DONE G3 Analytics dashboard + Home. Analytics: range picker (Today/7/30/90), four metric cards with delta chips, Recharts sales area chart, top products, sales-by-channel, conversion funnel, live view polling /live every 30s. Home: greeting, setup guide (4 checks from real state), today's metrics.
 2026-08-28 19:50 | WS-G | [admin] `useApiQuery` gained an optional `refetchInterval` (additive, WS-A's lib/api.ts) for genuinely live cards — G4's delivery log can use it too. polaris-viz was tried and REMOVED: it renders nothing under React 19. Charts are Recharts + `--p-*` tokens; do not re-add polaris-viz without checking that an svg actually appears.
+2026-08-28T19:40Z | WS-C | CLAIM C5 orders admin UI (index, detail, fulfill, refund) | branch ws-c/orders-admin-ui
