@@ -11,6 +11,7 @@ import { AppProvider } from '@shopify/polaris';
 import enTranslations from '@shopify/polaris/locales/en.json';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { PolarisLink } from './polaris-link.tsx';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Created in state so a hot reload does not discard the cache on every edit.
@@ -31,7 +32,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppProvider i18n={enTranslations}>{children}</AppProvider>
+      {/* linkComponent makes every Polaris `url` a client-side navigation
+          instead of a full document load — see polaris-link.tsx. */}
+      <AppProvider i18n={enTranslations} linkComponent={PolarisLink}>
+        {children}
+      </AppProvider>
     </QueryClientProvider>
   );
 }

@@ -9,6 +9,11 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // The admin talks to the API from the browser, so the URL has to reach the
+  // client bundle. `@merchant/config/env` is server-only (it would inline
+  // DATABASE_URL and the vault key), so the one public value is republished
+  // here instead of adding a NEXT_PUBLIC_ duplicate to the env schema.
+  env: { NEXT_PUBLIC_API_URL: process.env.API_URL ?? 'http://api.lvh.me:3001' },
   // Required for the Dockerfile: pnpm's node_modules is a symlink farm into the
   // store, so copying it between build stages produces a broken tree. Standalone
   // emits a self-contained server with only the files actually imported.
