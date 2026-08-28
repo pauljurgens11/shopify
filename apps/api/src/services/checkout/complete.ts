@@ -21,7 +21,7 @@
  * price or tax change between pricing and paying must reach the card.
  */
 
-import { newId } from '@merchant/config/ids';
+import { storefrontUrl } from '@merchant/config/env';
 import type { CartLine } from '@merchant/contracts/cart';
 import type { CompleteCheckoutInput, CompleteCheckoutResponse } from '@merchant/contracts/checkout';
 import type { CreateOrderInput } from '@merchant/contracts/orders';
@@ -29,8 +29,10 @@ import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { charge, PaymentError } from '@merchant/pay/router';
 import { badRequest, conflict } from '../../lib/errors.ts';
+import { findOrCreateByEmail } from '../customers/customers.ts';
 import { adjustMany } from '../inventory/adjust.ts';
 import { createOrder } from '../orders/create.ts';
+import { notifyOrder } from '../orders/notify.ts';
 import { assertReadyToPay, findCheckoutRow, priceCheckout } from './checkout.ts';
 
 /** Decline codes the shopper may see. Anything else is a processor problem. */
@@ -96,33 +98,23 @@ const orderLines = (lines: CartLine[], appliedByLine: Map<string, number>, curre
   }));
 
 /**
- * The customer behind an order, matched on a case-folded email.
- *
- * C4 owns customers and has not landed; when it does, this is one call to its
- * `findOrCreateByEmail` (AGENT-LOG). Until then checkout cannot leave orders
- * unattached — the customers index and E5's account page both read from here.
+ * The customer behind an order — C4's `findOrCreateByEmail`, which case-folds
+ * the email and survives two checkouts racing on the same address. The
+ * customers index and E5's account page both read from here.
  */
 async function findOrCreateCustomer(
   db: TenantClient,
   shopId: string,
   input: { email: string; phone: string | null; address: Prisma.JsonValue },
 ): Promise<string> {
-  const email = input.email.trim().toLowerCase();
-  const existing = await db.customer.findFirst({ where: { email }, select: { id: true } });
-  if (existing) return existing.id;
-
   const address = input.address as { firstName?: string; lastName?: string } | null;
-  const customer = await db.customer.create({
-    data: {
-      id: newId('customer'),
-      shopId,
-      email,
-      firstName: address?.firstName ?? null,
-      lastName: address?.lastName ?? null,
-      phone: input.phone,
-    },
+  const { id } = await findOrCreateByEmail(db, shopId, {
+    email: input.email,
+    firstName: address?.firstName,
+    lastName: address?.lastName,
+    phone: input.phone ?? undefined,
   });
-  return customer.id;
+  return id;
 }
 
 export async function completeCheckout(
@@ -279,9 +271,27 @@ export async function completeCheckout(
       note: existing.note,
     };
 
-    const order = await createOrder(db, shopId, orderInput, { actor: null });
+    const order = await createOrder(db, shopId, orderInput, {
+      actor: null,
+      orderStatusUrl: await orderStatusUrl(db, token),
+    });
 
     await db.payment.updateMany({ where: { id: payment.id }, data: { orderId: order.id } });
+
+    // The charge ran before the order existed, so D3's `onPaid` seam had no
+    // orderId to report. Now that the Payment row points at the order, this is
+    // the one place `orders/paid` can fire for a storefront purchase.
+    await notifyOrder({
+      shopId,
+      topic: 'orders/paid',
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        email: order.email,
+        total: order.total.amount,
+        currencyCode: order.currencyCode,
+      },
+    });
     await db.checkout.update({
       where: { id: existing.id },
       data: { completedOrderId: order.id, totals: totals as unknown as Prisma.InputJsonValue },
@@ -294,8 +304,6 @@ export async function completeCheckout(
       cartToken: options.cartToken ?? null,
       checkoutId: existing.id,
       reservedAt,
-      customerId,
-      total: totals.total.amount,
     });
 
     return {
@@ -332,6 +340,21 @@ async function releaseStock(
 
 function confirmationUrl(token: string): string {
   return `/checkouts/${token}/thank-you`;
+}
+
+/**
+ * Absolute thank-you URL for the confirmation email's button. The storefront
+ * gets the relative `confirmationUrl` (it is already on the shop's origin);
+ * the email needs the origin too. Null on any failure — the money has already
+ * moved by the time this runs, so a missing button must never fail the sale.
+ */
+async function orderStatusUrl(db: TenantClient, token: string): Promise<string | null> {
+  try {
+    const shop = await db.shop.findFirst({ select: { slug: true } });
+    return shop ? `${storefrontUrl(shop.slug)}${confirmationUrl(token)}` : null;
+  } catch {
+    return null;
+  }
 }
 
 async function successFor(
@@ -383,8 +406,6 @@ async function afterSale(
     cartToken: string | null;
     checkoutId: string;
     reservedAt: Date;
-    customerId: string;
-    total: number;
   },
 ): Promise<void> {
   // Empty the cart rather than clearing only the cookie: the browser may still
@@ -413,16 +434,8 @@ async function afterSale(
     // Cosmetic linkage only.
   }
 
-  try {
-    // `ordersCount` / `totalSpent` are denormalized because the customers index
-    // sorts on them (customers.prisma). Nothing else maintains them yet: C2
-    // records orders and C4 has not landed, so a customer who just bought would
-    // read "0 orders" in the admin. C4 should take this over (AGENT-LOG).
-    await db.customer.updateMany({
-      where: { id: input.customerId },
-      data: { ordersCount: { increment: 1 }, totalSpent: { increment: input.total } },
-    });
-  } catch {
-    // The sale is done; a stale counter is not worth failing it.
-  }
+  // `ordersCount` / `totalSpent` are NOT written here: C4 landed and derives
+  // both per request from the order rows (DECISIONS), so the denormalized
+  // columns are deliberately unused — a counter written from checkout but not
+  // from refund or cancel drifts, and dead writes read as load-bearing.
 }

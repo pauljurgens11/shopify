@@ -19,6 +19,7 @@ import { dbForShop } from '@merchant/db/tenant';
 import { tokenizeCard } from '@merchant/pay/vault';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { getCustomer } from '../src/services/customers/customers.ts';
 import { buildTestApp, createTestShop, deleteTestShops, type TestShop } from './helpers.ts';
 
 let app: FastifyInstance;
@@ -566,9 +567,10 @@ describe('complete', () => {
     expect(linked).toHaveLength(1);
   });
 
-  it('keeps the customer’s denormalized order columns current', async () => {
-    // The customers index sorts on these; a shopper who just bought must not
-    // read "0 orders" in the admin.
+  it('shows the purchase in the admin’s customer aggregates', async () => {
+    // A shopper who just bought must not read "0 orders" in the admin. C4
+    // derives `ordersCount`/`totalSpent` from the order rows per request
+    // (DECISIONS) — this asserts through that surface, the one the admin reads.
     const { checkout } = await openCheckout([{ variantId: v.socks, quantity: 2 }]);
     await readyToPay(checkout.token, { email: 'counted@example.com' });
     const paid = await pay(checkout.token, tok.approved);
@@ -578,8 +580,9 @@ describe('complete', () => {
     const customer = await dbAdmin.customer.findFirstOrThrow({
       where: { shopId: shop.shopId, email: 'counted@example.com' },
     });
-    expect(customer.ordersCount).toBe(1);
-    expect(customer.totalSpent).toBe(order.total);
+    const detail = await getCustomer(dbForShop(shop.shopId), customer.id);
+    expect(detail.ordersCount).toBe(1);
+    expect(detail.totalSpent).toEqual(usd(order.total));
   });
 
   it('keeps a charged checkout closed even if the order cannot be recorded', async () => {
