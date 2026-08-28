@@ -158,12 +158,14 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
 export function useApiQuery<T>(
   key: QueryKey,
   path: string,
-  options: { enabled?: boolean } = {},
+  /** `refetchInterval` is for genuinely live cards only (G3's "Right now"). */
+  options: { enabled?: boolean; refetchInterval?: number } = {},
 ): UseQueryResult<T, ApiError> {
   return useQuery<T, ApiError>({
     queryKey: key,
     queryFn: ({ signal }) => apiFetch<T>(path, { signal }),
     enabled: options.enabled,
+    refetchInterval: options.refetchInterval,
     // Re-authenticating is the shell's job; retrying a 401 just delays it.
     retry: (count, error) => error.status >= 500 && count < 1,
   });
