@@ -20,4 +20,11 @@ export function adapterFor(key: ProcessorKey): ProcessorAdapter {
   return adapter;
 }
 
-export type { ProcessorAdapter };
+export type { CardMaterial, ProcessorAdapter, ProcessorCredentials } from './adapter.ts';
+/** Whether `maverick` is talking to Maverick or simulating — the admin renders a badge from this. */
+export { maverickMode } from './adapters/maverick.ts';
+/**
+ * The published test cards. The seed, the checkout demo and the smoke suite all
+ * need them; the admin's Payments screen shows them next to the mock processor.
+ */
+export { TEST_CARDS } from './adapters/test-cards.ts';

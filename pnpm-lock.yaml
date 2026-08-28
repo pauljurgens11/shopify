@@ -303,6 +303,12 @@ importers:
       '@merchant/db':
         specifier: workspace:*
         version: link:../db
+      stripe:
+        specifier: ^22.6.0
+        version: 22.6.0(@types/node@22.20.1)
+      ulid:
+        specifier: ^2.3.0
+        version: 2.4.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -2073,6 +2079,15 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
+  stripe@22.6.0:
+    resolution: {integrity: sha512-Ezk+WYEEwX2DLxFrKfb6coznlCMZvCaCYMNPXNHFSZkBIEzF5Hgm7RLb38q/0h9Ol5jsUJGJRorvhzAvckgfhw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
     engines: {node: '>= 12.0.0'}
@@ -3744,6 +3759,10 @@ snapshots:
   strip-literal@3.1.0:
     dependencies:
       js-tokens: 9.0.1
+
+  stripe@22.6.0(@types/node@22.20.1):
+    optionalDependencies:
+      '@types/node': 22.20.1
 
   styled-jsx@5.1.6(react@19.2.8):
     dependencies:
