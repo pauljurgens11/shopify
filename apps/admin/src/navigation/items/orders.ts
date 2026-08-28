@@ -6,5 +6,4 @@ export const orders: NavItem = {
   icon: 'OrderIcon',
   permission: 'orders',
   badge: 'openOrders',
-  subItems: [{ label: 'Drafts', url: '/orders/drafts', permission: 'orders' }],
 };

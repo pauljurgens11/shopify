@@ -40,6 +40,11 @@ export function StorefrontHeader({
           <a href={SEARCH_PATH} className="opacity-80 hover:opacity-100">
             Search
           </a>
+          {/* E5's account pages had no entry point anywhere in the store; signed
+              out, /account redirects to the login form, so one link covers both. */}
+          <a href="/account" className="opacity-80 hover:opacity-100">
+            Account
+          </a>
           <a href={CART_PATH} className="opacity-80 hover:opacity-100">
             Cart
             {itemCount > 0 ? (

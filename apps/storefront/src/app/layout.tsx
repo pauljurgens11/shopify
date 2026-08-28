@@ -14,32 +14,43 @@ import { googleFontsHref, themeCssVariables } from '@merchant/theme-engine/rende
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { StorefrontHeader } from '../components/storefront-header.tsx';
-import { currentCart, shopContext } from '../lib/shop.ts';
+import { currentCart, optionalShopContext } from '../lib/shop.ts';
 import { PATHNAME_HEADER } from '../middleware.ts';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { shop } = await shopContext();
+  const context = await optionalShopContext();
+  if (!context) return { title: 'Store not found' };
+  const { shop } = context;
   return {
     title: { default: shop.name, template: `%s · ${shop.name}` },
     description: `Shop ${shop.name}.`,
   };
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const { shop, theme } = await shopContext();
+/** A themeless white shell — checkout, and any host that resolves no shop. */
+function PlainShell({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="bg-white text-neutral-900 antialiased">{children}</body>
+    </html>
+  );
+}
 
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Checkout is Shopify's checkout, not our storefront: a clean white page with
   // the shop name as a logotype and no navigation at all (PARITY.md). It opts
   // out of the theme chrome rather than fighting it from inside.
   const pathname = (await headers()).get(PATHNAME_HEADER) ?? '';
-  if (pathname.startsWith('/checkouts')) {
-    return (
-      <html lang="en">
-        <body className="bg-white text-neutral-900 antialiased">{children}</body>
-      </html>
-    );
-  }
+  if (pathname.startsWith('/checkouts')) return <PlainShell>{children}</PlainShell>;
+
+  // Deliberately not `shopContext()`: `notFound()` from the ROOT layout is a
+  // Next error, not a 404, because the not-found page renders inside this
+  // layout. An unknown subdomain gets the plain shell and the page below calls
+  // `notFound()` itself, so `not-found.tsx` renders instead of an error page.
+  const context = await optionalShopContext();
+  if (!context) return <PlainShell>{children}</PlainShell>;
+  const { shop, theme } = context;
 
   const cart = await currentCart(shop.slug);
 

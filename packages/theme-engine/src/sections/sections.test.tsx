@@ -146,3 +146,23 @@ describe('testimonials', () => {
     expect(html).toContain('1 out of 5');
   });
 });
+
+describe('footer', () => {
+  /**
+   * The newsletter fallback used to render a bare <button>Subscribe</button>
+   * outside any form and with no handler, so clicking it did nothing at all —
+   * a dead control on every themed page. It must submit into `InertForm` like
+   * the `newsletter` section does.
+   */
+  it('submits its newsletter fallback instead of rendering a dead button', () => {
+    const html = render('footer', settingsSchemaFor('footer').parse({ showNewsletter: true }));
+    expect(html).toContain('<form');
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('required');
+  });
+
+  it('omits the newsletter entirely when the setting is off', () => {
+    const html = render('footer', settingsSchemaFor('footer').parse({ showNewsletter: false }));
+    expect(html).not.toContain('footer-newsletter-email');
+  });
+});

@@ -19,6 +19,20 @@ pnpm db:setup                 # migrate + seed
 pnpm dev                      # api :3001, admin :3000, storefront :3002, worker
 ```
 
+Requires **Node 22** and **pnpm 9** (`corepack enable` picks up the pinned
+version). Nothing else — no global installs, no `/etc/hosts` editing, no API
+keys. `.env.example` is checked in already working: the mock payment processor
+needs no credentials and the AI builder falls back to three canned themes when
+`ANTHROPIC_API_KEY` is empty.
+
+> Measured on a fresh worktree against a running Docker stack: `pnpm install`
+> ~15s warm, `pnpm db:setup` ~10s (the seed itself runs in ~5s), and `pnpm dev`
+> serves all four apps a few seconds later — the admin's *first* page compile
+> then takes 1–2 minutes, so the first URL you open will hang before it paints.
+> The one number not yet measured is a genuinely cold machine, where
+> `docker compose up -d` must pull images and `pnpm install` populates an empty
+> store; budget more for both.
+
 | | URL |
 |---|---|
 | Admin | http://admin.lvh.me:3000 — `owner@demo.dev` / `password123` |
@@ -29,6 +43,85 @@ pnpm dev                      # api :3001, admin :3000, storefront :3002, worker
 
 `lvh.me` resolves to `127.0.0.1`, so wildcard shop subdomains work with no
 `/etc/hosts` editing.
+
+---
+
+## Demo walkthrough
+
+Two paths. The seeded store is the one to show — it looks like a real business
+that has been trading for two months. The fresh-signup path is the one that
+proves the platform is genuinely multi-tenant, and it is the walkthrough the
+Definition of Done (SPEC §18 #3) names.
+
+A minute-by-minute presenter version of all of this — what to click, what to
+say, which number to point at — is [docs/DEMO.md](docs/DEMO.md).
+
+### The seeded store
+
+`pnpm db:setup` builds **Aurora Supply Co.**: 32 products across 4 collections,
+2 locations, 25 customers, and 40 orders numbered #1001–#1040 spread over the
+last 60 days, with analytics events and daily rollups behind them.
+
+1. **Log in** at http://admin.lvh.me:3000 as `owner@demo.dev` / `password123`.
+   You land on Home: a setup guide and today's sales, orders and sessions.
+2. **Tour the admin.** Products (index with tabs, search and bulk actions; open
+   one for the two-column form), Orders (#1001–#1040, mixed fulfillment and
+   financial states), Customers, Discounts (`WELCOME10` is Active), Inventory
+   across both locations, Analytics (range picker, sales chart, top products,
+   conversion funnel, live view).
+3. **Build the storefront.** Storefront in the nav is the AI builder: chat on
+   the left, a live preview of the real storefront on the right. Describe the
+   store you want and it writes a new theme; with no `ANTHROPIC_API_KEY` set,
+   apply one of the three presets instead — the demo never depends on the key.
+   **Publish** promotes the draft, and the storefront picks it up within a
+   minute (published themes are cached for 60s).
+4. **Shop it.** http://demo.lvh.me:3002 — browse, open a product, add to cart,
+   check out. Card fields post the number straight to the vault, so the
+   checkout server only ever sees a `card_tok_…`. `4242 4242 4242 4242` with any
+   future expiry and any CVC approves; `4000 0000 0000 0002` declines and leaves
+   the checkout open and payable. The thank-you page shows the order number.
+5. **Watch it land.** The order appears in the admin under Orders with the same
+   total; Analytics moves (Orders, Total sales, and the live view's orders
+   today); the confirmation email arrives in Mailpit at http://localhost:8025;
+   and any webhook subscription on `orders/create` / `orders/paid` shows a
+   delivered row in its app's delivery log.
+6. **Refund it.** Open the order → **Refund** → set the quantity and the
+   shipping amount → the button prices itself → the order returns as Refunded
+   and the timeline records it.
+
+Storefront customer accounts are seeded too: `jane@example.com` /
+`password123` at http://demo.lvh.me:3002/account/login.
+
+### A brand-new store
+
+This is the Definition of Done walkthrough, and it is worth doing live because
+nothing about it is prepared.
+
+1. **Sign up** at http://admin.lvh.me:3000/signup. Store name, your name, email,
+   password. The slug is derived from the store name and de-duplicated
+   server-side, exactly the way a real store URL is assigned. Signing up logs
+   you in; the next screen is your admin.
+2. **Onboard.** The Home setup guide has four real checks — add a product,
+   customize the storefront, connect a payment processor, place a test order —
+   each of which reads actual state rather than a stored flag. The store already
+   has a published theme: signup installs the default preset so a new shop opens
+   on a real storefront instead of a blank page.
+3. **Make it sellable.** Settings → Payments → connect **Mock Gateway** (one
+   click, no credentials). Settings → Shipping and delivery → **Add rate** — a
+   new shop starts with no rates, and checkout needs one to complete.
+4. **Add a product.** Products → Add product. Title, description, price, and
+   options if you want variants generated. Save.
+5. **AI-build the storefront.** Storefront → describe the shop, or apply a
+   preset → **Publish**.
+6. **Open the storefront** at `http://{your-slug}.lvh.me:3002`. Your product is
+   there and none of Aurora Supply Co.'s are — different Host, different tenant,
+   same deployment.
+7. **Buy it** with `4242 4242 4242 4242` through to the thank-you page, then see
+   the order, the analytics and the webhook in your own admin, and refund it.
+
+---
+
+## Running many worktrees
 
 ### Watching `main`
 
@@ -74,8 +167,6 @@ hardlinked tree costs ~0 MB instead of ~840 MB. A worktree created before that
 landed converts on its next `pnpm install`; `pnpm stack disk` flags which ones
 are still carrying their own copy.
 
-Requires **Node 22** and **pnpm 9** (`corepack enable` picks up the pinned version).
-
 ---
 
 ## Layout
@@ -105,6 +196,52 @@ e2e/            Playwright smoke suite
 | `pnpm db:reset` | drop, migrate, reseed |
 | `pnpm e2e` | Playwright smoke (needs a seeded running stack) |
 
+## Production architecture
+
+Nothing here is deployed. This is the documented scale path (SPEC §17), and it
+is short because the shape of the code already assumes it.
+
+**The four services scale horizontally.** `api`, `admin`, `storefront` and
+`worker` hold no request state between calls, so each is an autoscaling group
+behind a load balancer. Staff sessions live in Redis, not in process memory, so
+any api instance can serve any request. Rate limits are Redis-backed and the job
+queues are BullMQ on the same Redis, so adding an instance adds capacity and
+nothing else: there is no in-process scheduler, no sticky routing and no
+singleton to elect.
+
+**The stateful pieces become managed services.** Postgres → RDS, with the
+analytics reads pointed at a read replica (the dashboard reads pre-computed
+daily rollups plus today's raw events, which is exactly the workload a replica
+serves well). Redis → a managed instance for sessions, rate limits and queues.
+MinIO → S3; the app already talks to it through the S3 API with presigned
+uploads, so it is a credentials-and-endpoint change. The vault's
+`VAULT_MASTER_KEY` moves out of the environment into KMS — the encrypt/decrypt
+path is confined to `packages/pay`, so it is one module that learns to ask KMS
+for the key.
+
+**A CDN goes in front of the storefront.** The storefront read endpoints already
+send `public, s-maxage=60, stale-while-revalidate=300`, so a CDN caches them
+without further work. Cache keys are per-shop by construction: the tenant is the
+Host, and the shop context a page renders from carries the id of the published
+theme version, so promoting a new theme changes what a key resolves to rather
+than requiring a purge. Carts, checkouts and signed theme previews are marked
+`no-store` in one place (`services/storefront/cache.ts`) so they can never enter
+a shared cache.
+
+**Packaging.** Each app has a production Dockerfile (`apps/*/Dockerfile`,
+multi-stage on `node:22-slim`), and CI builds all four on every commit to `main`
+— one job per app in `.github/workflows/main-checks.yml`. Publishing those
+images to a registry is the one thing that job does not do yet.
+
+The documented deployment target is a `docker-compose.prod.yml` that runs the
+four images behind **Caddy**, which terminates TLS automatically and routes by
+subdomain: `admin.*` → admin, `api.*` → api, everything else → storefront, which
+is what makes `{shop}.example.com` resolve a tenant in production the same way
+`{shop}.lvh.me:3002` does locally. That compose file and its Caddyfile land with
+the deploy issue; when they are present in the repo root, deploying is
+`docker compose -f docker-compose.prod.yml up -d` on a VM, or the same four
+images on Fly or Kubernetes.
+
 ## Working here
 
 This repo is built to be worked by many agents at once. Three things follow from
@@ -130,5 +267,7 @@ Named "Merchant" wherever a brand name is unavoidable. Built with Shopify's
 open-source [Polaris](https://polaris.shopify.com/) design system; not affiliated
 with or endorsed by Shopify, and the Shopify name and logo are not used.
 
-The card vault is a demonstration of PAN isolation, not a PCI-DSS-certified
-environment. A production deployment would need proper PCI scoping (SPEC §11).
+The card vault demonstrates PAN isolation — the card number goes from the
+browser straight to `/vault/tokenize` and only a `card_tok_…` reaches the
+checkout server — but this is not a PCI-DSS-certified environment. A production
+deployment would need proper PCI scoping (SPEC §11); that is out of scope here.

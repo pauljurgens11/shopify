@@ -8,10 +8,11 @@
  * five-point chart is harder to read than the numbers themselves.
  */
 import { BlockStack, Box, Card, InlineStack, Text } from '@shopify/polaris';
-import { funnelStages } from './range.ts';
+import { formatPercent, funnelStages } from './range.ts';
 
 export function FunnelCard({
   funnel,
+  conversionRate,
 }: {
   funnel: {
     sessions: number;
@@ -20,6 +21,8 @@ export function FunnelCard({
     reachedCheckout: number;
     purchased: number;
   };
+  /** The card's headline number: sessions that ended in a purchase. */
+  conversionRate: number;
 }) {
   const stages = funnelStages(funnel);
   const widest = Math.max(...stages.map((s) => s.value), 1);
@@ -27,9 +30,14 @@ export function FunnelCard({
   return (
     <Card>
       <BlockStack gap="400">
-        <Text as="h3" variant="headingMd">
-          Conversion funnel
-        </Text>
+        <BlockStack gap="100">
+          <Text as="h3" variant="headingMd">
+            Conversion funnel
+          </Text>
+          <Text as="p" variant="headingLg">
+            {formatPercent(conversionRate)}
+          </Text>
+        </BlockStack>
         <BlockStack gap="300">
           {stages.map((stage) => (
             <BlockStack key={stage.label} gap="100">

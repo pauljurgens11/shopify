@@ -281,6 +281,26 @@ export default function LocationsSettingsPage() {
       primaryAction={{ content: 'Add location', onAction: () => setAdding(true) }}
     >
       <Card padding="0">
+        {rows.length === 0 ? (
+          // Signup creates no location, so a fresh shop lands here on an empty
+          // card unless it says something (PARITY.md → Index pages).
+          <Box padding="800">
+            <BlockStack gap="200" inlineAlign="center">
+              <Text as="h2" variant="headingMd">
+                Add a location to hold stock
+              </Text>
+              <Text as="p" tone="subdued" alignment="center">
+                Locations are the places you store inventory and fulfill orders from.
+              </Text>
+              <Box paddingBlockStart="300">
+                <Button variant="primary" onClick={() => setAdding(true)}>
+                  Add location
+                </Button>
+              </Box>
+            </BlockStack>
+          </Box>
+        ) : null}
+
         <BlockStack gap="0">
           {rows.map((location, index) => {
             const blocked = blockedReason(location);

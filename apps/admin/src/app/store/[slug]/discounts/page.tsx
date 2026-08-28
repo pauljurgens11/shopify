@@ -21,16 +21,19 @@ import {
   Card,
   IndexFilters,
   IndexTable,
+  Modal,
   Page,
   Popover,
   Text,
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
-import { useApiQuery } from '../../../../lib/api.ts';
+import { useToast } from '../../../../components/shell/toast-provider.tsx';
+import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
 
@@ -40,6 +43,25 @@ const TABS = [
   { label: 'Scheduled', status: 'scheduled' },
   { label: 'Expired', status: 'expired' },
 ] as const;
+
+/**
+ * A tab that is empty on its own terms gets a sentence that explains why, not
+ * "try changing the filters" — the merchant has not filtered anything.
+ */
+const TAB_EMPTY: Record<string, { heading: string; body: string }> = {
+  active: {
+    heading: 'No active discounts',
+    body: 'Discounts that are running right now show up here.',
+  },
+  scheduled: {
+    heading: 'No scheduled discounts',
+    body: 'Give a discount a future start date and it waits here until then.',
+  },
+  expired: {
+    heading: 'No expired discounts',
+    body: 'Discounts show up here once their end date has passed.',
+  },
+};
 
 /** The words Shopify puts in the Type column. */
 const TYPE_LABELS: Record<Discount['type'], string> = {
@@ -59,11 +81,15 @@ function StatusBadge({ status }: { status: Discount['status'] }) {
 export default function DiscountsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
+  const toast = useToast();
+  const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { mode, setMode } = useSetIndexFiltersMode();
 
   const cursor = cursorStack.at(-1);
@@ -80,16 +106,41 @@ export default function DiscountsPage() {
   const discounts = useApiQuery<Paginated<Discount>>(['discounts', path], path);
   const rows = discounts.data?.data ?? [];
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange } = useIndexResourceState(
-    rows as unknown as Array<{ [key: string]: unknown; id: string }>,
-  );
+  const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
+    useIndexResourceState(rows as unknown as Array<{ [key: string]: unknown; id: string }>);
 
   const resetPaging = () => setCursorStack([]);
   const createUrl = (type: Discount['type']) => `/store/${slug}/discounts/new?type=${type}`;
 
+  /**
+   * The checkbox column is only honest if the bulk bar it opens can do
+   * something — an empty bulk bar is a dead control (CLAUDE.md §8). Delete is
+   * the one bulk action Shopify offers on this index.
+   */
+  const deleteSelected = async () => {
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        selectedResources.map((id) => apiFetch(`/admin/api/discounts/${id}`, { method: 'DELETE' })),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      toast.show('Discounts deleted');
+      clearSelection();
+    } catch (cause) {
+      toast.error((cause as ApiError).message);
+    } finally {
+      setBulkBusy(false);
+      setConfirmingDelete(false);
+    }
+  };
+
   if (discounts.isPending) return <PageSkeleton />;
 
   const empty = rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
+
+  // An unfiltered tab that is simply empty explains itself; a search that found
+  // nothing gets the "change the filters" line instead.
+  const tabEmpty = query.trim() === '' && status ? TAB_EMPTY[status] : undefined;
 
   const createMenu = (
     <Popover
@@ -180,6 +231,9 @@ export default function DiscountsPage() {
                 { title: 'Type' },
                 { title: 'Used' },
               ]}
+              promotedBulkActions={[
+                { content: 'Delete discounts', onAction: () => setConfirmingDelete(true) },
+              ]}
               pagination={{
                 hasPrevious: cursorStack.length > 0,
                 hasNext: Boolean(discounts.data?.nextCursor),
@@ -190,11 +244,16 @@ export default function DiscountsPage() {
                 },
               }}
               emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
-                    No discounts found. Try changing the search or filters.
-                  </Text>
-                </div>
+                <Box padding="800">
+                  <BlockStack gap="200" inlineAlign="center">
+                    <Text as="h2" variant="headingMd">
+                      {tabEmpty?.heading ?? 'No discounts found'}
+                    </Text>
+                    <Text as="p" tone="subdued" alignment="center">
+                      {tabEmpty?.body ?? 'Try changing the search or filters.'}
+                    </Text>
+                  </BlockStack>
+                </Box>
               }
             >
               {rows.map((discount, index) => (
@@ -241,6 +300,25 @@ export default function DiscountsPage() {
           </>
         )}
       </Card>
+
+      <Modal
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title={`Delete ${selectedResources.length} discount${selectedResources.length === 1 ? '' : 's'}?`}
+        primaryAction={{
+          content: 'Delete',
+          destructive: true,
+          loading: bulkBusy,
+          onAction: deleteSelected,
+        }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            This can’t be undone. Orders that already used these discounts keep their totals.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

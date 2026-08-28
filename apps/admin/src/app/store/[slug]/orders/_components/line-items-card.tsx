@@ -103,9 +103,10 @@ export function LineItemsCards({ order, fulfilHref }: { order: OrderDetail; fulf
         <Card key={fulfillment.id}>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
-              <Badge tone="success" progress="complete">
-                Fulfilled
-              </Badge>
+              {/* Neutral, not green: PARITY.md's badge table makes `Fulfilled`
+                  the default subdued tone, same as `status.ts` renders it in
+                  the header and on the index row. */}
+              <Badge progress="complete">Fulfilled</Badge>
               {fulfillment.trackingNumber ? (
                 <Text as="span" variant="bodySm" tone="subdued">
                   Tracking:{' '}

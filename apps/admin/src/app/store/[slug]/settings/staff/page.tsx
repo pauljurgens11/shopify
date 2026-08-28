@@ -63,6 +63,8 @@ export default function StaffSettingsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<StaffUser | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const open = (user: StaffUser | null) => {
     setEditing(user);
@@ -116,12 +118,15 @@ export default function StaffSettingsPage() {
   };
 
   const remove = (user: StaffUser) => {
+    setRemoving(true);
     apiFetch(`${PATH}/${user.id}`, { method: 'DELETE' })
       .then(() => {
         toast.show('Staff member removed');
+        setDeleting(null);
         return refresh();
       })
-      .catch((cause: ApiError) => toast.error(cause.message));
+      .catch((cause: ApiError) => toast.error(cause.message))
+      .finally(() => setRemoving(false));
   };
 
   const togglePermission = (area: PermissionArea, checked: boolean) =>
@@ -171,14 +176,21 @@ export default function StaffSettingsPage() {
                     {/* The owner is the one account that cannot be removed —
                         the server refuses it too, this just hides the trap. */}
                     {user.role === 'owner' ? null : (
-                      <Button
-                        variant="plain"
-                        tone="critical"
-                        onClick={() => remove(user)}
-                        accessibilityLabel={`Remove ${nameOf(user)}`}
-                      >
-                        Remove
-                      </Button>
+                      /* ResourceItem's row click fires for anything inside it, so
+                         without this Remove also opens the edit modal behind the
+                         confirmation. Same containment as the inventory table. */
+                      // biome-ignore lint/a11y/noStaticElementInteractions: containment only
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: containment only
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <Button
+                          variant="plain"
+                          tone="critical"
+                          onClick={() => setDeleting(user)}
+                          accessibilityLabel={`Remove ${nameOf(user)}`}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     )}
                   </InlineStack>
                 </InlineStack>
@@ -187,6 +199,31 @@ export default function StaffSettingsPage() {
           />
         </BlockStack>
       </Card>
+
+      {/* Removing a user deletes their account and ends their sessions, so it
+          asks first — the same confirmation every other destructive action in
+          Settings uses. */}
+      <Modal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={deleting ? `Remove ${nameOf(deleting)}?` : 'Remove user?'}
+        primaryAction={{
+          content: 'Remove user',
+          destructive: true,
+          loading: removing,
+          onAction: () => (deleting ? remove(deleting) : undefined),
+        }}
+        secondaryActions={[
+          { content: 'Cancel', onAction: () => setDeleting(null), disabled: removing },
+        ]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            They lose access to this store immediately, including any session they already have
+            open. This can’t be undone.
+          </Text>
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={draft !== null}

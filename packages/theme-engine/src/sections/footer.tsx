@@ -1,5 +1,5 @@
 import type { SectionProps } from '../context.ts';
-import { ThemeButton } from '../shared/theme-button.tsx';
+import { InertForm } from './client/inert-form.tsx';
 
 /**
  * `footer` section.
@@ -81,13 +81,22 @@ export function Footer({ settings, data }: SectionProps<'footer'>) {
 }
 
 /**
- * Decorative until E2 slots in a real island. SPEC §2 rules out marketing
- * email, so there is no backend to post to — and a form that silently fails is
- * worse than one that plainly does nothing.
+ * SPEC §2 rules out marketing email, so there is no backend to post to. This
+ * uses the same `InertForm` as the `newsletter` section: it acknowledges the
+ * submit instead of doing nothing at all. The bare button this replaced sat
+ * outside any form with no handler, so clicking Subscribe was a no-op — a dead
+ * control on every themed page (CLAUDE.md §8).
+ *
+ * `data.slots.newsletterForm` stays the override for a real island; nothing
+ * supplies it today, so this fallback is what renders.
  */
 function NewsletterFallback() {
   return (
-    <div className="flex max-w-sm items-center gap-2">
+    <InertForm
+      buttonLabel="Subscribe"
+      successMessage="Thanks — you're on the list."
+      className="flex max-w-sm items-center gap-2"
+    >
       <label className="sr-only" htmlFor="footer-newsletter-email">
         Email address
       </label>
@@ -95,10 +104,10 @@ function NewsletterFallback() {
         id="footer-newsletter-email"
         type="email"
         name="email"
+        required
         placeholder="you@example.com"
         className="min-w-0 flex-1 rounded-theme border border-text/20 bg-transparent px-3 py-2 text-sm text-text placeholder:text-text/40 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
       />
-      <ThemeButton size="sm">Subscribe</ThemeButton>
-    </div>
+    </InertForm>
   );
 }

@@ -15,12 +15,16 @@ import {
   Box,
   Button,
   Card,
+  Collapsible,
   Icon,
   InlineStack,
   ProgressBar,
+  SkeletonBodyText,
+  SkeletonDisplayText,
   Text,
 } from '@shopify/polaris';
 import { CheckCircleIcon } from '@shopify/polaris-icons';
+import { useState } from 'react';
 import { useApiQuery } from '../../../lib/api.ts';
 
 type ListResponse = { data: unknown[] };
@@ -36,6 +40,10 @@ export type OnboardingTask = {
 };
 
 export function OnboardingCard({ slug }: { slug: string }) {
+  // `undefined` = the viewer has not chosen yet, so the guide opens on the
+  // first unfinished task the way Shopify's does; `null` = they collapsed it.
+  const [openTitle, setOpenTitle] = useState<string | null | undefined>(undefined);
+
   const products = useApiQuery<ListResponse>(
     ['onboarding', 'products'],
     '/admin/api/products?limit=1',
@@ -79,6 +87,22 @@ export function OnboardingCard({ slug }: { slug: string }) {
   ];
 
   const complete = tasks.filter((task) => task.done).length;
+  const expanded =
+    openTitle === undefined ? (tasks.find((task) => !task.done)?.title ?? null) : openTitle;
+
+  // Every check is a separate request, so the count is wrong until all four
+  // answer — and "0 of 4 tasks complete" flashing on the first screen of the
+  // demo is a wrong number, not a loading state (PARITY.md: skeleton on load).
+  if (products.isPending || orders.isPending || themes.isPending || processors.isPending) {
+    return (
+      <Card>
+        <BlockStack gap="400">
+          <SkeletonDisplayText size="small" />
+          <SkeletonBodyText lines={6} />
+        </BlockStack>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -95,34 +119,46 @@ export function OnboardingCard({ slug }: { slug: string }) {
           <ProgressBar progress={(complete / tasks.length) * 100} size="small" tone="primary" />
         </BlockStack>
 
-        <BlockStack gap="300">
-          {tasks.map((task) => (
-            <InlineStack key={task.title} gap="300" blockAlign="center" wrap={false}>
-              <Box>
-                <Icon source={CheckCircleIcon} tone={task.done ? 'success' : 'subdued'} />
-              </Box>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <BlockStack gap="050">
-                  <Text
-                    as="span"
-                    variant="bodyMd"
-                    fontWeight={task.done ? 'regular' : 'semibold'}
-                    tone={task.done ? 'subdued' : undefined}
-                  >
-                    {task.title}
-                  </Text>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    {task.description}
-                  </Text>
-                </BlockStack>
-              </div>
-              {!task.done && (
-                <Button url={task.href} variant="secondary">
-                  {task.action}
-                </Button>
-              )}
-            </InlineStack>
-          ))}
+        <BlockStack gap="100">
+          {tasks.map((task, index) => {
+            const panelId = `setup-task-${index}`;
+            const open = expanded === task.title;
+            return (
+              <BlockStack key={task.title} gap="100">
+                <InlineStack gap="300" blockAlign="center" wrap={false}>
+                  <Box>
+                    <Icon source={CheckCircleIcon} tone={task.done ? 'success' : 'subdued'} />
+                  </Box>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Button
+                      variant="monochromePlain"
+                      textAlign="left"
+                      fullWidth
+                      ariaExpanded={open}
+                      ariaControls={panelId}
+                      onClick={() => setOpenTitle(open ? null : task.title)}
+                    >
+                      {task.title}
+                    </Button>
+                  </div>
+                </InlineStack>
+                <Collapsible id={panelId} open={open}>
+                  <Box paddingInlineStart="800" paddingBlockEnd="300">
+                    <BlockStack gap="200" inlineAlign="start">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {task.description}
+                      </Text>
+                      {!task.done && (
+                        <Button url={task.href} variant="secondary">
+                          {task.action}
+                        </Button>
+                      )}
+                    </BlockStack>
+                  </Box>
+                </Collapsible>
+              </BlockStack>
+            );
+          })}
         </BlockStack>
       </BlockStack>
     </Card>

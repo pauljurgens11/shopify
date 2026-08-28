@@ -16,6 +16,7 @@ import type { Customer } from '@merchant/contracts/customers';
 import type { Order } from '@merchant/contracts/orders';
 import {
   Badge,
+  Banner,
   BlockStack,
   Box,
   Button,
@@ -27,6 +28,7 @@ import {
   Page,
   ResourceItem,
   ResourceList,
+  SkeletonBodyText,
   Tag,
   Text,
   TextField,
@@ -145,7 +147,17 @@ export default function CustomerDetailPage() {
   };
 
   if (customer.isPending) return <PageSkeleton />;
-  if (!loaded) return <PageSkeleton />;
+
+  // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
+  if (!loaded) {
+    return (
+      <Page backAction={{ content: 'Customers', url: `/store/${slug}/customers` }} title="Customer">
+        <Banner tone="critical" title="This customer could not be loaded">
+          <p>{customer.error?.message ?? 'They may have been deleted.'}</p>
+        </Banner>
+      </Page>
+    );
+  }
 
   const orderRows = orders.data?.data ?? [];
   const lastOrder = orderRows[0];
@@ -178,7 +190,12 @@ export default function CustomerDetailPage() {
                 <Text as="h2" variant="headingMd">
                   Last order placed
                 </Text>
-                {lastOrder ? (
+                {/* The orders query resolves after the customer's, so without
+                    this the card flashes "hasn't placed an order yet" at a
+                    customer who has (PARITY.md: skeleton, never a wrong state). */}
+                {orders.isPending ? (
+                  <SkeletonBodyText lines={2} />
+                ) : lastOrder ? (
                   <BlockStack gap="200">
                     <InlineStack align="space-between" blockAlign="center">
                       <Link url={`/store/${slug}/orders/${lastOrder.id}`} removeUnderline>
@@ -211,10 +228,14 @@ export default function CustomerDetailPage() {
                   Order history
                 </Text>
               </Box>
-              {orderRows.length === 0 ? (
+              {orders.isPending ? (
+                <Box padding="400">
+                  <SkeletonBodyText lines={3} />
+                </Box>
+              ) : orderRows.length === 0 ? (
                 <Box padding="400">
                   <Text as="p" tone="subdued">
-                    No orders yet.
+                    Orders this customer places will appear here.
                   </Text>
                 </Box>
               ) : (
@@ -261,9 +282,19 @@ export default function CustomerDetailPage() {
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Customer
-                </Text>
+                {/* PARITY.md → Customer detail: the Customer card carries the
+                    email and the marketing badge. The badge reads the draft, so
+                    it agrees with the checkbox below it before a save lands. */}
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">
+                    Customer
+                  </Text>
+                  {acceptsMarketing ? (
+                    <Badge tone="success">Subscribed</Badge>
+                  ) : (
+                    <Badge>Not subscribed</Badge>
+                  )}
+                </InlineStack>
                 <BlockStack gap="100">
                   <Text as="p" tone="subdued" variant="bodySm">
                     {loaded.ordersCount === 1 ? '1 order' : `${loaded.ordersCount} orders`} ·{' '}

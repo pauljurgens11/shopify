@@ -3,8 +3,8 @@
  * Minimal centered form; a signed-in customer goes straight to their account.
  */
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
-import { resolveShopSlug } from '../../../lib/tenant.ts';
+import { redirect } from 'next/navigation';
+import { shopContext } from '../../../lib/shop.ts';
 import { LoginForm } from '../forms.tsx';
 import { currentCustomer } from '../session.ts';
 
@@ -12,8 +12,10 @@ export const metadata: Metadata = { title: 'Sign in' };
 export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
-  const slug = await resolveShopSlug();
-  if (!slug) notFound();
+  // shopContext(), not resolveShopSlug(): the slug only parses the Host, so an
+  // unknown subdomain produced a working sign-in form for a store that does not
+  // exist. This 404s instead, and the layout's fetch is reused (React cache).
+  const { slug } = await shopContext();
   if (await currentCustomer(slug)) redirect('/account');
 
   return (

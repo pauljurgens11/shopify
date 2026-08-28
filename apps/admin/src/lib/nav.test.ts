@@ -37,7 +37,7 @@ describe('visibleNav', () => {
     );
     expect(products?.subItems?.map((s) => s.label)).toEqual(['Collections', 'Inventory']);
 
-    // Orders' Drafts subitem needs the orders permission, which this user lacks.
+    // Orders needs the orders permission, which this user lacks.
     const orders = visibleNav(NAVIGATION, staff({ orders: false, products: true })).find(
       (i) => i.key === 'orders',
     );
@@ -52,7 +52,9 @@ describe('storeHref', () => {
   it('mounts a nav url under the shop, without a trailing slash', () => {
     expect(storeHref('demo', '/')).toBe('/store/demo');
     expect(storeHref('demo', '/products')).toBe('/store/demo/products');
-    expect(storeHref('aurora-supply', '/orders/drafts')).toBe('/store/aurora-supply/orders/drafts');
+    expect(storeHref('aurora-supply', '/settings/general')).toBe(
+      '/store/aurora-supply/settings/general',
+    );
   });
 });
 
@@ -85,7 +87,8 @@ describe('isItemSelected', () => {
     // parent has to match through its subitems or Products goes dark there.
     expect(isItemSelected('/store/demo/collections', 'demo', item('products'))).toBe(true);
     expect(isItemSelected('/store/demo/inventory', 'demo', item('products'))).toBe(true);
-    expect(isItemSelected('/store/demo/orders/drafts', 'demo', item('orders'))).toBe(true);
+    // A detail route under /orders still lights the Orders item.
+    expect(isItemSelected('/store/demo/orders/ord_123', 'demo', item('orders'))).toBe(true);
   });
 
   it('scopes matching to the shop in the path', () => {

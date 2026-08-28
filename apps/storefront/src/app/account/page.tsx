@@ -2,7 +2,7 @@
  * `/account` — order history + profile (SPEC §8, optional path). Owner: WS-E (E5).
  * Signed out renders as a redirect to the login form, never an error page.
  */
-import { formatMoney } from '@merchant/theme-engine/shared';
+import { formatMoney, HOME_PATH, ThemeButton } from '@merchant/theme-engine/shared';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { resolveShopSlug } from '../../lib/tenant.ts';
@@ -24,6 +24,39 @@ const dateFormat = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   day: 'numeric',
 });
+
+/**
+ * A signed-in shopper with no orders — the first thing a new account sees, and
+ * the state the seeded demo customer is in. Designed rather than apologetic: a
+ * card the size of the table it replaces, one heading, one sentence, one way
+ * out. (H3: the alternative fix is seed-side — see the report.)
+ */
+function EmptyOrderHistory() {
+  return (
+    <div className="mt-4 flex flex-col items-center gap-4 rounded-theme border border-text/10 px-6 py-14 text-center">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="h-10 w-10 text-text/30"
+      >
+        <path d="M6 7h12l1.2 12.2a1 1 0 0 1-1 1.1H5.8a1 1 0 0 1-1-1.1L6 7Z" />
+        <path d="M9 10V6.5a3 3 0 0 1 6 0V10" />
+      </svg>
+      <div className="flex flex-col gap-1.5">
+        <h3 className="font-heading text-lg text-text">No orders yet</h3>
+        <p className="mx-auto max-w-sm text-sm text-text/60">
+          Orders you place will show up here with their status and totals.
+        </p>
+      </div>
+      <ThemeButton href={HOME_PATH}>Start shopping</ThemeButton>
+    </div>
+  );
+}
 
 export default async function AccountPage() {
   // Slug only — the layout already resolved the theme. Not `shopContext()`:
@@ -55,9 +88,7 @@ export default async function AccountPage() {
             Order history
           </h2>
           {orders.length === 0 ? (
-            <p className="mt-4 rounded-theme border border-text/10 px-4 py-8 text-center text-sm text-text/60">
-              You haven&rsquo;t placed any orders yet.
-            </p>
+            <EmptyOrderHistory />
           ) : (
             <div className="mt-4 overflow-x-auto rounded-theme border border-text/10">
               <table className="w-full text-left text-sm">

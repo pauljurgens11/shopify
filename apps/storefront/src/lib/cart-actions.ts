@@ -13,7 +13,8 @@
  */
 import { CART_COOKIE } from '@merchant/config/constants';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { PATHNAME_HEADER } from '../middleware.ts';
 import { storefrontApiUrl } from './api.ts';
 import { cartTokenFromSetCookie } from './set-cookie.ts';
 import { resolveShopSlug } from './tenant.ts';
@@ -69,6 +70,12 @@ async function cartRequest(
 
   const cart = (await response.json()) as { itemCount: number };
   revalidatePath('/cart');
+  // …and the page the shopper is actually on, or the header's cart badge keeps
+  // the count it was server-rendered with until they navigate — adding from a
+  // product page would look like nothing happened. The middleware puts the
+  // path on a header, which is also set for the Server Action's own POST.
+  const pathname = (await headers()).get(PATHNAME_HEADER);
+  if (pathname && pathname !== '/cart') revalidatePath(pathname);
   return { ok: true, itemCount: cart.itemCount };
 }
 

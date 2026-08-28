@@ -9,13 +9,40 @@
  * endpoint has not landed yet simply report nothing (see `lib/search.ts`).
  */
 import type { SessionResponse } from '@merchant/contracts/auth';
-import { ActionList, Box, Card, Icon, InlineStack, Text, TopBar } from '@shopify/polaris';
+import { ActionList, Avatar, Box, Card, Icon, InlineStack, Text, TopBar } from '@shopify/polaris';
 import { NotificationIcon } from '@shopify/polaris-icons';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { storeHref } from '../../lib/nav.ts';
 import { type SearchHit, useSearch } from '../../lib/search.ts';
 import { useLogout } from '../../lib/session.ts';
+
+/**
+ * The keyboard hint sitting inside the search field. Polaris's `SearchField`
+ * takes no children, so this is the §7 escape hatch: plain JSX, `--p-*` tokens
+ * only, positioned over the field the way Shopify's admin shows `⌘K`.
+ */
+function ShortcutHint({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        right: 'var(--p-space-300)',
+        pointerEvents: 'none',
+        color: 'var(--p-color-text-inverse-secondary)',
+        fontFamily: 'var(--p-font-family-sans)',
+        fontSize: 'var(--p-font-size-300)',
+        lineHeight: 'var(--p-font-line-height-400)',
+        padding: '0 var(--p-space-150)',
+        border: 'var(--p-border-width-025) solid var(--p-color-border-inverse)',
+        borderRadius: 'var(--p-border-radius-100)',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 function initialsOf(name: string): string {
   return (
@@ -43,6 +70,13 @@ export function AdminTopBar({
   const [searchFocused, setSearchFocused] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Set after mount, never during render: the server has no navigator, and
+  // guessing would print "Ctrl K" on a Mac for one frame and then swap it.
+  const [shortcut, setShortcut] = useState<string | null>(null);
+  useEffect(() => {
+    setShortcut(/Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K');
+  }, []);
 
   const { data: groups, isFetching } = useSearch(query);
 
@@ -80,15 +114,15 @@ export function AdminTopBar({
         return;
       }
 
-      if (!hasQuery) return;
-
-      if (event.key === 'Escape') {
+      // Escape leaves the search whether or not anything is typed — a focused
+      // empty field that will not let go reads as a stuck modal.
+      if (event.key === 'Escape' && (hasQuery || searchFocused)) {
         event.preventDefault();
         dismissSearch();
         return;
       }
 
-      if (flatHits.length === 0) return;
+      if (!hasQuery || flatHits.length === 0) return;
 
       // Wrap around: from the last hit, ArrowDown returns to the first.
       if (event.key === 'ArrowDown') {
@@ -108,7 +142,7 @@ export function AdminTopBar({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [hasQuery, flatHits, activeIndex, dismissSearch, openHit]);
+  }, [hasQuery, searchFocused, flatHits, activeIndex, dismissSearch, openHit]);
 
   const searchSections = useMemo(() => {
     let index = 0;
@@ -151,16 +185,29 @@ export function AdminTopBar({
       onNavigationToggle={onNavigationToggle}
       searchResultsVisible={hasQuery}
       searchField={
-        <TopBar.SearchField
-          value={query}
-          placeholder="Search"
-          focused={searchFocused}
-          showFocusBorder
-          onChange={setQuery}
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-          onCancel={dismissSearch}
-        />
+        // The wrapper inherits the search field's own flex sizing, so the field
+        // stays centred in the bar; it exists only to position the ⌘K hint.
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flex: '1 1 auto',
+            alignItems: 'center',
+          }}
+        >
+          <TopBar.SearchField
+            value={query}
+            placeholder="Search"
+            focused={searchFocused}
+            showFocusBorder
+            onChange={setQuery}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            onCancel={dismissSearch}
+          />
+          {/* Hidden once the field is in use: the clear button lives there. */}
+          {shortcut && !hasQuery && !searchFocused ? <ShortcutHint label={shortcut} /> : null}
+        </div>
       }
       searchResults={searchResults}
       onSearchResultsDismiss={dismissSearch}
@@ -182,14 +229,31 @@ export function AdminTopBar({
         />
       }
       userMenu={
-        <TopBar.UserMenu
-          name={session.shop.name}
-          detail={session.user.email}
-          initials={initialsOf(session.shop.name)}
+        // `TopBar.Menu` rather than `TopBar.UserMenu`, for two PARITY.md lines
+        // its API cannot express: the chip reads initials-square-then-shop-name
+        // (UserMenu renders the text first), and the popover opens with the shop
+        // name as a header (`UserMenu.actions` is typed without section titles).
+        // Same Polaris subcomponent the notifications bell already uses, in its
+        // `userMenu` variant — the chip styling is still Polaris's.
+        <TopBar.Menu
+          accessibilityLabel="Store menu"
+          userMenu
+          activatorContent={
+            <>
+              <Avatar size="md" initials={initialsOf(session.shop.name)} name={session.shop.name} />
+              <span style={{ maxWidth: '10rem', padding: '0 var(--p-space-200)' }}>
+                <Text as="p" variant="bodySm" fontWeight="medium" alignment="start" truncate>
+                  {session.shop.name}
+                </Text>
+              </span>
+            </>
+          }
           open={userMenuOpen}
-          onToggle={() => setUserMenuOpen((open) => !open)}
+          onOpen={() => setUserMenuOpen(true)}
+          onClose={() => setUserMenuOpen(false)}
           actions={[
             {
+              title: session.shop.name,
               items: [
                 {
                   content: 'Log out',
