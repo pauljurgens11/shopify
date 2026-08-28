@@ -14,6 +14,10 @@ const config: NextConfig = {
   // DATABASE_URL and the vault key), so the one public value is republished
   // here instead of adding a NEXT_PUBLIC_ duplicate to the env schema.
   env: { NEXT_PUBLIC_API_URL: process.env.API_URL ?? 'http://api.lvh.me:3001' },
+  // The admin is served from admin.lvh.me in dev (CLAUDE.md §1), which Next
+  // treats as cross-origin to its own /_next/* assets. Declaring the dev hosts
+  // silences the warning now and keeps it working when Next starts enforcing it.
+  allowedDevOrigins: ['admin.lvh.me', '*.lvh.me'],
   // Required for the Dockerfile: pnpm's node_modules is a symlink farm into the
   // store, so copying it between build stages produces a broken tree. Standalone
   // emits a self-contained server with only the files actually imported.
