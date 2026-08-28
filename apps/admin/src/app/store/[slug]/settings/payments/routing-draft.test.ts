@@ -92,6 +92,23 @@ describe('validation', () => {
     const empty = newRuleDraft('');
     expect(validateDrafts([empty], CURRENCY).valid).toBe(false);
   });
+
+  it('rejects a negative amount in either bound', () => {
+    // `-5` in Max previously validated and saved a rule that can never match —
+    // the `min={0}` input attribute only gates the spinner, not typing.
+    const negativeMin = { ...newRuleDraft('proc_a'), minAmount: '-5' };
+    expect(validateDrafts([negativeMin], CURRENCY).byKey[negativeMin.key]).toMatch(/negative/i);
+
+    const negativeMax = { ...newRuleDraft('proc_a'), maxAmount: '-5' };
+    expect(validateDrafts([negativeMax], CURRENCY).byKey[negativeMax.key]).toMatch(/negative/i);
+  });
+
+  it('rejects a blank weight instead of reading it as 0', () => {
+    // Number('') === 0, so a cleared field silently saved a rule that receives
+    // no traffic. Blank is a missing answer, not an instruction.
+    const blank = { ...newRuleDraft('proc_a'), weight: '' };
+    expect(validateDrafts([blank], CURRENCY).byKey[blank.key]).toBeTruthy();
+  });
 });
 
 describe('ordering', () => {

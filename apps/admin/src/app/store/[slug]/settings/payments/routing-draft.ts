@@ -103,7 +103,9 @@ export function validateDrafts(drafts: RuleDraft[], currencyCode: string): Valid
       continue;
     }
 
-    const weight = Number(draft.weight);
+    // Blank is a missing answer, not a weight — Number('') is 0, which would
+    // silently save a rule that receives no traffic.
+    const weight = draft.weight.trim() === '' ? Number.NaN : Number(draft.weight);
     if (!Number.isInteger(weight) || weight < 0 || weight > 100) {
       byKey[draft.key] = 'Weight must be a whole number between 0 and 100.';
       continue;
@@ -118,7 +120,9 @@ export function validateDrafts(drafts: RuleDraft[], currencyCode: string): Valid
       byKey[draft.key] = 'Enter amounts as numbers, for example 25.00.';
       continue;
     }
-    if (min && min.amount < 0) {
+    // Both bounds: a negative amount can never match a charge, and the server
+    // schema (positiveMoneySchema) now refuses it too.
+    if ((min && min.amount < 0) || (max && max.amount < 0)) {
       byKey[draft.key] = 'Amounts can’t be negative.';
       continue;
     }

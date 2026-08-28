@@ -18,6 +18,7 @@ import {
   paymentMethodSchema,
   paymentSchema,
 } from '@merchant/contracts/pay';
+import type { TenantClient } from '@merchant/db/tenant';
 import { capturePayment, chargeSavedCard, PaymentError, voidPayment } from '@merchant/pay/router';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -61,6 +62,40 @@ interface PaymentRow {
   routingTrail: unknown;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Money was captured against an order: flip `pending|authorized` → `paid` once
+ * the captured payments cover the total. Here rather than in `@merchant/pay`
+ * because Order is C's model and pay stays order-agnostic; guarded by status so
+ * a refunded or voided order is never resurrected. The financialStatus enum
+ * has no partial-paid state, so an under-collection leaves the status alone.
+ */
+async function settleOrderStatus(
+  db: TenantClient,
+  payment: { orderId: string | null; status: string },
+): Promise<void> {
+  if (!payment.orderId || payment.status !== 'captured') return;
+
+  const order = await db.order.findUnique({
+    where: { id: payment.orderId },
+    select: { total: true },
+  });
+  if (!order) return;
+
+  const collected = await db.payment.aggregate({
+    where: {
+      orderId: payment.orderId,
+      status: { in: ['captured', 'partially_refunded', 'refunded'] },
+    },
+    _sum: { amount: true },
+  });
+  if ((collected._sum.amount ?? 0) < order.total) return;
+
+  await db.order.updateMany({
+    where: { id: payment.orderId, financialStatus: { in: ['pending', 'authorized'] } },
+    data: { financialStatus: 'paid' },
+  });
 }
 
 const toPayment = (row: PaymentRow) =>
@@ -108,7 +143,13 @@ export default async function routes(app: FastifyInstance) {
   app.post('/:id/capture', { preHandler: requirePermission('orders') }, async (request) => {
     const { id } = request.params as { id: string };
     const { amount } = capturePaymentInput.parse(request.body ?? {});
-    return run(() => capturePayment(request.db, id, amount));
+    // The capture is when the money moves, so it fires `orders/paid` and can
+    // settle the order's financial status — not the earlier authorization.
+    const payment = await run(() =>
+      capturePayment(request.db, id, amount, { onPaid: notifyOrderPaid }),
+    );
+    await settleOrderStatus(request.db, payment);
+    return payment;
   });
 
   app.post('/:id/void', { preHandler: requirePermission('orders') }, async (request) => {
@@ -144,11 +185,9 @@ export default async function routes(app: FastifyInstance) {
    * money, so it belongs to whoever is allowed to work an order.
    */
   app.post('/charge-saved-card', { preHandler: requirePermission('orders') }, async (request) => {
-    const input = chargeSavedCardInput
-      .extend({ orderId: z.string().optional(), checkoutId: z.string().optional() })
-      .parse(request.body ?? {});
+    const input = chargeSavedCardInput.parse(request.body ?? {});
 
-    return run(() =>
+    const payment = await run(() =>
       chargeSavedCard(
         request.db,
         request.shopId as string,
@@ -164,5 +203,7 @@ export default async function routes(app: FastifyInstance) {
         { onPaid: notifyOrderPaid },
       ),
     );
+    await settleOrderStatus(request.db, payment);
+    return payment;
   });
 }

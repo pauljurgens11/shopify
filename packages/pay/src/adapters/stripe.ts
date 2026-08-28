@@ -304,14 +304,19 @@ async function refund(
   txnId: string,
   amount: MoneyDto,
   creds: ProcessorCredentials,
+  opts?: { idempotencyKey?: string },
 ): Promise<ProcessorResult> {
   try {
     // The refund id, not the intent id: a payment has many refunds, and the
     // admin's refund row needs to point at its own.
-    const created = await client(creds).refunds.create({
-      payment_intent: txnId,
-      amount: amount.amount,
-    });
+    const created = await client(creds).refunds.create(
+      {
+        payment_intent: txnId,
+        amount: amount.amount,
+      },
+      // Suffixed so it can never collide with the charge that used this key.
+      opts?.idempotencyKey ? { idempotencyKey: `${opts.idempotencyKey}:refund` } : undefined,
+    );
     return { outcome: 'success', processor: 'stripe', processorTxnId: created.id, amount };
   } catch (err) {
     return toProcessorResult(classifyStripeError(err));

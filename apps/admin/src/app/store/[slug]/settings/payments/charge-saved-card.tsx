@@ -8,9 +8,10 @@
  * page carries no dead UI for the common case (CLAUDE.md §8).
  *
  * A decline is a 200 with `status: 'failed'` (the card was rejected; the
- * charge API worked) — it renders as a banner in the modal, and a retry sends
- * a FRESH idempotency key: replaying the old key would just return the failed
- * payment row again.
+ * charge API worked) — it renders as a banner in the modal, and only then is a
+ * fresh idempotency key minted: replaying a declined key would just return the
+ * failed payment row again. A TRANSPORT failure keeps the key, so retrying a
+ * charge whose response was lost replays it instead of charging twice.
  */
 import { format, fromDecimal, type Money, minorUnitFactor } from '@merchant/config/money';
 import type { OrderDetail } from '@merchant/contracts/orders';
@@ -43,6 +44,8 @@ function idempotencyKey(): string {
   crypto.getRandomValues(bytes);
   return `admin-${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
+
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
 
 const BRAND_LABELS: Record<string, string> = {
   visa: 'Visa',
@@ -80,12 +83,20 @@ export function ChargeSavedCard({
 
   const [charging, setCharging] = useState<PaymentMethod | null>(null);
   const [amount, setAmount] = useState('');
+  // One key per ATTEMPT, minted when the modal opens and kept across transport
+  // failures — a retry after a lost response must replay the charge, not make
+  // a second one. It rotates only when the attempt genuinely changes: a
+  // definitive decline (retrying that key would just replay the failed row),
+  // or an edited amount (the server refuses a reused key for a different
+  // charge).
+  const [chargeKey, setChargeKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!customerId || methods.length === 0) return null;
 
   const currencyCode = order.total.currencyCode;
+  const currencySymbol = CURRENCY_SYMBOLS[currencyCode] ?? currencyCode;
   // Prefill what is still owed; on a fully paid order, offer the order total —
   // the repeat-billing demo charges a paid order again on purpose.
   const outstanding = order.total.amount - capturedTotal(order.payments, currencyCode).amount;
@@ -94,6 +105,7 @@ export function ChargeSavedCard({
   const open = (method: PaymentMethod) => {
     setCharging(method);
     setAmount(toAmountString(prefill));
+    setChargeKey(idempotencyKey());
     setError(null);
   };
   const close = () => {
@@ -124,7 +136,7 @@ export function ChargeSavedCard({
       body: {
         paymentMethodId: charging.id,
         amount: money,
-        idempotencyKey: idempotencyKey(),
+        idempotencyKey: chargeKey,
         orderId: order.id,
       },
     })
@@ -135,6 +147,10 @@ export function ChargeSavedCard({
               ? 'The card was declined for insufficient funds.'
               : 'The card was declined.',
           );
+          setChargeKey(idempotencyKey());
+          // The declined attempt is a committed Payment row; the order's
+          // timeline should show it without waiting for an unrelated refetch.
+          onCharged();
           return;
         }
         toast.show(`${format(payment.amount)} payment collected`);
@@ -197,13 +213,16 @@ export function ChargeSavedCard({
             <TextField
               label="Amount"
               type="number"
-              prefix="$"
+              prefix={currencySymbol}
               min={0}
-              step={0.01}
+              step={minorUnitFactor(currencyCode) === 1 ? 1 : 0.01}
               autoComplete="off"
               value={amount}
               onChange={(value) => {
                 setAmount(value);
+                // A different amount is a different charge — it needs its own
+                // key, or the server (rightly) refuses the mismatched replay.
+                setChargeKey(idempotencyKey());
                 setError(null);
               }}
               helpText={`Order total is ${format(order.total)}.`}
