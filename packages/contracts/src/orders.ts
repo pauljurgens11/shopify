@@ -13,6 +13,7 @@ import {
   timestampsSchema,
 } from './common.ts';
 import { appliedDiscountSchema } from './discounts.ts';
+import { paymentSchema } from './pay.ts';
 
 export const financialStatusSchema = z.enum([
   'pending',
@@ -192,3 +193,81 @@ export const updateOrderInput = z.object({
 });
 
 export const addOrderNoteInput = z.object({ message: z.string().min(1).max(2000) });
+
+export type ListOrdersQuery = z.infer<typeof listOrdersQuery>;
+export type CancelOrderInput = z.input<typeof cancelOrderInput>;
+export type UpdateOrderInput = z.input<typeof updateOrderInput>;
+
+/* --- creation (C2 service input; E3 is the producer) ---------------------- */
+
+/**
+ * One purchased line, fully snapshotted. `price` is the UNIT price; the caller
+ * has already priced the cart (C1 engine), so nothing here is recomputed.
+ */
+export const createOrderLineInput = orderLineItemSchema
+  .omit({ id: true, fulfilledQuantity: true, refundedQuantity: true })
+  .extend({
+    productId: idSchema.nullable().default(null),
+    variantId: idSchema.nullable().default(null),
+    variantTitle: z.string().nullable().default(null),
+    sku: z.string().nullable().default(null),
+    imageUrl: z.string().url().nullable().default(null),
+    /** Omitted means nothing was discounted; the currency comes from the order. */
+    totalDiscount: moneySchema.optional(),
+  });
+export type CreateOrderLineInput = z.input<typeof createOrderLineInput>;
+
+/** Totals arrive computed and must balance — the service records, it never prices. */
+export const orderTotalsInput = z.object({
+  subtotal: moneySchema,
+  discountTotal: moneySchema,
+  shippingTotal: moneySchema,
+  taxTotal: moneySchema,
+  total: moneySchema,
+});
+
+export const createOrderInput = z.object({
+  customerId: idSchema.nullable().default(null),
+  email: z.string().email(),
+  phone: z.string().max(64).nullable().default(null),
+  currencyCode: z.string().length(3).default('USD'),
+  lineItems: z.array(createOrderLineInput).min(1),
+  totals: orderTotalsInput,
+  shippingAddress: addressSchema.nullable().default(null),
+  billingAddress: addressSchema.nullable().default(null),
+  shippingLine: shippingLineSchema.nullable().default(null),
+  /** Straight from the C1 engine's `applied`; each one counts a redemption. */
+  discountCodes: z.array(appliedDiscountSchema).default([]),
+  /** Checkout sets this from the Pay result; the default is an unpaid order. */
+  financialStatus: financialStatusSchema.default('pending'),
+  note: z.string().max(5000).nullable().default(null),
+  tags: tagsSchema,
+  metadata: metadataSchema,
+});
+export type CreateOrderInput = z.input<typeof createOrderInput>;
+
+/* --- responses ------------------------------------------------------------ */
+
+/** What the index table needs. Fulfillments and refunds are detail-only. */
+export const orderSummarySchema = orderSchema.omit({ fulfillments: true, refunds: true });
+export type OrderSummary = z.infer<typeof orderSummarySchema>;
+
+/**
+ * Order detail. Payments are joined by `orderId` and read-only here — Pay (D3)
+ * owns writing them, C3 owns refunding them.
+ */
+export const orderDetailSchema = orderSchema.extend({
+  customer: z
+    .object({
+      id: idSchema,
+      email: z.string(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+      ordersCount: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .default(null),
+  events: z.array(orderEventSchema).default([]),
+  payments: z.array(paymentSchema).default([]),
+});
+export type OrderDetail = z.infer<typeof orderDetailSchema>;
