@@ -17,6 +17,7 @@ import rateLimit from '@fastify/rate-limit';
 import { RATE_LIMITS } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { ApiError } from './lib/errors.ts';
 import errorHandler from './plugins/error-handler.ts';
 import tenancy from './plugins/tenancy.ts';
 
@@ -69,16 +70,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     global: false, // opt in per route group — see RATE_LIMITS
     max: RATE_LIMITS.adminApi.max,
     timeWindow: RATE_LIMITS.adminApi.windowMs,
-    // @fastify/rate-limit builds its own 429 body instead of going through
-    // setErrorHandler, so the SPEC §5 error shape has to be produced here.
-    errorResponseBuilder: (_req, context) => ({
-      errors: [
-        {
-          code: 'rate_limited',
-          message: `Rate limit exceeded. Retry in ${context.after}.`,
-        },
-      ],
-    }),
+    // @fastify/rate-limit THROWS whatever this returns, so it has to be an
+    // Error carrying a statusCode — a bare SPEC-shaped object arrives at
+    // setErrorHandler with no status and comes back out as a 500.
+    errorResponseBuilder: (_req, context) =>
+      new ApiError('rate_limited', `Rate limit exceeded. Retry in ${context.after}.`),
   });
 
   await app.register(tenancy);
