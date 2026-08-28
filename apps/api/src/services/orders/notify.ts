@@ -32,6 +32,12 @@ export type OrderNotification = {
     'orders/create' | 'orders/paid' | 'orders/cancelled' | 'orders/fulfilled' | 'refunds/create'
   >;
   order: OrderSummary;
+  /**
+   * Absolute thank-you URL for the confirmation email's button. Only checkout
+   * knows it (the token is the credential), so it arrives here as an option;
+   * null omits the button rather than linking a customer at a guessed 404.
+   */
+  orderStatusUrl?: string | null;
 };
 
 /**
@@ -53,13 +59,16 @@ function swallow(what: string, err: unknown): void {
 }
 
 /** Fire-and-forget: callers do not await a delivery, only the enqueue. */
-export async function notifyOrder({ shopId, topic, order }: OrderNotification): Promise<void> {
+export async function notifyOrder({
+  shopId,
+  topic,
+  order,
+  orderStatusUrl,
+}: OrderNotification): Promise<void> {
   try {
     await emitWebhookEvent(shopId, topic, orderPayload(order));
     if (topic === 'orders/create') {
-      // orderStatusUrl is E3's to supply — it holds the checkout token. Null
-      // omits the button rather than linking a customer at a guessed 404.
-      await enqueueOrderConfirmationEmail(shopId, order.id);
+      await enqueueOrderConfirmationEmail(shopId, order.id, orderStatusUrl ?? null);
     }
   } catch (err) {
     swallow(`${topic} for order ${order.id}`, err);

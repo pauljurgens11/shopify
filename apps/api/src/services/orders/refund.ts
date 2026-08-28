@@ -14,7 +14,7 @@
  */
 
 import { newId } from '@merchant/config/ids';
-import { allocate, money } from '@merchant/config/money';
+import { allocate, format, money } from '@merchant/config/money';
 import {
   type CreateRefundInput,
   createRefundInput,
@@ -202,7 +202,7 @@ export async function refundOrder(
               id: newId('event'),
               shopId,
               type: 'refund_created',
-              message: `Refunded ${(amount / 100).toFixed(2)} ${order.currencyCode}.`,
+              message: `Refunded ${format(money(amount, order.currencyCode))}.`,
               actor,
               payload: { refundId, restock: data.restock ?? true },
             },

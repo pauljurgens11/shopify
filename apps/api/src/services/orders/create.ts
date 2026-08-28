@@ -83,7 +83,7 @@ export async function createOrder(
   db: TenantClient,
   shopId: string,
   input: CreateOrderInput,
-  options: { actor?: string | null } = {},
+  options: { actor?: string | null; orderStatusUrl?: string | null } = {},
 ): Promise<OrderDetail> {
   const data = createOrderInput.parse(input);
   const currency = data.currencyCode;
@@ -228,6 +228,7 @@ export async function createOrder(
       total: order.total,
       currencyCode: order.currencyCode,
     },
+    orderStatusUrl: options.orderStatusUrl ?? null,
   });
 
   return loadOrderDetail(db, order.id);
