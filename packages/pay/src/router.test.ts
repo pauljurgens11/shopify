@@ -358,6 +358,21 @@ describe('charge — persistence', () => {
 });
 
 describe('charge — idempotency', () => {
+  it('survives two concurrent charges on one key without a unique-index 500', async () => {
+    await connectProcessor('mock', { position: 0 });
+    const cardTokenId = await tokenFor(TEST_CARDS.approved);
+    const idempotencyKey = key();
+    const adapters = adaptersOf({ mock: mockAdapter });
+
+    const [a, b] = await Promise.all([
+      charge(db, shopId, { cardTokenId, amount: usd(2500), idempotencyKey }, { adapters }),
+      charge(db, shopId, { cardTokenId, amount: usd(2500), idempotencyKey }, { adapters }),
+    ]);
+
+    expect(a.id).toBe(b.id);
+    expect(await db.payment.count()).toBe(1);
+  });
+
   it('replaying a key returns the first Payment and never calls a processor again', async () => {
     await connectProcessor('mock', { position: 0 });
     const cardTokenId = await tokenFor(TEST_CARDS.approved);
@@ -518,6 +533,26 @@ describe('capture, void and refund', () => {
   });
 });
 
+describe('charge — routing rules are a preference, not a whitelist', () => {
+  it('still charges when a rule exists but excludes this card', async () => {
+    // One rule, "amex → mock". A Visa customer must not be told that no
+    // processor is connected while an enabled one is sitting right there.
+    await connectProcessor('mock', { position: 0, conditions: { cardBrands: ['amex'] } });
+
+    const payment = await charge(
+      db,
+      shopId,
+      {
+        cardTokenId: await tokenFor(TEST_CARDS.approved),
+        amount: usd(2500),
+        idempotencyKey: key(),
+      },
+      { adapters: adaptersOf({ mock: mockAdapter }) },
+    );
+    expect(payment.status).toBe('captured');
+  });
+});
+
 describe('saved cards — the repeat-billing primitive', () => {
   it('charges a saved card through the same router', async () => {
     await connectProcessor('mock', { position: 0 });
@@ -533,6 +568,9 @@ describe('saved cards — the repeat-billing primitive', () => {
       await tokenFor(TEST_CARDS.approved),
     );
     expect(method).toMatchObject({ brand: 'visa', last4: '4242', isDefault: true });
+    // A PaymentMethod is not a card token; sharing the prefix would make
+    // `isId('cardToken', …)` true for a row that resolves to nothing.
+    expect(method.id.startsWith('pm_')).toBe(true);
 
     const payment = await chargeSavedCard(
       db,
@@ -541,5 +579,23 @@ describe('saved cards — the repeat-billing primitive', () => {
       { adapters: adaptersOf({ mock: mockAdapter }) },
     );
     expect(payment).toMatchObject({ status: 'captured', last4: '4242' });
+  });
+
+  it('does not let a failing onPaid handler fail a charge that already went through', async () => {
+    await connectProcessor('mock', { position: 0 });
+    const payment = await charge(
+      db,
+      shopId,
+      {
+        cardTokenId: await tokenFor(TEST_CARDS.approved),
+        amount: usd(2500),
+        idempotencyKey: key(),
+      },
+      {
+        adapters: adaptersOf({ mock: mockAdapter }),
+        onPaid: () => Promise.reject(new Error('redis is down')),
+      },
+    );
+    expect(payment.status).toBe('captured');
   });
 });

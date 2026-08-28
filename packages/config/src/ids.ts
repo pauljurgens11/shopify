@@ -25,6 +25,7 @@ export const ID_PREFIXES = {
   cart: 'cart',
   payment: 'pay',
   cardToken: 'card_tok',
+  paymentMethod: 'pm',
   processor: 'proc',
   routingRule: 'rule',
   app: 'app',

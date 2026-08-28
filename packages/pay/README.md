@@ -68,6 +68,28 @@ on `mock` as on Stripe test keys.
 | `4000000000000119` | hard failure on `mock` — **approves on `maverick`**, so failover is demoable |
 | anything else | approved |
 
+## Routing
+
+`routing.ts` decides *which* processors are tried and in what order — pure, no
+database and no adapters. `router.ts` executes that chain and persists the
+result.
+
+- Rules whose `conditions` match are the candidates; one is picked by `weight`
+  (a percentage split), and the rest become the fallback chain.
+- Routing rules are a **preference, not a whitelist**. No matching rule falls
+  back to every enabled processor — an incomplete routing table must never stop
+  a shop taking money. A merchant says "never use this" by disabling it.
+- `rng` is injected everywhere, so a split is testable and a production failover
+  is reproducible from its `routingTrail`.
+- A `Payment` row is written for declines and failures too, so the order page
+  can show the attempt.
+- Capture, void and refund resolve their adapter from the `Payment` row, never
+  from today's routing rules — a refund must reach the processor that took the
+  money.
+
+Order-level refunds belong to C3's `POST /admin/api/orders/:id/refunds`, which
+calls `refundPayment()` here; the refund cap lives in exactly one place.
+
 ## Adding a processor
 
 One new file in `src/adapters/`, one line in `src/index.ts`. If a change needs

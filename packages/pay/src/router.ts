@@ -81,10 +81,10 @@ export interface RouterDeps {
   rng?: () => number;
   adapters?: (key: ProcessorKey) => ProcessorAdapter;
   /**
-   * Fired once, after a successful charge that belongs to an order. Awaited, so
-   * a throwing handler surfaces rather than becoming an unhandled rejection —
-   * but see `charge()`: the payment is already committed by then, so a failure
-   * here must not un-charge the customer.
+   * Fired once, after a successful charge. Awaited so ordering is predictable,
+   * but its failures are swallowed: it runs after the Payment row is committed,
+   * so it must never be able to fail the charge it is reporting. The handler
+   * owns its own logging and retries (G1's producer does both).
    */
   onPaid?: (event: PaidEvent) => void | Promise<void>;
 }
@@ -136,17 +136,41 @@ export async function charge(
   };
 
   const { result, trail, config } = await runChain(chain, request, card, deps);
-  const payment = await recordCharge(db, shopId, { input, card, result, trail, config, capture });
+
+  let payment: Payment;
+  try {
+    payment = await recordCharge(db, shopId, { input, card, result, trail, config, capture });
+  } catch (error) {
+    // A concurrent request with the same key got there first — a double-clicked
+    // Pay button, or a client retrying while the first call is still open. The
+    // unique index on (shopId, idempotencyKey) is what caught it; without this
+    // the loser returns a 500 for a card that was charged.
+    //
+    // No second charge reached the processor: every adapter honours the same
+    // idempotency key, so the attempt above replayed the winner's transaction
+    // rather than creating one. The winner's row is the answer.
+    if (!isUniqueViolation(error)) throw error;
+    const winner = await db.payment.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
+    if (!winner) throw error;
+    return toPayment(winner);
+  }
 
   if (result.outcome === 'approved' && deps.onPaid) {
-    await deps.onPaid({
-      shopId,
-      paymentId: payment.id,
-      orderId: payment.orderId,
-      checkoutId: payment.checkoutId,
-      amount: payment.amount,
-      processor: payment.processor,
-    });
+    // The money has already moved and the row is committed. A queue push that
+    // fails must not turn a successful payment into an error at checkout, so
+    // this is best-effort — the handler owns its own logging and retries.
+    try {
+      await deps.onPaid({
+        shopId,
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        checkoutId: payment.checkoutId,
+        amount: payment.amount,
+        processor: payment.processor,
+      });
+    } catch {
+      // Intentionally swallowed. See above.
+    }
   }
 
   return payment;
@@ -185,16 +209,21 @@ async function resolveChain(
       conditions: (rule.conditions ?? {}) as RoutingCandidate['conditions'],
     }));
 
-  const selected =
-    candidates.length > 0
-      ? selectProcessorChain(candidates, ctx, rng)
-      : configs.map((config, index) => ({
-          processorConfigId: config.id,
-          processor: config.processor as ProcessorKey,
-          position: index,
-          weight: 0,
-          conditions: {},
-        }));
+  const everyEnabled = () =>
+    configs.map((config, index) => ({
+      processorConfigId: config.id,
+      processor: config.processor as ProcessorKey,
+      position: index,
+      weight: 0,
+      conditions: {},
+    }));
+
+  // Routing rules are a preference, not a whitelist. A merchant whose only rule
+  // is "amex → Stripe" has not said "decline every Visa"; they say that by
+  // disabling a processor. An incomplete routing table must never be able to
+  // stop a shop taking money, so no match falls back to everything enabled.
+  const byRules = candidates.length > 0 ? selectProcessorChain(candidates, ctx, rng) : [];
+  const selected = byRules.length > 0 ? byRules : everyEnabled();
 
   return selected.map((candidate) => ({
     ...candidate,
@@ -279,6 +308,11 @@ async function recordCharge(
   });
 
   return toPayment(row);
+}
+
+/** Prisma P2002 — the write lost a race against a unique index. */
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === 'P2002';
 }
 
 /** `null` on success; the decline code, or `processor_error`, on failure. */
@@ -480,7 +514,7 @@ export async function savePaymentMethod(
 
   const row = await db.paymentMethod.create({
     data: {
-      id: newId('cardToken'),
+      id: newId('paymentMethod'),
       shopId,
       customerId,
       cardTokenId,

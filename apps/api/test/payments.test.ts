@@ -68,6 +68,17 @@ describe('processor configuration', () => {
     expect(response.body).not.toContain('encryptedCredentials');
   });
 
+  it('re-connecting updates the existing row instead of colliding on the unique key', async () => {
+    // (shopId, processor) is unique, so this exercises the tenant-scoped upsert
+    // UPDATE path — the one the tenancy plugin warns turns into a P2002 500 if
+    // the scoped `where` fails to find the shop's own row.
+    const again = await connect('mock');
+    expect(again.statusCode).toBe(201);
+    expect(
+      await dbAdmin.processorConfig.count({ where: { shopId: shop.shopId, processor: 'mock' } }),
+    ).toBe(1);
+  });
+
   it('rejects credentials the processor itself refuses', async () => {
     // stripe.verifyCredentials with no secret key cannot authenticate, so the
     // config must not be stored — a connected badge over a dead key declines
@@ -160,6 +171,37 @@ describe('routing rules', () => {
     });
     expect(response.statusCode).toBe(400);
     expect(await dbAdmin.routingRule.count({ where: { shopId: shop.shopId } })).toBe(0);
+  });
+
+  it("replacing this shop's rules leaves another shop's rules alone", async () => {
+    const foreign = await dbAdmin.processorConfig.findFirst({ where: { shopId: other.shopId } });
+    await dbAdmin.routingRule.create({
+      data: {
+        id: newId('routingRule'),
+        shopId: other.shopId,
+        processorConfigId: foreign?.id as string,
+        position: 0,
+        weight: 100,
+      },
+    });
+
+    const configs = await app.inject({
+      method: 'GET',
+      url: '/admin/api/payments/processors',
+      headers: auth(),
+    });
+    await app.inject({
+      method: 'PUT',
+      url: '/admin/api/payments/routing-rules',
+      headers: auth(),
+      payload: {
+        rules: [{ processorConfigId: configs.json().data[0].id, weight: 100, conditions: {} }],
+      },
+    });
+
+    // The PUT deletes the whole list before rewriting it. If that deleteMany
+    // were not tenant-scoped it would wipe every shop on the platform.
+    expect(await dbAdmin.routingRule.count({ where: { shopId: other.shopId } })).toBe(1);
   });
 
   it('replaces the whole ordered list on PUT', async () => {
