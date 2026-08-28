@@ -30,6 +30,7 @@ import {
 } from '@shopify/polaris';
 import { ImageIcon } from '@shopify/polaris-icons';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { apiFetch } from '../../../../../lib/api.ts';
 import {
   columnOptions,
@@ -50,6 +51,57 @@ const PLACEHOLDERS: Record<string, string> = {
   money: '20.00',
   number: '10',
 };
+
+/** Enough for the currencies the demo ships; falls back to the code itself. */
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
+
+/**
+ * The condition value input.
+ *
+ * The field holds what the merchant TYPED; the canonical form (minor units for
+ * money, trimmed for text) lives only on the rule. Feeding the canonical form
+ * back as the controlled `value` on every keystroke made the field rewrite
+ * itself mid-edit — "2" became "2.00", the next digit landed after the cents
+ * and rounded, and "$25" was unreachable by typing (a trailing space vanished
+ * the same way on text columns). The text resyncs from the rule only when the
+ * rule changed underneath it (column switch, discard).
+ */
+function RuleValueField({
+  rule,
+  currencyCode,
+  onCondition,
+}: {
+  rule: CollectionRule;
+  currencyCode: string;
+  onCondition: (condition: string) => void;
+}) {
+  const kind = columnSpec(rule.column).kind;
+  const [text, setText] = useState(() =>
+    conditionToInput(rule.column, rule.condition, currencyCode),
+  );
+  const [synced, setSynced] = useState(rule.condition);
+  if (rule.condition !== synced) {
+    setSynced(rule.condition);
+    setText(conditionToInput(rule.column, rule.condition, currencyCode));
+  }
+
+  return (
+    <TextField
+      label="Value"
+      labelHidden
+      autoComplete="off"
+      prefix={kind === 'money' ? (CURRENCY_SYMBOLS[currencyCode] ?? currencyCode) : undefined}
+      placeholder={PLACEHOLDERS[kind]}
+      value={text}
+      onChange={(value) => {
+        setText(value);
+        const condition = inputToCondition(rule.column, value, currencyCode);
+        setSynced(condition);
+        onCondition(condition);
+      }}
+    />
+  );
+}
 
 function MatchingProducts({ ruleSet }: { ruleSet: CollectionRuleSet }) {
   const rules = completeRules(ruleSet.rules);
@@ -186,19 +238,14 @@ export function RulesBuilder({
                 />
               </Box>
               <Box minWidth="180px">
-                <TextField
-                  label="Value"
-                  labelHidden
-                  autoComplete="off"
-                  prefix={columnSpec(rule.column).kind === 'money' ? '$' : undefined}
-                  placeholder={PLACEHOLDERS[columnSpec(rule.column).kind]}
-                  value={conditionToInput(rule.column, rule.condition)}
-                  onChange={(value) =>
-                    setRule(index, {
-                      ...rule,
-                      condition: inputToCondition(rule.column, value, currencyCode),
-                    })
-                  }
+                <RuleValueField
+                  // Remount on a column change, so the text restarts from the
+                  // (possibly cleared) condition rather than the old column's.
+                  // Sole child of its Box, so the key exists only for that.
+                  key={rule.column}
+                  rule={rule}
+                  currencyCode={currencyCode}
+                  onCondition={(condition) => setRule(index, { ...rule, condition })}
                 />
               </Box>
               <Button

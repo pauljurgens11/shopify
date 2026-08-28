@@ -13,7 +13,7 @@
  *     "20.00" and the rule carries "2000". Converting in the wrong direction
  *     silently builds a collection for products under $20.00 instead of $20.
  */
-import { fromDecimal, toDecimal } from '@merchant/config/money';
+import { fromDecimal, minorUnitFactor, toDecimal } from '@merchant/config/money';
 import type { CollectionRule } from '@merchant/contracts/collections';
 
 export type RuleColumn = CollectionRule['column'];
@@ -90,10 +90,16 @@ export function withColumn(rule: CollectionRule, column: RuleColumn): Collection
 /* -------------------------------------------------------------------------- */
 
 /** What the merchant types. Price is decimal in the field, minor units on the wire. */
-export function conditionToInput(column: RuleColumn, condition: string): string {
+export function conditionToInput(
+  column: RuleColumn,
+  condition: string,
+  currencyCode = 'USD',
+): string {
   if (columnSpec(column).kind !== 'money' || condition === '') return condition;
   const amount = Number.parseInt(condition, 10);
-  return Number.isFinite(amount) ? toDecimal({ amount, currencyCode: 'USD' }).toFixed(2) : '';
+  if (!Number.isFinite(amount)) return '';
+  const decimals = minorUnitFactor(currencyCode) === 1 ? 0 : 2;
+  return toDecimal({ amount, currencyCode }).toFixed(decimals);
 }
 
 export function inputToCondition(column: RuleColumn, input: string, currencyCode = 'USD'): string {

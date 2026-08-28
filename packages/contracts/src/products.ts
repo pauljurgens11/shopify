@@ -107,8 +107,15 @@ export type CreateProductInput = z.infer<typeof createProductInput>;
  * carry ids back; the API matches a payload variant to an existing row by id
  * when given one and by option values otherwise, so editing options preserves
  * the rows B4's inventory levels hang off.
+ *
+ * Every field is `.partial()`-optional WITHOUT the create-side defaults:
+ * "undefined means leave it alone" has to hold per FIELD here, not just per
+ * product. Inheriting `createVariantInput`'s defaults made an omitted
+ * `barcode` parse as an explicit `null` and an omitted `inventoryPolicy` as an
+ * explicit `'deny'`, so any client that sent only what its form edits (B5
+ * sends id/price/sku/optionValues) silently wiped the rest on every save.
  */
-export const upsertVariantInput = createVariantInput.extend({ id: idSchema.optional() });
+export const upsertVariantInput = createVariantInput.partial().extend({ id: idSchema.optional() });
 
 /**
  * Every field is optional and `undefined` means "leave it alone" — in
