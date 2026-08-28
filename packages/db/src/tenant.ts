@@ -142,6 +142,24 @@ function buildClient(shopId: string) {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
+          // Fail CLOSED, in both directions this file could silently rot:
+          //  - a model with no shopId column cannot be scoped, so reaching one
+          //    through a tenant client is a design error, not a pass-through
+          //    (today only Shop qualifies; the first platform-level table
+          //    someone adds must not become quietly readable cross-tenant);
+          //  - an operation neither set knows (a future Prisma addition) must
+          //    not run unscoped just because this file predates it.
+          if (model !== SHOP_MODEL && !TENANT_MODELS.has(model)) {
+            throw new Error(
+              `dbForShop cannot scope model ${model} — it has no shopId column. Use dbAdmin for platform-level tables.`,
+            );
+          }
+          if (!WHERE_OPS.has(operation) && !DATA_OPS.has(operation)) {
+            throw new Error(
+              `dbForShop has no scoping rule for "${operation}" — add it to WHERE_OPS/DATA_OPS in tenant.ts before using it.`,
+            );
+          }
+
           const next = { ...(args as Record<string, unknown>) };
 
           if (WHERE_OPS.has(operation)) {
