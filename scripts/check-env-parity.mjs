@@ -40,5 +40,5 @@ if (extra.length) {
   for (const k of extra) console.error(`  - ${k}`);
   console.error('\n  Either add it to the zod schema or delete the stale line.');
 }
-console.error('\nSee CLAUDE.md §2 rule 7.\n');
+console.error('\nRule: env.ts and .env.example change together, same commit (CLAUDE.md §5).\n');
 process.exit(1);

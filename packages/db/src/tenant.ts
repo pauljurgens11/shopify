@@ -8,6 +8,12 @@
  *
  * This is a FUNCTIONAL requirement, not a security nicety: cross-shop bleed
  * breaks the multi-tenant demo instantly.
+ *
+ * LIMITATION — nested writes: only the TOP-LEVEL `data` is stamped. A nested
+ * create (`data: { …, variants: { create: [...] } }`) is passed through as-is,
+ * so its rows would violate the NOT NULL shopId. Either set shopId explicitly
+ * inside nested create payloads, or create the related rows in separate calls
+ * inside a transaction. Reads are unaffected (the top-level where is scoped).
  */
 import { dbAdmin, type PrismaClient } from './client.ts';
 
@@ -29,6 +35,8 @@ const WHERE_OPS = new Set([
   'findMany',
   'update',
   'updateMany',
+  'updateManyAndReturn',
+  'upsert', // without this, an upsert given another shop's id would UPDATE that row
   'delete',
   'deleteMany',
   'count',
@@ -37,7 +45,15 @@ const WHERE_OPS = new Set([
 ]);
 
 /** Operations whose args carry `data` we must stamp. */
-const DATA_OPS = new Set(['create', 'createMany', 'upsert', 'update', 'updateMany']);
+const DATA_OPS = new Set([
+  'create',
+  'createMany',
+  'createManyAndReturn',
+  'upsert',
+  'update',
+  'updateMany',
+  'updateManyAndReturn',
+]);
 
 function stampData(data: unknown, shopId: string): unknown {
   if (Array.isArray(data)) return data.map((row) => ({ ...row, shopId }));

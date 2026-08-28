@@ -15,7 +15,7 @@
     "migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "seed": "dotenv -e ../../.env -- prisma db seed",
-    "setup": "dotenv -e ../../.env -- prisma migrate deploy && dotenv -e ../../.env -- prisma db seed",
+    "setup": "prisma generate && dotenv -e ../../.env -- prisma migrate deploy && dotenv -e ../../.env -- prisma db seed",
     "reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "typecheck": "tsc --noEmit",
