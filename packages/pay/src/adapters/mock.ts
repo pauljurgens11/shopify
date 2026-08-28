@@ -15,10 +15,10 @@
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { AuthorizeRequest, AuthResult, ProcessorResult } from '@merchant/contracts/pay';
 import type { CardMaterial, ProcessorAdapter } from '../adapter.ts';
-import { SimulatedProcessor } from './simulated.ts';
+import { SimulatedProcessor, simulatedLedger } from './simulated.ts';
 import { classifyTestCard } from './test-cards.ts';
 
-const ledger = new SimulatedProcessor('mock', 'mock');
+const ledger = simulatedLedger('mock', 'mock');
 
 /** Test/demo-reset hook. Never called from a request path. */
 export function resetMockProcessor(): void {

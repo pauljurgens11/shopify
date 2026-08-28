@@ -8,14 +8,6 @@
  * The case worth reading first is the proration one. A refund that differs from
  * the line's share of the discount by a cent is money, and it compounds: two
  * half-refunds of a line must add up to exactly what one whole refund would.
- *
- * Refunds that actually reach the processor call `refundOrder` directly rather
- * than going over HTTP. `@fastify/autoload` pulls route files in with a plain
- * dynamic import, so under vitest the route tree and this file hold SEPARATE
- * instances of `@merchant/pay` — and therefore separate copies of the mock
- * processor's in-memory ledger, so a charge made here is an unknown transaction
- * over there. Everything that does not need the ledger is still driven over
- * HTTP, which is what covers the route wiring.
  */
 import { newId } from '@merchant/config/ids';
 import { dbAdmin } from '@merchant/db/client';
@@ -27,7 +19,6 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeRedis } from '../src/lib/redis.ts';
 import { createOrder } from '../src/services/orders/create.ts';
-import { refundOrder } from '../src/services/orders/refund.ts';
 import { buildTestApp, createTestShop, deleteTestShops, sessionCookie } from './helpers.ts';
 
 let app: FastifyInstance;
@@ -120,9 +111,14 @@ async function payFor(order: { id: string; total: { amount: number } }) {
 const post = (url: string, payload: unknown) =>
   app.inject({ method: 'POST', url, headers: { cookie, ...CSRF }, payload });
 
-/** Refunds go through the service — see the module-graph note in the header. */
-const refund = (orderId: string, input: Parameters<typeof refundOrder>[3]) =>
-  refundOrder(db, shop.shopId, orderId, { restock: false, ...input }, shop.ownerEmail);
+/** Refund over HTTP, as C5 will. Returns the updated order, or throws its error. */
+async function refund(orderId: string, input: Record<string, unknown>) {
+  const res = await post(`/admin/api/orders/${orderId}/refunds`, { restock: false, ...input });
+  if (res.statusCode !== 201) {
+    throw new Error(`${res.statusCode} ${res.json().errors?.[0]?.message ?? res.body}`);
+  }
+  return res.json();
+}
 
 beforeAll(async () => {
   app = await buildTestApp();
@@ -259,11 +255,11 @@ describe('refund proration', () => {
     expect(preview.json().maximumRefundable).toEqual(usd(4001));
 
     const first = await refund(order.id, { lineItems: [{ lineItemId: lineId, quantity: 1 }] });
-    expect(first.refunds.at(-1)?.amount).toEqual(usd(2001));
+    expect(first.refunds.at(-1).amount).toEqual(usd(2001));
     expect(first.financialStatus).toBe('partially_refunded');
 
     const second = await refund(order.id, { lineItems: [{ lineItemId: lineId, quantity: 1 }] });
-    expect(second.refunds.at(-1)?.amount).toEqual(usd(2000));
+    expect(second.refunds.at(-1).amount).toEqual(usd(2000));
 
     // The whole point: the halves add up to the whole.
     expect(second.refundedTotal).toEqual(usd(4001));
@@ -280,7 +276,7 @@ describe('refund proration', () => {
       lineItems: [{ lineItemId: lineId, quantity: 1 }],
       shippingAmount: usd(500),
     });
-    expect(withShipping.refunds.at(-1)?.amount).toEqual(usd(3000));
+    expect(withShipping.refunds.at(-1).amount).toEqual(usd(3000));
     expect(withShipping.refundedTotal).toEqual(usd(3000));
 
     // Shipping is refundable once, even though the order total still has room.
@@ -329,6 +325,6 @@ describe('refund proration', () => {
       where: { variantId: jacket.variantId, reason: 'restock' },
     });
     expect(adjustment.delta).toBe(1);
-    expect(adjustment.referenceId).toBe(returned.refunds.at(-1)?.id);
+    expect(adjustment.referenceId).toBe(returned.refunds.at(-1).id);
   });
 });

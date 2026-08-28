@@ -23,7 +23,7 @@ import { minorUnitFactor } from '@merchant/config/money';
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { AuthorizeRequest, AuthResult, ProcessorResult } from '@merchant/contracts/pay';
 import type { CardMaterial, ProcessorAdapter, ProcessorCredentials } from '../adapter.ts';
-import { SimulatedProcessor } from './simulated.ts';
+import { SimulatedProcessor, simulatedLedger } from './simulated.ts';
 import { classifyTestCard } from './test-cards.ts';
 
 const DEFAULT_BASE_URL = 'https://api.maverickpayments.com';
@@ -154,7 +154,7 @@ function declineCodeFor(
 
 /* --- simulation ------------------------------------------------------------ */
 
-const ledger = new SimulatedProcessor('maverick', 'mav');
+const ledger = simulatedLedger('maverick', 'mav');
 
 /** Test/demo-reset hook. Never called from a request path. */
 export function resetMaverickProcessor(): void {
