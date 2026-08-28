@@ -20,15 +20,30 @@ const connection = new IORedis(config.REDIS_URL, {
 const workers = Object.values(QUEUES).map((queue) => {
   const jobsForQueue = new Map(JOBS.filter((j) => j.queue === queue).map((j) => [j.name, j]));
 
-  return new Worker(
+  const worker = new Worker(
     queue,
     async (job) => {
       const definition = jobsForQueue.get(job.name);
       if (!definition) throw new Error(`No handler registered for job "${job.name}"`);
-      await definition.handler(job.data);
+      await definition.handler(job.data, {
+        // attemptsMade is 0 on the first run; handlers count from 1.
+        attempt: job.attemptsMade + 1,
+        maxAttempts: job.opts.attempts ?? 1,
+        jobId: job.id ?? job.name,
+      });
     },
     { connection, concurrency: 5 },
   );
+
+  // Without this the only trace of a failing job is BullMQ's silent retry.
+  worker.on('failed', (job, err) => {
+    const attempt = job ? `${job.attemptsMade}/${job.opts.attempts ?? 1}` : '?';
+    console.log(
+      `[warn] worker: ${job?.name ?? queue} failed (attempt ${attempt}) — ${err.message}`,
+    );
+  });
+
+  return worker;
 });
 
 console.log(`worker: listening on ${Object.values(QUEUES).join(', ')} (${JOBS.length} jobs)`);

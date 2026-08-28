@@ -9,12 +9,16 @@
  * email that sends twice is a real customer-visible bug.
  */
 import { aiThemeGenerate } from './ai-theme-generate.ts';
+import { orderConfirmationEmailJob } from './order-confirmation-email.ts';
 import type { JobDefinition } from './types.ts';
+import { webhookDeliverJob } from './webhook-deliver.ts';
 
 // biome-ignore lint/suspicious/noExplicitAny: the registry is heterogeneous by design
 export const JOBS: JobDefinition<any>[] = [
-  // WS-G: webhookDelivery, orderConfirmationEmail, analyticsRollup
+  webhookDeliverJob,
+  orderConfirmationEmailJob,
   aiThemeGenerate,
+  // WS-G: analyticsRollup
 ];
 
-export type { JobDefinition };
+export type { JobContext, JobDefinition } from './types.ts';

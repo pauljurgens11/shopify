@@ -44,6 +44,9 @@ model WebhookDelivery {
   id             String    @id
   shopId         String
   subscriptionId String
+  // The `evt_…` that triggered this delivery. One row per (subscription, event),
+  // so BullMQ's retries update a row instead of creating five (SPEC §13).
+  eventId        String
   topic          String
   payload        Json
   status         String    @default("pending") // pending | success | failed | exhausted
@@ -57,6 +60,7 @@ model WebhookDelivery {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
+  @@unique([subscriptionId, eventId])
   @@index([shopId, createdAt])
   @@index([subscriptionId, status])
   @@map("webhook_deliveries")
