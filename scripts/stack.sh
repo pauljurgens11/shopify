@@ -535,6 +535,20 @@ cmd_status() {
     printf '  %s%s tables seeded, %s still empty%s\n' "$DIM" \
       "$(printf '%s' "$rows" | awk '$2 > 0' | wc -l | tr -d ' ')" \
       "$(printf '%s' "$rows" | awk '$2 == 0' | wc -l | tr -d ' ')" "$R"
+
+    # "Is the demo there?" is not "does any table have a row in it". main runs
+    # on its own database (ensure_isolated_db), so it does NOT pick up a seed
+    # that landed on main after the last `stack sync` — and what it holds in the
+    # meantime is a shop, an owner and an order sequence, which the any-row
+    # check above happily reports as seeded. Judge on what the seed actually
+    # promises (SeedSummary: products, customers, orders), or `status` reads
+    # green while the admin shows an empty store to whoever opens it.
+    local demo
+    demo=$(printf '%s' "$rows" | awk '$1=="products" || $1=="orders" || $1=="customers" { n += $2 } END { print n+0 }')
+    if [ "$demo" = "0" ]; then
+      warn "no products, orders or customers — a bare shop, not the demo store"
+      warn "\`pnpm stack sync\` (pull main, then reseed) or \`pnpm stack reset\` (reseed only)"
+    fi
   fi
 
   if dev_running; then
