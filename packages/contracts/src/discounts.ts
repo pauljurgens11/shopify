@@ -31,6 +31,7 @@ export const discountAppliesToSchema = z.discriminatedUnion('scope', [
   z.object({ scope: z.literal('collections'), collectionIds: z.array(idSchema).min(1) }),
   z.object({ scope: z.literal('products'), productIds: z.array(idSchema).min(1) }),
 ]);
+export type DiscountAppliesTo = z.infer<typeof discountAppliesToSchema>;
 
 export const minimumRequirementSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('none') }),
@@ -82,6 +83,7 @@ export const discountableLineSchema = z.object({
   unitPrice: moneySchema,
   quantity: z.number().int().positive(),
 });
+export type DiscountableLine = z.infer<typeof discountableLineSchema>;
 
 export const appliedDiscountSchema = z.object({
   discountId: idSchema,
@@ -103,3 +105,41 @@ export const discountResultSchema = z.object({
   shippingDiscount: moneySchema,
 });
 export type DiscountResult = z.infer<typeof discountResultSchema>;
+
+/**
+ * Why an entered code did not apply. Automatic discounts never surface a
+ * rejection — they simply don't apply. Shopper-facing copy lives in the UI.
+ */
+export const discountRejectionReasonSchema = z.enum([
+  'expired',
+  'not_started',
+  'minimum_not_met',
+  'usage_limit',
+  'invalid',
+]);
+export type DiscountRejectionReason = z.infer<typeof discountRejectionReasonSchema>;
+
+/** A cart line after the engine has run. `lineTotal` is pre-discount. */
+export const discountedLineSchema = discountableLineSchema.extend({
+  lineTotal: moneySchema,
+  totalDiscount: moneySchema,
+});
+export type DiscountedLine = z.infer<typeof discountedLineSchema>;
+
+/**
+ * Full engine output. `discountTotal` covers line discounts only and
+ * `shippingTotal` is already net of `shippingDiscount`, so a caller's order
+ * total is `subtotal - discountTotal + shippingTotal + tax` with nothing
+ * counted twice (see DECISIONS.md).
+ */
+export const discountEngineResultSchema = discountResultSchema.extend({
+  lines: z.array(discountedLineSchema),
+  rejected: z
+    .array(z.object({ code: z.string(), reason: discountRejectionReasonSchema }))
+    .default([]),
+  /** Pre-discount sum of line totals. */
+  subtotal: moneySchema,
+  /** `shippingPrice - shippingDiscount`. */
+  shippingTotal: moneySchema,
+});
+export type DiscountEngineResult = z.infer<typeof discountEngineResultSchema>;
