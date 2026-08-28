@@ -22,7 +22,8 @@ When ambiguous: pick the option that maximizes the KPI, append one line to `DECI
 cp .env.example .env      # must work with ZERO edits
 docker compose up -d      # postgres, redis, minio, mailpit
 pnpm install
-pnpm db:setup             # prisma migrate + seed
+pnpm setup:git            # REQUIRED once per clone: installs hooks + merge drivers
+pnpm db:setup             # prisma generate + migrate + seed
 pnpm dev                  # turbo: api :3001, admin :3000, storefront :3002, worker
 ```
 
@@ -32,8 +33,9 @@ pnpm dev                  # turbo: api :3001, admin :3000, storefront :3002, wor
 | Lint + format | `pnpm lint` / `pnpm format` (Biome — one root config) |
 | Unit tests | `pnpm test` (Vitest) |
 | One test file | `pnpm vitest run path/to/file.test.ts` |
+| Everything CI checks, locally | `pnpm verify` (lint + typecheck + unit) — run before every push |
 | E2E smoke | `pnpm e2e` (Playwright, needs seeded stack) |
-| New migration | `pnpm db:migrate --name NNN_ws{X}_description` |
+| New migration | `pnpm db:migrate --name NNN_ws{x}_description` |
 | Reseed from scratch | `pnpm db:reset` |
 | Single package script | `pnpm --filter @merchant/api dev` |
 
@@ -46,7 +48,7 @@ Demo login: `owner@demo.dev` / `password123`.
 
 ## 2. Before you touch a file
 
-1. **Read your workstream row in SPEC.md §16** — it defines the directories you own.
+1. **Read your workstream row in SPEC.md §16 and the exact paths in `docs/WORKSTREAMS.md`** — they define the directories you own.
 2. **Read `DECISIONS.md`** — it records what other agents already settled. Never relitigate a logged decision.
 3. **Cut a branch off fresh `main`** (§4) — never work on `main` itself.
 4. **`git pull`** before creating a Prisma migration.
@@ -57,8 +59,8 @@ Demo login: `owner@demo.dev` / `password123`.
 - You may freely edit **inside your workstream's directories**. Never edit another workstream's app code.
 - **Need something another workstream owns?** Define the type in `packages/contracts`, stub against it, and keep going. Blocked >30 min → stub + one line in `DECISIONS.md`.
 - **`packages/contracts` and `packages/db/prisma/schema.prisma` are shared.** Additive changes (new schema, new optional field, new field with a default) anytime. Breaking changes (rename / retype / remove) require: append `DECISIONS.md` **first**, then `grep -r` every usage and fix them all in the same commit.
-- **Migrations** are named `NNN_ws{X}_description` (e.g. `007_wsD_processor_config`). Pull latest before generating.
-- **Admin shell (Frame / TopBar / Navigation) is owned by workstream A.** Other agents add nav entries only via `apps/admin/src/navigation.ts`.
+- **Migrations** are named `NNN_ws{x}_description` (e.g. `007_wsd_processor_config` — lowercase, matching `001_wsa_initial`). Pull latest before generating.
+- **Admin shell (Frame / TopBar / Navigation) is owned by workstream A.** The nav registry is pre-built complete — edit only your leaf file `apps/admin/src/navigation/items/<area>.ts`, never `navigation/index.ts`. Same pattern for theme sections (`packages/theme-engine/src/sections/`) and worker jobs (`apps/worker/src/jobs/`).
 - `DECISIONS.md` is **append-only**: one line per decision, never edit or delete existing lines.
 
 ---
@@ -69,14 +71,15 @@ Demo login: `owner@demo.dev` / `password123`.
 
 ```bash
 git checkout main && git pull                 # always start from fresh main
-git checkout -b ws{X}/short-description       # e.g. wsD/vault-tokenize
+git checkout -b ws-{x}/short-description      # e.g. ws-d/vault-tokenize
 # ... work, commit in logical chunks ...
-git push -u origin ws{X}/short-description
+git push -u origin ws-{x}/short-description
 gh pr create --fill
 gh pr merge --auto --squash --delete-branch   # merges itself once checks pass
 ```
 
-- **Branch names**: `ws{X}/short-description` — the workstream letter makes it obvious who owns an in-flight branch.
+- **Branch names**: `ws-{x}/short-description` (lowercase, e.g. `ws-b/product-form`) — the `ws-` prefix is what arms the auto-merge fallback workflow.
+- **Commit messages**: Conventional Commits with your workstream as scope — `feat(ws-b): product form`, `fix(ws-d): no decline cascade`, or scope `shared`/`root`. The commit-msg hook rejects anything else.
 - **Auto-merge is enabled on this repo.** `gh pr merge --auto` queues the PR; it lands on its own the moment CI is green. Do not sit and watch it, and do not merge manually to skip a red check.
 - **Squash merge**, delete the branch after. One PR = one coherent change.
 - **Never force-push a branch another agent may have pulled**, and never force-push `main`.
@@ -165,6 +168,7 @@ Never render the Shopify name or logo. Brand string is "Merchant".
 - Committing to `main`, or merging your own PR past a red check.
 - Floats for money — anywhere, including tests and seed data.
 - Raw `prisma` client in a request handler instead of `dbForShop`.
+- Nested `create` inside a `dbForShop` write — only top-level `data` is auto-stamped with `shopId`; set it explicitly on nested create payloads (see `packages/db/src/tenant.ts`).
 - Raw `inventoryLevel.update` — inventory changes go through the adjustment service so `InventoryAdjustment` history exists.
 - Adding a package with `npm i`.
 - Editing another workstream's app code instead of stubbing against `contracts`.
