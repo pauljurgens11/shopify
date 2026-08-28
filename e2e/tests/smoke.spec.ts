@@ -8,6 +8,7 @@ import {
   payWithApprovedCard,
   STOREFRONT_URL,
   searchAdminIndex,
+  signupFreshShop,
   storefrontUrlFor,
   uniqueSuffix,
 } from './helpers.ts';
@@ -67,10 +68,31 @@ test.describe('mandatory smoke flows', () => {
       await page.waitForURL(/\/products\/prod_/);
     });
 
+    await test.step('edit one variant price, re-save — the other rows survive', async () => {
+      // The one UI-wiring regression this project has actually shipped lived on
+      // exactly this path: a form-shaped PUT that wiped variant fields it did
+      // not carry (fixed by ws-b, PR #66). Rows render first-option-slowest:
+      // S/Black, S/White, M/Black, M/White.
+      const prices = page.getByLabel('Price');
+      await expect(prices).toHaveCount(4);
+      await prices.nth(2).fill('26.50'); // M / Black
+      await expect(page.getByText('Unsaved changes')).toBeVisible();
+      await page.getByRole('button', { name: 'Save' }).click();
+      // The save bar clears only after the refetched product re-seeds the form,
+      // so these values are the server's, not the local draft's.
+      await expect(page.getByText('Unsaved changes')).toBeHidden();
+      await expect(page.getByText('4 variants')).toBeVisible();
+      for (const [i, value] of ['24.00', '24.00', '26.50', '24.00'].entries()) {
+        await expect(prices.nth(i)).toHaveValue(value);
+      }
+    });
+
     await test.step('product appears in the index', async () => {
       await page.goto(`${ADMIN_URL}/store/demo/products`);
       await searchAdminIndex(page, title);
       await expect(page.getByText(title)).toBeVisible();
+      // The price column repeats the edited range — the PUT persisted.
+      await expect(page.getByText('$24.00 – $26.50')).toBeVisible();
     });
   });
 
@@ -139,15 +161,34 @@ test.describe('mandatory smoke flows', () => {
       await expect(page.locator('dl').getByText('$18.00')).toBeVisible(); // subtotal, undiscounted
       await expect(page.getByText('$26.53')).toBeVisible(); // 18.00 − 1.80 + 8.95 + 1.38 tax
     });
+
+    await test.step('pay — the charge goes through at the discounted total', async () => {
+      // Completing the purchase pins the UI→complete seam: the discount code
+      // the sidebar shows is also the one the charge is made with.
+      await payWithApprovedCard(page);
+      await expect(page.getByText(/Confirmation #\d+/)).toBeVisible();
+      await expect(page.getByText('$26.53')).toBeVisible();
+    });
   });
 
   test('d) AI builder: apply preset → publish → storefront reflects it', async ({ page }) => {
-    // The storefront caches the published theme for up to 60s, so the final
-    // assertion polls past that window.
+    // Runs on a shop of its own, not demo: publishing is shop-wide state, so on
+    // the demo shop this flow restyled the seeded Aurora theme for good (a local
+    // `pnpm e2e` defaced the demo store) and raced the flows that read demo's
+    // storefront in parallel. Signup gives the shop a live Aurora theme.
     test.setTimeout(180_000);
+    let slug = '';
+
+    await test.step('sign up a fresh shop', async () => {
+      const suffix = uniqueSuffix();
+      slug = await signupFreshShop(
+        page,
+        `Smoke Builder ${suffix}`,
+        `builder-${suffix}@example.dev`,
+      );
+    });
 
     await test.step('apply the Monochrome preset', async () => {
-      await loginAsOwner(page);
       await page.getByRole('link', { name: 'Storefront', exact: true }).click();
       await page.waitForURL(/\/storefront$/);
       // Preset rows render in THEME_PRESETS order: Aurora, Monochrome, Bloom.
@@ -168,8 +209,12 @@ test.describe('mandatory smoke flows', () => {
     });
 
     await test.step('storefront home reflects the preset', async () => {
+      // Even a never-visited host is not cache-cold: the builder's preview
+      // iframe already made the storefront fetch this shop's PUBLISHED theme
+      // (the layout ignores ?preview=), starting the 60s revalidate window.
+      // So the assertion still has to poll past that window.
       await expect(async () => {
-        await page.goto(STOREFRONT_URL, { waitUntil: 'domcontentloaded' });
+        await page.goto(storefrontUrlFor(slug), { waitUntil: 'domcontentloaded' });
         await expect(page.getByText('Complimentary shipping and returns, everywhere.')).toBeVisible(
           { timeout: 2_000 },
         );
@@ -188,16 +233,7 @@ test.describe('mandatory smoke flows', () => {
     let slug = '';
 
     await test.step('sign up a fresh shop through the UI', async () => {
-      await page.goto(`${ADMIN_URL}/signup`);
-      await page.locator('input[name="shopName"]').fill(shopName);
-      await page.locator('input[name="firstName"]').fill('Iso');
-      await page.locator('input[name="email"]').fill(`iso-${suffix}@example.dev`);
-      await page.locator('input[name="password"]').fill('password123');
-      await page.getByRole('button', { name: 'Create store' }).click();
-      // The slug is derived (and de-duplicated) server-side — read it back.
-      await page.waitForURL(/\/store\/[^/]+$/);
-      slug = new URL(page.url()).pathname.split('/')[2] ?? '';
-      expect(slug).not.toBe('');
+      slug = await signupFreshShop(page, shopName, `iso-${suffix}@example.dev`);
       expect(slug).not.toBe('demo');
     });
 
