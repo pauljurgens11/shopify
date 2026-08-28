@@ -23,9 +23,13 @@ bash scripts/setup-git.sh >/dev/null
 # The hooks path setup-git.sh installs is for humans; a bot push must not run it.
 git config --local --unset core.hooksPath || true
 
+# Either GitHub says CONFLICTING, or the triage job already labelled it. The
+# label matters: mergeability is computed asynchronously and reads UNKNOWN for a
+# while after a push, and a strict CONFLICTING filter silently skips exactly the
+# PRs that were stuck the longest.
 candidates=$(gh pr list --repo "$REPO" --state open --base main --limit 100 \
-  --json number,headRefName,isDraft,mergeable,autoMergeRequest,headRepositoryOwner \
-  --jq ".[] | select(.mergeable == \"CONFLICTING\")
+  --json number,headRefName,isDraft,mergeable,autoMergeRequest,labels \
+  --jq ".[] | select(.mergeable == \"CONFLICTING\" or ([.labels[].name] | index(\"$LABEL\") != null))
           | select(.isDraft == false)
           | select(.autoMergeRequest != null)
           | select(.headRefName | startswith(\"ws-\"))
@@ -43,7 +47,19 @@ echo "$candidates" | while read -r pr branch; do
     echo "    cannot fetch branch — skipping"
     continue
   fi
-  git checkout -B "$branch" "origin/$branch" --quiet
+  # Guarded: a failed checkout must not fall through to the rebase below, which
+  # would then report "conflict" for what was actually a dirty working tree.
+  if ! git checkout -B "$branch" "origin/$branch" --quiet; then
+    echo "    could not check out branch — skipping"
+    git checkout --force main --quiet 2>/dev/null || true
+    continue
+  fi
+
+  if git merge-base --is-ancestor origin/main HEAD; then
+    echo "    already on top of main — nothing to do"
+    gh pr edit "$pr" --repo "$REPO" --remove-label "$LABEL" >/dev/null 2>&1 || true
+    continue
+  fi
 
   if git rebase origin/main; then
     if git push --force-with-lease origin "$branch"; then
