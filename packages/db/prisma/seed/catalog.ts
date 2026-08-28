@@ -1,13 +1,15 @@
 /**
  * Products, options, variants, images and opening stock (H1).
  *
- * Images are picsum URLs with a **stable seed derived from the handle**, so the
- * same product shows the same photo on every machine and every reset — a demo
- * where the shirts change picture between screenshots looks broken.
+ * Images are curated, pinned Unsplash photos (data/images.ts) — real
+ * photography that matches each product's subject, identical on every machine
+ * and every reset. A demo where "merino crewneck" shows a landscape photo, or
+ * where the shirts change picture between screenshots, looks broken.
  */
 import { newId } from '@merchant/config/ids';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { daysAgo, type SeedContext } from './context.ts';
+import { PRODUCT_IMAGES, unsplashImage } from './data/images.ts';
 import { SEED_PRODUCTS, type SeedProduct } from './data/products.ts';
 import type { InventoryLedger } from './inventory.ts';
 import type { SeededLocation } from './shop.ts';
@@ -40,6 +42,10 @@ export interface SeededProduct {
 const IMAGES_PER_PRODUCT = 2;
 
 function productImageUrl(handle: string, index: number): string {
+  const curated = PRODUCT_IMAGES[handle]?.[index];
+  if (curated) return unsplashImage(curated, 1200, 1500);
+  // Unmapped handle: a deterministic placeholder keeps the seed running, but it
+  // is a wrong-subject photo — add the product to PRODUCT_IMAGES (data/images.ts).
   return `https://picsum.photos/seed/${handle}-${index + 1}/1200/1500`;
 }
 

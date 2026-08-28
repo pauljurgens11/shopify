@@ -40,7 +40,8 @@ export const monochrome: ThemeDocInput = {
         settings: {
           heading: 'Aurora Supply Co.',
           subheading: 'Utility apparel. Nothing decorative.',
-          image: 'https://picsum.photos/seed/mono-hero/2400/1400',
+          image:
+            'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=2400&h=1400&fit=crop&q=80&auto=format',
           imagePosition: 'background',
           alignment: 'center',
           height: 'full',
@@ -57,7 +58,8 @@ export const monochrome: ThemeDocInput = {
         id: 'home-banner',
         type: 'image-banner',
         settings: {
-          image: 'https://picsum.photos/seed/mono-banner/2400/900',
+          image:
+            'https://images.unsplash.com/photo-1544441893-675973e31985?w=2400&h=900&fit=crop&q=80&auto=format',
           heading: 'Autumn/Winter',
           body: 'Twelve pieces. One palette.',
           button: { label: 'Shop the season', url: '/collections/featured' },

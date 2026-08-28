@@ -9,6 +9,7 @@ import { newId } from '@merchant/config/ids';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { SeededProduct } from './catalog.ts';
 import { daysAgo, type SeedContext } from './context.ts';
+import { COLLECTION_IMAGES, unsplashImage } from './data/images.ts';
 
 export interface SeededCollection {
   id: string;
@@ -94,7 +95,9 @@ export async function createCollections(
         type: definition.type,
         ruleSet: definition.ruleSet ?? undefined,
         sortOrder: definition.sortOrder,
-        imageUrl: `https://picsum.photos/seed/collection-${definition.handle}/1600/900`,
+        imageUrl: COLLECTION_IMAGES[definition.handle]
+          ? unsplashImage(COLLECTION_IMAGES[definition.handle] as string, 1600, 900)
+          : `https://picsum.photos/seed/collection-${definition.handle}/1600/900`,
         seoTitle: `${definition.title} — Aurora Supply Co.`,
         seoDescription: definition.description.slice(0, 160),
         createdAt,
