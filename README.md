@@ -49,6 +49,19 @@ pnpm stack down     # stop everything
 `pnpm stack up` reclaims ports 3000/3001/3002 from stale dev servers left behind
 by other worktrees, naming each one it stops.
 
+### Isolating a worktree
+
+All worktrees share one compose stack. Run this once in a new worktree:
+
+```bash
+pnpm worktree:env --migrate
+```
+
+It gives the worktree its own Postgres database and Redis db index, then
+migrates and seeds it. Both are free — databases are catalog entries, not
+processes, and redis-server already allocates all 16 logical dbs. Ports stay
+shared deliberately: only one agent runs a dev stack at a time.
+
 Requires **Node 22** and **pnpm 9** (`corepack enable` picks up the pinned version).
 
 ---
