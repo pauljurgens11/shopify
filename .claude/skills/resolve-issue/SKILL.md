@@ -1,6 +1,6 @@
 ---
 name: resolve-issue
-description: Take one issue from docs/issues/ and land it as a merged PR. Use when picking up backlog work, when asked to "do C3" / "work on the next issue", or when resuming an issue already claimed in AGENT-LOG. Covers claiming, TDD that catches real bugs, verifying against the running stack, and the swarm/environment traps that cost hours. Applies to every workstream — API, admin, storefront, worker, pay, theme, seed.
+description: Build ONE issue from docs/issues/ and land it as a merged PR. Use when picking up backlog work, when asked to "do C3" / "work on the next issue", or when resuming an issue already claimed in AGENT-LOG. Covers claiming, TDD that catches real bugs, verifying against the running stack, and the swarm/environment traps that cost hours. Applies to every workstream — API, admin, storefront, worker, pay, theme, seed. To judge existing code rather than build: critical-review for one named scope, repo-review for the whole project.
 ---
 
 # Resolving an issue
@@ -12,6 +12,11 @@ cost real time when ignored.
 
 **The bar:** a merged PR whose behaviour you have *seen work*, not one that
 compiles and has green tests.
+
+**This skill vs the others:** `resolve-issue` *builds*.
+[`critical-review`](../critical-review/SKILL.md) audits one named scope in depth
+and only reports. [`repo-review`](../repo-review/SKILL.md) surveys the whole
+build, drives the app in a browser, and lands the small fixes itself.
 
 **The tiebreaker, for every judgement call below:** the KPI — a Shopify user
 opens our admin and cannot tell it isn't Shopify. Resolve trade-offs in
