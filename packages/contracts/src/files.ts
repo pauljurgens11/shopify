@@ -21,3 +21,5 @@ export const presignUploadResponse = z.object({
   key: z.string(),
   expiresInSeconds: z.number().int().positive(),
 });
+export type PresignUploadInput = z.infer<typeof presignUploadInput>;
+export type PresignUploadResponse = z.infer<typeof presignUploadResponse>;
