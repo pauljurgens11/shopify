@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { cartLineSchema } from './cart.ts';
 import { addressSchema, idSchema, moneySchema, timestampsSchema } from './common.ts';
-import { appliedDiscountSchema } from './discounts.ts';
+import { appliedDiscountSchema, discountRejectionReasonSchema } from './discounts.ts';
 
 export const checkoutStatusSchema = z.enum(['open', 'completed', 'expired']);
 
@@ -21,13 +21,20 @@ export const shippingOptionSchema = z.object({
   /** e.g. "3 to 5 business days" — Shopify shows this under the rate name. */
   estimatedDelivery: z.string().nullable().default(null),
 });
+export type ShippingOption = z.infer<typeof shippingOptionSchema>;
 
 export const checkoutTotalsSchema = z.object({
-  subtotal: moneySchema,
-  discountTotal: moneySchema,
-  shippingTotal: moneySchema,
-  taxTotal: moneySchema,
-  total: moneySchema,
+  subtotal: moneySchema.describe('Sum of the snapshotted line totals, before anything else.'),
+  discountTotal: moneySchema.describe(
+    'Line-level discounts only; a free-shipping discount shows up in shippingTotal.',
+  ),
+  shippingTotal: moneySchema.describe(
+    'The selected rate, already net of any free-shipping discount.',
+  ),
+  taxTotal: moneySchema.describe(
+    'The shop tax rate applied once to (subtotal − discountTotal). Shipping is not taxed.',
+  ),
+  total: moneySchema.describe('subtotal − discountTotal + shippingTotal + taxTotal, exactly.'),
 });
 export type CheckoutTotals = z.infer<typeof checkoutTotalsSchema>;
 
@@ -48,6 +55,15 @@ export const checkoutSchema = z
     selectedShippingRateId: idSchema.nullable().default(null),
     discountCode: z.string().nullable().default(null),
     appliedDiscounts: z.array(appliedDiscountSchema).default([]),
+    /**
+     * The code the shopper typed that did not apply, for E4's inline error. A
+     * rejected code is not an HTTP error — mistyping a coupon must not look
+     * like the checkout broke — and it never changes the totals.
+     */
+    rejectedDiscount: z
+      .object({ code: z.string(), reason: discountRejectionReasonSchema })
+      .nullable()
+      .default(null),
     totals: checkoutTotalsSchema,
     completedOrderId: idSchema.nullable().default(null),
   })
@@ -55,6 +71,7 @@ export const checkoutSchema = z
 export type Checkout = z.infer<typeof checkoutSchema>;
 
 export const createCheckoutInput = z.object({ cartToken: z.string().min(1) });
+export type CreateCheckoutInput = z.infer<typeof createCheckoutInput>;
 
 /** Partial save as the shopper moves through the sections. */
 export const updateCheckoutInput = z.object({
@@ -68,6 +85,7 @@ export const updateCheckoutInput = z.object({
   discountCode: z.string().max(64).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
 });
+export type UpdateCheckoutInput = z.infer<typeof updateCheckoutInput>;
 
 /** "Pay now". `cardTokenId` came from the vault; this API never sees a PAN. */
 export const completeCheckoutInput = z.object({
@@ -76,6 +94,7 @@ export const completeCheckoutInput = z.object({
   /** Client-generated, so a double-click cannot double-charge (SPEC §11). */
   idempotencyKey: z.string().min(8).max(128),
 });
+export type CompleteCheckoutInput = z.infer<typeof completeCheckoutInput>;
 
 export const completeCheckoutResponse = z.discriminatedUnion('status', [
   z.object({
@@ -98,3 +117,4 @@ export const completeCheckoutResponse = z.discriminatedUnion('status', [
     ]),
   }),
 ]);
+export type CompleteCheckoutResponse = z.infer<typeof completeCheckoutResponse>;

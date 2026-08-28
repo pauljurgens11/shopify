@@ -100,6 +100,26 @@ export async function createApiToken(shopId: string): Promise<string> {
 export async function deleteTestShops(shopIds: string[]): Promise<void> {
   if (shopIds.length === 0) return;
   const where = { shopId: { in: shopIds } };
+
+  // Checkout (E3) is the first thing that creates orders, payments and
+  // customers in a test, and none of them cascade from Shop. Deleted first, and
+  // in FK order: Payment references ProcessorConfig, Order references Customer.
+  await dbAdmin.paymentRefund.deleteMany({ where });
+  await dbAdmin.payment.deleteMany({ where });
+  await dbAdmin.paymentMethod.deleteMany({ where });
+  await dbAdmin.vaultCard.deleteMany({ where });
+  await dbAdmin.routingRule.deleteMany({ where });
+  await dbAdmin.processorConfig.deleteMany({ where });
+  await dbAdmin.discountRedemption.deleteMany({ where });
+  await dbAdmin.discount.deleteMany({ where });
+  await dbAdmin.orderEvent.deleteMany({ where });
+  await dbAdmin.refund.deleteMany({ where });
+  await dbAdmin.fulfillment.deleteMany({ where });
+  await dbAdmin.orderLineItem.deleteMany({ where });
+  await dbAdmin.order.deleteMany({ where });
+  await dbAdmin.checkout.deleteMany({ where });
+  await dbAdmin.customerAddress.deleteMany({ where });
+  await dbAdmin.customer.deleteMany({ where });
   // CollectionProduct cascades from either side; the join rows go with them.
   await dbAdmin.collection.deleteMany({ where });
   // Options, variants and images cascade from the product row; inventory levels
