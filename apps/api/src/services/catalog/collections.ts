@@ -508,6 +508,38 @@ export async function listCollectionProducts(
   };
 }
 
+/**
+ * The products an unsaved rule set matches, for the admin's condition builder.
+ *
+ * Goes through exactly the same translator a saved smart collection does, so a
+ * preview can never promise something the collection would not deliver. An
+ * unsupported condition is refused here the way it is refused on save, rather
+ * than quietly matching nothing.
+ */
+export async function previewSmartCollection(
+  db: TenantClient,
+  currencyCode: string,
+  ruleSet: RuleSet,
+  limit: number,
+): Promise<Paginated<Product>> {
+  if (ruleSet.rules.length === 0) {
+    throw badRequest('Add a condition to see what it matches.', 'ruleSet');
+  }
+  const where = smartCollectionWhere(ruleSet);
+  const products = await productsMatching(db, currencyCode, {
+    where,
+    orderBy: [{ title: 'asc' }, { id: 'asc' }],
+    skip: 0,
+    take: limit + 1,
+  });
+  return {
+    data: products.slice(0, limit),
+    // A preview is a peek, not a paginated list: the form shows the first page
+    // and a count, so the cursor is deliberately always null.
+    nextCursor: null,
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Write                                                                        */
 /* -------------------------------------------------------------------------- */

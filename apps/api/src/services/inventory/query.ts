@@ -26,29 +26,51 @@ type LocationRow = {
   updatedAt: Date;
 };
 
-const toLocationDto = (row: LocationRow): Location =>
+const toLocationDto = (row: LocationRow, stockedVariantCount = 0): Location =>
   locationSchema.parse({
     id: row.id,
     name: row.name,
     address: row.address ?? null,
     isActive: row.isActive,
     fulfillsOnlineOrders: row.fulfillsOnlineOrders,
+    stockedVariantCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   });
+
+/**
+ * locationId → how many variants hold a non-zero quantity there.
+ *
+ * One grouped query for every location, rather than a count per row: the
+ * settings page renders them all and would otherwise fan out.
+ */
+async function stockedCounts(db: TenantClient): Promise<Map<string, number>> {
+  const grouped = await db.inventoryLevel.groupBy({
+    by: ['locationId'],
+    where: { NOT: { available: 0 } },
+    _count: { _all: true },
+  });
+  return new Map(grouped.map((row) => [row.locationId, row._count._all]));
+}
 
 /** Oldest first, so the shop's original location stays at the top of the list. */
 const BY_AGE = { createdAt: 'asc' } as const;
 
 export async function listLocations(db: TenantClient): Promise<Location[]> {
-  const rows = await db.location.findMany({ orderBy: BY_AGE });
-  return rows.map(toLocationDto);
+  const [rows, stocked] = await Promise.all([
+    db.location.findMany({ orderBy: BY_AGE }),
+    stockedCounts(db),
+  ]);
+  return rows.map((row) => toLocationDto(row, stocked.get(row.id) ?? 0));
 }
 
 export async function getLocation(db: TenantClient, id: string): Promise<Location> {
-  const row = await db.location.findFirst({ where: { id } });
+  const [row, stocked] = await Promise.all([
+    db.location.findFirst({ where: { id } }),
+    db.inventoryLevel.count({ where: { locationId: id, NOT: { available: 0 } } }),
+  ]);
   if (!row) throw notFound('Location');
-  return toLocationDto(row);
+  return toLocationDto(row, stocked);
 }
 
 export type LocationInput = {
@@ -99,15 +121,25 @@ export async function updateLocation(
 }
 
 /**
- * Deleting cascades this location's inventory levels; the adjustment history
- * survives, because it carries no foreign key. The last location cannot go — a
- * shop with nowhere to hold stock cannot fulfil anything, and Shopify's
- * locations page enforces the same floor.
+ * Two rules, both because deleting cascades this location's inventory levels:
+ * the last location cannot go (a shop with nowhere to hold stock cannot fulfil
+ * anything), and neither can one that still holds units. The adjustment history
+ * survives either way — it carries no foreign key.
  */
 export async function deleteLocation(db: TenantClient, id: string): Promise<void> {
-  await getLocation(db, id);
+  const location = await getLocation(db, id);
   if ((await db.location.count()) <= 1) {
     throw conflict('A store needs at least one location.', 'id');
+  }
+  // Levels cascade with the location, so deleting one that still holds units
+  // would erase that stock from the shop's totals with no adjustment behind it.
+  // Move or zero the quantities first — the admin greys the action out for the
+  // same reason, but the rule lives here.
+  if (location.stockedVariantCount > 0) {
+    throw conflict(
+      `${location.name} still holds stock. Set its quantities to zero before deleting it.`,
+      'id',
+    );
   }
   await db.location.delete({ where: { id } });
 }

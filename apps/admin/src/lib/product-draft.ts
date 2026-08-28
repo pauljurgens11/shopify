@@ -14,6 +14,9 @@
  */
 import { fromDecimal, toDecimal } from '@merchant/config/money';
 import type { Product } from '@merchant/contracts/products';
+import { htmlToText, isSimpleHtml, textToHtml } from './description-html.ts';
+
+export { htmlToText, isSimpleHtml, textToHtml };
 
 export const DEFAULT_VARIANT_TITLE = 'Default Title';
 
@@ -36,53 +39,6 @@ export type VariantDraft = {
   /** Integer string. Saved through the inventory service, not the product API. */
   available: string;
 };
-
-/* -------------------------------------------------------------------------- */
-/* Description                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * A rich-text editor is out of scope (B5), so the description is a plain
- * multiline field. Showing `<p>Four pockets…</p>` in it is a tell, so simple
- * markup is unwrapped for editing and re-wrapped on save.
- *
- * "Simple" means paragraphs and line breaks and nothing else. Anything richer
- * is left as raw HTML in the field rather than silently flattened — losing a
- * merchant's list or bold text on an unrelated edit would be worse than showing
- * them the tags.
- */
-export function isSimpleHtml(html: string): boolean {
-  return (html.match(/<[^>]*>/g) ?? []).every((tag) => /^<\/?(p|br)\s*\/?>$/i.test(tag));
-}
-
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&nbsp;': ' ',
-};
-
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
-    .replace(/<\/?p[^>]*>/gi, '')
-    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/gi, (m) => ENTITIES[m.toLowerCase()] ?? m)
-    .trim();
-}
-
-export function textToHtml(text: string): string {
-  const escapeHtml = (value: string) =>
-    value.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
-  return text
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph !== '')
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-}
 
 export type ImageDraft = { id?: string; url: string; altText: string };
 
