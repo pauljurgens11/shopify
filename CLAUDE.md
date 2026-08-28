@@ -48,8 +48,9 @@ Demo login: `owner@demo.dev` / `password123`.
 
 1. **Read your workstream row in SPEC.md §16** — it defines the directories you own.
 2. **Read `DECISIONS.md`** — it records what other agents already settled. Never relitigate a logged decision.
-3. **`git pull`** before creating a Prisma migration.
-4. **Types before code**: whatever crosses a package or service boundary is defined in `packages/contracts` first.
+3. **Cut a branch off fresh `main`** (§4) — never work on `main` itself.
+4. **`git pull`** before creating a Prisma migration.
+5. **Types before code**: whatever crosses a package or service boundary is defined in `packages/contracts` first.
 
 ## 3. Ownership & conflict rules
 
@@ -62,7 +63,30 @@ Demo login: `owner@demo.dev` / `password123`.
 
 ---
 
-## 4. Non-negotiable conventions
+## 4. Git workflow
+
+**Never commit to `main`.** Every agent works on its own branch and lands through a pull request with auto-merge armed.
+
+```bash
+git checkout main && git pull                 # always start from fresh main
+git checkout -b ws{X}/short-description       # e.g. wsD/vault-tokenize
+# ... work, commit in logical chunks ...
+git push -u origin ws{X}/short-description
+gh pr create --fill
+gh pr merge --auto --squash --delete-branch   # merges itself once checks pass
+```
+
+- **Branch names**: `ws{X}/short-description` — the workstream letter makes it obvious who owns an in-flight branch.
+- **Auto-merge is enabled on this repo.** `gh pr merge --auto` queues the PR; it lands on its own the moment CI is green. Do not sit and watch it, and do not merge manually to skip a red check.
+- **Squash merge**, delete the branch after. One PR = one coherent change.
+- **Never force-push a branch another agent may have pulled**, and never force-push `main`.
+- **Rebase on `main` rather than merging it back into your branch** — keeps the two-day history readable.
+- If CI is red on your PR, fix it on your branch. Never disable a test or lower a check to get a merge through — the §14 suites are blocking by design.
+- A PR that touches `packages/contracts` or `schema.prisma` names it in the title (`[contracts]`, `[schema]`), so other agents know to pull before their next migration.
+
+---
+
+## 5. Non-negotiable conventions
 
 Getting these wrong creates cross-workstream breakage that costs hours. Full list in SPEC.md §5.
 
@@ -89,7 +113,7 @@ Never floats, never `parseFloat`, never `toFixed` for math. All arithmetic throu
 
 ---
 
-## 5. Multi-tenancy — the load-bearing wall
+## 6. Multi-tenancy — the load-bearing wall
 
 Cross-tenant leakage is **the one unforgivable bug**. It is a *functional* requirement (the demo dies instantly), not a security nicety.
 
@@ -110,7 +134,7 @@ The tenancy test suite (§14.1) is mandatory and blocking. Do not merge past a r
 
 ---
 
-## 6. Admin app — pixel parity (the KPI workstream)
+## 7. Admin app — pixel parity (the KPI workstream)
 
 - **Polaris v13 components only**, pinned exactly. Do not upgrade mid-project. No custom CSS beyond Polaris `--p-*` tokens.
 - **If Polaris has a pattern for it, use exactly that pattern.** Don't invent layouts — Polaris idiom ≈ Shopify. When unsure of a Shopify layout detail, choose the simplest Polaris-idiomatic version.
@@ -124,7 +148,7 @@ Never render the Shopify name or logo. Brand string is "Merchant".
 
 ---
 
-## 7. Working style for this project
+## 8. Working style for this project
 
 - **Ship the KPI, cut the rest.** Two days. A cut feature's UI element either works minimally or is not rendered at all.
 - **No dead code. No TODO-stubs that throw.** A stub that throws in a demo is worse than an absent button.
@@ -136,8 +160,9 @@ Never render the Shopify name or logo. Brand string is "Merchant".
 
 ---
 
-## 8. Landmines
+## 9. Landmines
 
+- Committing to `main`, or merging your own PR past a red check.
 - Floats for money — anywhere, including tests and seed data.
 - Raw `prisma` client in a request handler instead of `dbForShop`.
 - Raw `inventoryLevel.update` — inventory changes go through the adjustment service so `InventoryAdjustment` history exists.
@@ -151,7 +176,7 @@ Never render the Shopify name or logo. Brand string is "Merchant".
 
 ---
 
-## 9. Layout
+## 10. Layout
 
 ```
 apps/api          Fastify 5 + Zod — ALL business logic, REST (:3001)
