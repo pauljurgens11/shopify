@@ -69,3 +69,20 @@ export const inviteStaffInput = z.object({
   role: staffRoleSchema,
   permissions: permissionsSchema.optional(),
 });
+
+/** Settings → Staff (A4). Role and permissions are the only editable fields. */
+export const updateStaffInput = z.object({
+  role: staffRoleSchema.optional(),
+  permissions: permissionsSchema.optional(),
+  firstName: z.string().max(255).nullable().optional(),
+  lastName: z.string().max(255).nullable().optional(),
+});
+
+/** Invite creates the user with a password, since there is no email flow yet. */
+export const createStaffInput = inviteStaffInput.extend({
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().max(255).optional(),
+  lastName: z.string().max(255).optional(),
+});
+
+export const staffListResponse = z.object({ data: z.array(staffUserSchema) });
