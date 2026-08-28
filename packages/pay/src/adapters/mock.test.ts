@@ -9,6 +9,7 @@
 import type { AuthorizeRequest } from '@merchant/contracts/pay';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CardMaterial } from '../adapter.ts';
+import type { VaultedCard } from '../vault.ts';
 import { mockAdapter, resetMockProcessor } from './mock.ts';
 
 const APPROVED = '4242424242424242';
@@ -208,6 +209,26 @@ describe('mockAdapter.voidAuth', () => {
     await mockAdapter.voidAuth(voided, {});
     await expect(mockAdapter.capture(voided, usd(2500), {})).resolves.toMatchObject({
       outcome: 'failure',
+    });
+  });
+});
+
+describe('the vault → adapter seam', () => {
+  it('accepts a VaultedCard as-is, which is what the router (D3) will hand it', async () => {
+    // Compile-time proof that the two halves of packages/pay still fit: getCard
+    // returns VaultedCard, authorize takes CardMaterial, and D3 passes one
+    // straight to the other. If either side grows a required field, this breaks
+    // here rather than at wiring time.
+    const vaulted: VaultedCard = {
+      number: APPROVED,
+      cvc: '123',
+      brand: 'visa',
+      last4: '4242',
+      expMonth: 12,
+      expYear: 2030,
+    };
+    await expect(mockAdapter.authorize(req(), vaulted, {})).resolves.toMatchObject({
+      outcome: 'approved',
     });
   });
 });
