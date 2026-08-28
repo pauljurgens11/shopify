@@ -21,8 +21,8 @@ import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { badRequest } from '../../lib/errors.ts';
 import { recordPurchaseEvent } from '../analytics/record.ts';
+import { loadOrderDetail } from './detail.ts';
 import { notifyOrder } from './notify.ts';
-import { toOrderDetail } from './serialize.ts';
 
 type Parsed = ReturnType<typeof createOrderInput.parse>;
 
@@ -230,5 +230,5 @@ export async function createOrder(
     },
   });
 
-  return toOrderDetail(order);
+  return loadOrderDetail(db, order.id);
 }

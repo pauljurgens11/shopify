@@ -77,6 +77,8 @@ export const refundSchema = z
       .array(z.object({ lineItemId: idSchema, quantity: z.number().int().positive() }))
       .default([]),
     restock: z.boolean().default(true),
+    /** The part of `amount` that came off shipping rather than off lines. */
+    shippingAmount: moneySchema.default({ amount: 0, currencyCode: 'USD' }),
     /** Set once Pay confirms the processor refund (SPEC §11). */
     paymentRefundId: idSchema.nullable().default(null),
   })
@@ -175,8 +177,44 @@ export const createFulfillmentInput = fulfillmentSchema
   });
 
 export const createRefundInput = refundSchema
-  .omit({ id: true, orderId: true, createdAt: true, updatedAt: true, paymentRefundId: true })
-  .partial({ reason: true, note: true, lineItems: true, restock: true });
+  .omit({
+    id: true,
+    orderId: true,
+    createdAt: true,
+    updatedAt: true,
+    paymentRefundId: true,
+    amount: true,
+  })
+  .partial({ reason: true, note: true, lineItems: true, restock: true, shippingAmount: true })
+  .extend({
+    /** So a double-clicked "Refund" button cannot refund twice (SPEC §11). */
+    idempotencyKey: z.string().min(8).max(128).optional(),
+  });
+export type CreateRefundInput = z.input<typeof createRefundInput>;
+
+/**
+ * `POST /:id/refunds/calculate` — what C5's refund form shows before the
+ * merchant commits, the same way Shopify previews a refund. Same body as the
+ * refund itself; `restock` is irrelevant to the arithmetic and ignored.
+ */
+export const refundCalculationSchema = z.object({
+  lineItems: z.array(
+    z.object({
+      lineItemId: idSchema,
+      quantity: z.number().int().nonnegative(),
+      /** Line price less its share of the discount, for the units being refunded. */
+      amount: moneySchema,
+    }),
+  ),
+  shippingAmount: moneySchema,
+  subtotal: moneySchema,
+  total: moneySchema,
+  /** `order.total - order.refundedTotal`. The form caps its inputs at this. */
+  maximumRefundable: moneySchema,
+});
+export type RefundCalculation = z.infer<typeof refundCalculationSchema>;
+
+export type CreateFulfillmentInput = z.input<typeof createFulfillmentInput>;
 
 export const cancelOrderInput = z.object({
   reason: z.enum(['customer', 'fraud', 'inventory', 'declined', 'other']).default('other'),
