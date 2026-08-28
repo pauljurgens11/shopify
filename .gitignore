@@ -27,3 +27,6 @@ coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# local dev stack runtime (pid files, logs)
+.local/

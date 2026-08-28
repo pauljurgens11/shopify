@@ -22,7 +22,8 @@
     "seed": "pnpm --filter @merchant/db run seed",
     "e2e": "pnpm --filter @merchant/e2e run test",
     "verify": "node scripts/check-env-parity.mjs && pnpm lint && pnpm typecheck && pnpm test",
-    "setup:git": "bash scripts/setup-git.sh"
+    "setup:git": "bash scripts/setup-git.sh",
+    "stack": "bash scripts/stack.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

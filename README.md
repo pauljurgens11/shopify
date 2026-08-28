@@ -30,6 +30,25 @@ pnpm dev                      # api :3001, admin :3000, storefront :3002, worker
 `lvh.me` resolves to `127.0.0.1`, so wildcard shop subdomains work with no
 `/etc/hosts` editing.
 
+### Watching `main`
+
+While the swarm is running, `pnpm stack` keeps one always-on copy of `main` up
+so you can see the product fill in. It drives the **main checkout** no matter
+which worktree you run it from, and it gives that stack its own database
+(`merchant_main`) so a branch's unmerged migration cannot break it.
+
+```bash
+pnpm stack up       # infra + deps + db + dev servers, then prints the URLs
+pnpm stack status   # where main is, what is healthy, what has been built so far
+pnpm stack sync     # pull main, reinstall, migrate, reseed, restart
+pnpm stack watch    # do that automatically, every time a PR lands
+pnpm stack logs     # tail the dev servers
+pnpm stack down     # stop everything
+```
+
+`pnpm stack up` reclaims ports 3000/3001/3002 from stale dev servers left behind
+by other worktrees, naming each one it stops.
+
 Requires **Node 22** and **pnpm 9** (`corepack enable` picks up the pinned version).
 
 ---
