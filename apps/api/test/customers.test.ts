@@ -172,6 +172,19 @@ describe('GET /admin/api/customers', () => {
     ]);
     expect(namesIn((await get('/admin/api/customers?query=555-0100')).json())).toEqual(['ada']);
 
+    // The rendered full name — no single column holds "Ada Lovelace", so this
+    // exercises the token-AND branch, in either token order.
+    expect(
+      namesIn(
+        (await get(`/admin/api/customers?query=${encodeURIComponent('Ada Lovelace')}`)).json(),
+      ),
+    ).toEqual(['ada']);
+    expect(
+      namesIn(
+        (await get(`/admin/api/customers?query=${encodeURIComponent('lovelace ada')}`)).json(),
+      ),
+    ).toEqual(['ada']);
+
     // `?acceptsMarketing=false` must filter for false, not for "truthy string".
     expect(namesIn((await get('/admin/api/customers?acceptsMarketing=true')).json())).toEqual([
       'katherine',
@@ -291,6 +304,25 @@ describe('creating and editing a customer', () => {
 
     expect((await send('DELETE', `/admin/api/customers/${customerId}`)).statusCode).toBe(200);
     expect((await get(`/admin/api/customers/${customerId}`)).statusCode).toBe(404);
+  });
+
+  it('refuses to delete a customer who has placed orders', async () => {
+    // Linus has one order; the FK is ON DELETE SET NULL, so deleting him would
+    // orphan it. Shopify refuses this too.
+    const res = await send('DELETE', `/admin/api/customers/${ids.linus}`);
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      errors: [
+        {
+          code: 'conflict',
+          message: "Customers who have placed orders can't be deleted.",
+          field: 'id',
+        },
+      ],
+    });
+
+    // And he is still there.
+    expect((await get(`/admin/api/customers/${ids.linus}`)).statusCode).toBe(200);
   });
 
   it('refuses a duplicate email in the SPEC error shape', async () => {
