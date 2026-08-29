@@ -1,16 +1,17 @@
 # Demo script
 
-A timed presenter script for Merchant. Fourteen minutes end to end, plus two
-optional beats. Read it once, run it once, then present it.
+A timed presenter script. Fourteen minutes end to end, plus two optional beats.
+Read it once, run it once, then present it.
 
 Every beat has three parts: **Do** (what you click), **Say** (out loud), and
 **Point at** (the number on screen that carries the beat). The numbers below are
 the seeded ones — they are exact, so if the screen disagrees, something is
 wrong and it is worth stopping to find out.
 
-Names used here: the store is **Aurora Supply Co.**, the platform is
-**Merchant**. Never say the other company's name; you are showing an admin that
-happens to look familiar.
+Names used here: the store is **Aurora Supply Co.**; the admin brands itself as
+Shopify, per the owner's reversal of the old "never render the name or logo"
+rule (DECISIONS, 2026-08-29). Say plainly what this is — a study clone built to
+be indistinguishable from the real admin, never deployed and never distributed.
 
 ---
 
@@ -50,9 +51,16 @@ last seeded order is **#1040**. The first order you place live will be **#1041**
 the owner of one of them."
 
 **Point at.** The Home greeting — *"Good morning, Aurora Supply Co."* — and the
-setup guide underneath it. Note that the four tasks are ticked from real state,
-not from a stored flag: this store has products, a theme, a processor and
-orders, so it is complete.
+dashboard under it: the date-range and comparison pills, four metric tiles
+(**Total sales $6,559.11**, **Orders 24**, Sessions, Average order value, over
+Last 30 days), the two-series sales chart against the previous period, and the
+Total sales breakdown beside it.
+
+There is **no setup guide on this Home**, and that is the thing to say if anyone
+asks. Its four tasks are checked from real state rather than a stored flag, and
+Aurora has products, a theme, a processor and orders — so the card hides itself,
+the way Shopify's does once a store is set up. Beat 9 shows the other half of
+that: a brand-new store where the same card appears at 1 of 4.
 
 ---
 
@@ -77,11 +85,11 @@ Move fast. Two minutes, six pages, no clicking into detail unless asked.
 - **Inventory.** "Two locations." Point at the location switcher, then edit an
   Available cell so the Save button appears — and discard. "Every change goes
   through the adjustment service, so there is a history row behind each number."
-- **Analytics.** Set the range to **Last 30 days**. Point at the four metric
-  cards — Total sales, Orders, Sessions, Average order value — the sales chart,
-  top products, and the conversion funnel: Sessions → Viewed a product → Added
-  to cart → Reached checkout. "Remember the Orders number. We are going to move
-  it."
+- **Analytics.** Set the range to **Last 30 days**. Same chrome as Home, then
+  the rest of the report: Total sales by sales channel, Total sales by product,
+  and the conversion funnel — Sessions → Viewed a product → Added to cart →
+  Reached checkout → Purchased — with Live view under it. "Remember the Orders
+  number. We are going to move it."
 
 ---
 
@@ -243,8 +251,8 @@ This is the beat that proves the platform, and nothing about it is prepared.
 **Say.** "New store, new tenant, same deployment. Signing up logs me in."
 
 **Point at.** The URL — `/store/northwind-goods` — "the store URL was derived
-from the name and de-duplicated server-side" — and the Home setup guide, now
-showing **1 of 4 tasks complete**: the store already has a published theme,
+from the name and de-duplicated server-side" — and the Home setup guide, which
+Aurora's Home did not show, here at **1 of 4 tasks complete**: the store already has a published theme,
 because signup installs one so a new shop never opens on a blank page.
 
 **Do.** Click **Products**.
