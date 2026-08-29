@@ -9,8 +9,9 @@
  * (CLAUDE.md §8).
  */
 import type { Paginated } from '@merchant/contracts/common';
-import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from './api.ts';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { ApiError, apiFetch } from './api.ts';
 
 export type SearchHit = { id: string; title: string; subtitle?: string; url: string };
 export type SearchGroup = { key: string; title: string; hits: SearchHit[] };
@@ -31,11 +32,14 @@ async function fetchGroup<T>(path: string, signal: AbortSignal): Promise<T[]> {
   try {
     const page = await apiFetch<Paginated<T>>(path, { signal });
     return page?.data ?? [];
-  } catch {
+  } catch (error) {
     // A 404 means that workstream has not landed yet; a 403 means this staff
     // user cannot see that resource. Either way: no results for this group,
-    // never a broken search box.
-    return [];
+    // never a broken search box. Anything else — the API unreachable (status
+    // 0) or a 5xx — must NOT read as "No results for …": that is a false
+    // answer, so it surfaces as the query's error state instead.
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) return [];
+    throw error;
   }
 }
 
@@ -82,13 +86,30 @@ export async function searchAll(query: string, signal: AbortSignal): Promise<Sea
   ].filter((group) => group.hits.length > 0);
 }
 
+/**
+ * The raw value trails the input by `delayMs`. One word typed = one search
+ * request instead of one per keystroke — Shopify's admin searches the pause,
+ * not the keystroke.
+ */
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export function useSearch(query: string) {
   const trimmed = query.trim();
   return useQuery({
     queryKey: ['search', trimmed],
     queryFn: ({ signal }) => searchAll(trimmed, signal),
     enabled: trimmed.length > 0,
-    // Typing a word fires several of these; a short cache keeps backspacing snappy.
+    // Backspacing through a word replays cached keys instead of refetching.
     staleTime: 15_000,
+    // A new query key keeps the previous results on screen while it loads, so
+    // the panel never flashes to "Searching…" between keystrokes.
+    placeholderData: keepPreviousData,
   });
 }

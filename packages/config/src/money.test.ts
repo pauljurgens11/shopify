@@ -25,10 +25,20 @@ describe('fromDecimal', () => {
     expect(fromDecimal('1000.6', 'JPY').amount).toBe(1001);
   });
 
+  it('accepts a bare fraction, the way merchants type it', () => {
+    expect(fromDecimal('.99').amount).toBe(99);
+    expect(fromDecimal('-.5').amount).toBe(-50);
+  });
+
   it('rejects non-decimal input', () => {
     expect(() => fromDecimal('abc')).toThrow();
     expect(() => fromDecimal('1,99')).toThrow();
     expect(() => fromDecimal('')).toThrow();
+    // A lone sign or dot is not an amount, even though the regex now allows
+    // each part to be empty on its own.
+    expect(() => fromDecimal('.')).toThrow();
+    expect(() => fromDecimal('-')).toThrow();
+    expect(() => fromDecimal('-.')).toThrow();
   });
 });
 

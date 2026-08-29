@@ -53,6 +53,11 @@ export async function createStaff(
     lastName?: string;
   },
 ): Promise<StaffUser> {
+  // Same invariant updateStaff enforces on promotion: a shop has exactly one
+  // owner, and a second one could never be demoted or removed again.
+  if (input.role === 'owner') {
+    throw forbidden('A store has one owner, and ownership cannot be transferred.');
+  }
   if (await db.staffUser.findFirst({ where: { email: input.email } })) {
     throw conflict('That email already has access to this store.', 'email');
   }
@@ -101,6 +106,12 @@ export async function updateStaff(
   // else handles: neither could be removed, and "the owner" stops being one row.
   if (existing.role !== 'owner' && input.role === 'owner') {
     throw forbidden('A store has one owner, and ownership cannot be transferred.');
+  }
+  // The owner bypasses the permission map entirely (lib/permissions.ts), so a
+  // permissions write here changes nothing except destroying the owner's
+  // sessions below — which makes it a repeatable force-logout, not an edit.
+  if (existing.role === 'owner' && input.permissions !== undefined) {
+    throw forbidden("The store owner's permissions cannot be changed.");
   }
 
   const row = await db.staffUser.update({ where: { id }, data: input });

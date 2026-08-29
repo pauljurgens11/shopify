@@ -77,6 +77,10 @@ isolate() {
   wt=$(cd "$wt" && pwd)
   local label; label=$(basename "$wt")
   [ "$wt" = "$MAIN" ] && { db=merchant_main; slot=0; label="main"; } || { db=$(db_for "$wt"); slot=$(slot_of "$wt"); [ -n "$slot" ] || slot=$(next_slot "$wt"); }
+  # next_slot's die() runs in a $() subshell, so its exit cannot stop THIS
+  # shell — without this check a full house writes REDIS_URL with no db index
+  # (= shared db 0, another worktree's sessions) and still exits 0.
+  [ -n "$slot" ] || die "no Redis slot for $label — remove a finished worktree's directory (or fix its .env) and rerun"
 
   step "$label"
   [ -f "$wt/.env" ] || { cp "$MAIN/.env.example" "$wt/.env" && ok "created .env from .env.example"; }

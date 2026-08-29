@@ -130,6 +130,31 @@ describe('HTTP layer', () => {
     expect(ordersB.json().data).toEqual([]);
   });
 
+  it('keeps customers and orders invisible across the fence — list and get (SPEC §14.1)', async () => {
+    const customersB = await app.inject({
+      method: 'GET',
+      url: '/admin/api/customers',
+      headers: { cookie: cookieB },
+    });
+    expect(customersB.statusCode).toBe(200);
+    const customerIds = customersB.json().data.map((c: { id: string }) => c.id);
+    expect(customerIds).not.toContain(customerA.id);
+
+    const customerGet = await app.inject({
+      method: 'GET',
+      url: `/admin/api/customers/${customerA.id}`,
+      headers: { cookie: cookieB },
+    });
+    expect(customerGet.statusCode).toBe(404);
+
+    const orderGet = await app.inject({
+      method: 'GET',
+      url: `/admin/api/orders/${orderA.id}`,
+      headers: { cookie: cookieB },
+    });
+    expect(orderGet.statusCode).toBe(404);
+  });
+
   it('404s a get-by-id across the fence, in the SPEC error shape', async () => {
     const response = await app.inject({
       method: 'GET',
@@ -243,6 +268,14 @@ describe('writes', () => {
     const row = await dbAdmin.product.findUnique({ where: { id: productA.id } });
     expect(row?.title).toBe('Shop A Jacket');
     expect(row?.shopId).toBe(shopA.shopId);
+  });
+
+  it('refuses to create Shop rows — a scoped client cannot mint tenants', async () => {
+    await expect(
+      dbA.shop.create({
+        data: { id: newId('shop'), slug: `evil-${Date.now()}`, name: 'Evil', email: 'e@e.test' },
+      }),
+    ).rejects.toThrow(/dbAdmin/);
   });
 
   it('overrides a caller-supplied foreign shopId, top-level and nested', async () => {

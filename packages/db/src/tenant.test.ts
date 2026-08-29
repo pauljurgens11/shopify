@@ -103,6 +103,40 @@ describe('stampWriteData', () => {
     expect(out).toEqual({ shippingAddress: json, shopId: SHOP });
   });
 
+  it('stamps a nested upsert’s create half, and only that half', () => {
+    const out = stampWriteData(
+      'Product',
+      {
+        title: 'x',
+        variants: {
+          upsert: [
+            {
+              where: { id: 'var_1' },
+              create: { title: 'S' },
+              update: { title: 'Small' },
+            },
+          ],
+        },
+      },
+      SHOP,
+    );
+    expect(out).toEqual({
+      title: 'x',
+      shopId: SHOP,
+      variants: {
+        upsert: [
+          {
+            // `where` and `update` touch only rows already connected to the
+            // scoped parent; `create` inserts, so it alone is stamped.
+            where: { id: 'var_1' },
+            create: { title: 'S', shopId: SHOP },
+            update: { title: 'Small' },
+          },
+        ],
+      },
+    });
+  });
+
   it('leaves nested connect untouched (documented residual vector)', () => {
     const out = stampWriteData(
       'CollectionProduct',

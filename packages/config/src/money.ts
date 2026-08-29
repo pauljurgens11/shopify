@@ -120,11 +120,14 @@ export function fromDecimal(
 ): Money {
   const factor = minorUnitFactor(currencyCode);
   const decimals = factor === 1 ? 0 : 2;
-  const match = /^(-?)(\d+)(?:\.(\d*))?$/.exec(
+  const match = /^(-?)(\d*)(?:\.(\d*))?$/.exec(
     typeof value === 'number' ? String(value) : value.trim(),
   );
   if (!match) throw new Error(`Not a decimal amount: ${String(value)}`);
-  const [, sign, whole = '0', fracRaw = ''] = match;
+  const [, sign, wholeRaw = '', fracRaw = ''] = match;
+  // ".99" is a real amount a merchant types; "", ".", "-" and "-." are not.
+  if (wholeRaw === '' && fracRaw === '') throw new Error(`Not a decimal amount: ${String(value)}`);
+  const whole = wholeRaw === '' ? '0' : wholeRaw;
 
   const roundUp = fracRaw.length > decimals && (fracRaw.charCodeAt(decimals) ?? 0) - 48 >= 5;
   const frac = fracRaw.slice(0, decimals).padEnd(decimals, '0');

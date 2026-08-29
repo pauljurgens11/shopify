@@ -55,6 +55,14 @@ export type PermissionArea = (typeof PERMISSION_AREAS)[number];
 export const STAFF_ROLES = ['owner', 'admin', 'staff'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
+/**
+ * Subdomains the platform itself answers on. A shop with one of these slugs
+ * could never be served: the Host parser refuses `www` outright, and in the
+ * prod topology (SPEC §17) Caddy routes `admin.*`/`api.*` to the apps before
+ * the storefront ever sees them.
+ */
+export const RESERVED_SHOP_SLUGS = new Set(['www', 'admin', 'api']);
+
 /** SPEC §8 — rate limits. */
 export const RATE_LIMITS = {
   login: { max: 10, windowMs: 60_000 },

@@ -30,6 +30,14 @@ export default function SignupPage() {
   };
 
   const fieldErrors = signup.error?.fieldErrors ?? {};
+  // The banner is normally redundant when a field shows the error inline — but
+  // an error on a field this form does not render (`shopSlug`, say) would
+  // otherwise fail with zero feedback: no banner, no field, spinner just stops.
+  const RENDERED_FIELDS = ['shopName', 'firstName', 'email', 'password'];
+  const errorFields = Object.keys(fieldErrors);
+  const showBanner =
+    signup.error &&
+    (errorFields.length === 0 || errorFields.some((field) => !RENDERED_FIELDS.includes(field)));
 
   return (
     <AuthCard
@@ -39,9 +47,9 @@ export default function SignupPage() {
     >
       <Form onSubmit={submit}>
         <FormLayout>
-          {signup.error && Object.keys(fieldErrors).length === 0 ? (
+          {showBanner ? (
             <Banner tone="critical" title="Could not create the store">
-              <p>{signup.error.message}</p>
+              <p>{signup.error?.message}</p>
             </Banner>
           ) : null}
 

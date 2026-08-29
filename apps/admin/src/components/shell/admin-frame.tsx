@@ -43,24 +43,35 @@ export function AdminFrame({
     { enabled: Boolean(session) },
   );
 
+  // `usePathname` drops the query string, and `useSearchParams` would demand a
+  // Suspense boundary around the whole shell — so the redirects append
+  // `window.location.search` at event time instead. They only ever run in
+  // effects/handlers, where `window` exists. Without it, expiring on
+  // /orders?tab=unfulfilled came back on tab "All".
+
   // Any 401 from any page, not just this query — a session can expire between
   // two clicks and the resulting failure should not be a silent empty table.
   useEffect(() => {
-    setUnauthorizedHandler(() => router.replace(loginHref(pathname)));
+    setUnauthorizedHandler(() => router.replace(loginHref(`${pathname}${window.location.search}`)));
     return () => setUnauthorizedHandler(undefined);
   }, [router, pathname]);
 
   useEffect(() => {
-    if (error?.status === 401) router.replace(loginHref(pathname));
+    if (error?.status === 401) {
+      router.replace(loginHref(`${pathname}${window.location.search}`));
+    }
   }, [error, router, pathname]);
 
   // The URL names a shop; the session decides which one you actually have.
-  // Editing the slug by hand must not show another merchant's chrome.
+  // Editing the slug by hand must not show another merchant's chrome — but the
+  // rest of the path is yours, so /store/other/orders lands on YOUR orders.
   useEffect(() => {
     if (session && session.shop.slug !== shopSlug) {
-      router.replace(`/store/${session.shop.slug}`);
+      const prefix = `/store/${shopSlug}`;
+      const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : '';
+      router.replace(`/store/${session.shop.slug}${rest}${window.location.search}`);
     }
-  }, [session, shopSlug, router]);
+  }, [session, shopSlug, router, pathname]);
 
   // A 401 is on its way to /login, so keep the bar. Anything else — the API is
   // down, a 500 — has to say so: an endless progress bar is the spinner-only
