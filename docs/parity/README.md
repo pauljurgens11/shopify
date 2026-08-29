@@ -42,9 +42,9 @@ Filling those gaps needs a store with data. See "Extending this folder" below.
 | [product-form.md](product-form.md) | Add/edit product — full card order, both columns | High |
 | [customer-form.md](customer-form.md) | New customer | High |
 | [collection-detail.md](collection-detail.md) | Collection editor, skeleton state | High |
-| [dashboard.md](dashboard.md) | Date range, metric tiles, charts — **build Home from this** | High for structure |
+| [dashboard.md](dashboard.md) | Date-range popover, metric tiles, charts — **build Home from this** | High for structure |
 | [index-tables.md](index-tables.md) | Index page chrome, bulk actions, empty states | Medium — one populated table only |
-| [home.md](home.md) | Onboarding Home | **Low — wrong page, see file** |
+| [home.md](home.md) | Onboarding Home — complete, but the wrong variant | High for the variant; **not the page to clone** |
 | [capture.md](capture.md) | How to capture more, and the priority queue | — |
 
 ## How to use this
