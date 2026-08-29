@@ -9,16 +9,24 @@
  * the browser to `api.lvh.me` would also be cross-origin, and the cookie would
  * never be sent.
  *
- * No action calls `revalidatePath`. It looks like the obvious way to keep the
- * page and the header badge in step, and on a production build it is not: a
- * revalidating action makes Next re-render the whole route and stream it back
- * on the action's own response, and that update frequently never commits — the
- * control that fired it stays disabled forever and the badge keeps its old
- * count (E8; measurements in DECISIONS.md). Nothing here needs it either. The
- * cart is fetched `no-store`, every storefront page is dynamic, and the chrome
- * navigates with plain `<a href>` — so a real navigation always re-reads the
- * cart from the server. What has to move WITHOUT a navigation is returned
- * instead: `itemCount` drives the header badge through `cart-count.ts`.
+ * No action calls `revalidatePath`, and that is the fix for E8 rather than a
+ * tidy-up. A revalidating action makes Next re-render the route and stream the
+ * new tree back on the action's own response, and on a production build that
+ * update frequently never commits: React reads the whole flight and closes the
+ * stream cleanly and still does not apply it. Measured on this page, same
+ * build, two buttons side by side — the same mutating action settles 0/8 with
+ * the revalidation and 12/12 without. (E8's own notes list revalidatePath as
+ * excluded; it does not reproduce that way here. Method in DECISIONS.md.)
+ *
+ * Nothing here needs it either. The cart is fetched `no-store`, every
+ * storefront page is dynamic, and the chrome navigates with plain `<a href>` —
+ * so a real navigation always re-reads the cart from the server. What has to
+ * move WITHOUT a navigation is returned instead: `itemCount` drives the header
+ * badge through `cart-count.ts`.
+ *
+ * The dependency that buys: this holds only while the storefront chrome stays
+ * on plain anchors. Swapping one for `next/link` reintroduces Next's client
+ * router cache, and with it a stale cart page and a stale badge.
  */
 import { CART_COOKIE } from '@merchant/config/constants';
 import { cookies } from 'next/headers';

@@ -129,15 +129,18 @@ export async function addSocksToCartAndOpenCheckout(
     const increase = page.getByRole('button', { name: /^Increase quantity/ });
     const decrease = page.getByRole('button', { name: /^Decrease quantity/ });
     const quantity = page.locator('[data-cart-line] span').filter({ hasText: /^\d+$/ }).first();
-    // The line total is server-rendered outside the stepper island, so asserting
+    // The subtotal is server-rendered outside the stepper island, so asserting
     // it is what proves the whole page caught up — not just the local control.
+    // It has to be the SUBTOTAL and not the unit price: "$18.00" is a substring
+    // of the line's permanent "$18.00 each" and would pass without a repaint.
+    const subtotal = page.getByText('Subtotal').locator('..');
     await increase.click();
     await expect(quantity).toHaveText('2');
-    await expect(page.getByText('$36.00').first()).toBeVisible();
+    await expect(subtotal).toContainText('$36.00');
     await expect(increase).toBeEnabled();
     await decrease.click();
     await expect(quantity).toHaveText('1');
-    await expect(page.getByText('$18.00').first()).toBeVisible();
+    await expect(subtotal).toContainText('$18.00');
     await expect(decrease).toBeEnabled();
   }
 

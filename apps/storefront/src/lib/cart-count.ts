@@ -7,12 +7,11 @@
  * the one thing that has to move without one: adding from a product page must
  * bump the badge while the shopper stays on the page.
  *
- * It deliberately does NOT go through `revalidatePath`. A Server Action that
- * revalidates makes Next re-render the whole route and stream it back on the
- * action's own response, and on a production build that update frequently
- * never commits — see E8 / DECISIONS.md. The actions already return the new
- * `itemCount`, so the badge is driven from that instead and nothing depends on
- * the re-render landing.
+ * It deliberately does NOT go through `revalidatePath`: on a production build
+ * the re-render an action streams back frequently never commits (E8 — the
+ * reasoning and the numbers are in `cart-actions.ts` and DECISIONS.md). The
+ * actions already return the new `itemCount`, so the badge is driven from that
+ * and nothing depends on the re-render landing.
  *
  * Module state, not a context: every storefront navigation is a full page load
  * (the chrome uses plain `<a href>`), so this starts empty on each page and the
