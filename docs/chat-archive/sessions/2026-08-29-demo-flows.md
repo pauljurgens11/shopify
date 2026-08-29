@@ -1,0 +1,577 @@
+# Demo flows
+
+| | |
+|---|---|
+| **Session** | `b2e3b231-9376-4b8f-acc1-9a67615ee6fe` |
+| **Started** | 2026-08-29T09:22:15.448Z |
+| **Ended** | 2026-08-29T09:34:25.881Z |
+| **Working dir** | `~/Downloads/projects/shopify` |
+| **Branch** | `main` |
+| **Model** | `claude-opus-5` |
+| **Claude Code** | 2.1.247 |
+| **Archived** | no |
+
+---
+
+### 👤 User
+
+what are the flows i should show at the demo? most important flows.
+
+🔧 **Bash**
+```
+ls && echo "--- e2e ---" && ls e2e && ls e2e/* 2>/dev/null | head -50
+```
+
+🔧 **Bash**
+```
+grep -n "§14\|14\." SPEC.md | head -40 && echo "=== smoke section ===" && sed -n '/## 14/,/## 15/p' SPEC.md | head -120
+```
+
+> **↳ result**
+> ```
+> CLAUDE.md
+> DECISIONS.md
+> README.md
+> SPEC.md
+> apps
+> biome.json
+> deploy
+> docker-compose.prod.yml
+> docker-compose.yml
+> docs
+> e2e
+> node_modules
+> package.json
+> packages
+> pnpm-lock.yaml
+> pnpm-workspace.yaml
+> scripts
+> tsconfig.base.json
+> turbo.json
+> --- e2e ---
+> node_modules
+> package.json
+> playwright.config.ts
+> tests
+> tsconfig.json
+> e2e/package.json
+> e2e/playwright.config.ts
+> e2e/tsconfig.json
+> 
+> e2e/node_modules:
+> @playwright
+> @types
+> typescript
+> 
+> e2e/tests:
+> helpers.ts
+> smoke.spec.ts
+> ```
+
+> **↳ result**
+> ```
+> 71:| Unit tests | Vitest | Only where mandated in §14 |
+> 139:**Cross-tenant leakage is the one unforgivable bug.** The tenancy test suite (§14) is mandatory and blocking.
+> 203:- Discounts engine (in `apps/api`, pure function in `packages/config` or api services): given cart + discount set → applied discounts + new totals. Unit-tested (§14).
+> 235:- `PaymentRouter.charge(shopId, cardTokenId, amount, ctx)` picks processor by rules (weighted random within matching rules), executes, records `Payment`, emits `orders/paid` webhook + analytics event. Fully unit-tested (§14).
+> 272:## 14. Testing Policy (deliberately minimal — tests that help you build, nothing else)
+> 307:| **C. Orders & customers** | api
+> … [truncated, 2,060 more chars]
+> ```
+
+🔧 **Bash**
+```
+ls docs && echo "--- issues ---" && ls docs/issues | head -60 && echo "--- grep demo docs ---" && grep -ril "demo script\|demo flow" docs | head
+```
+
+> **↳ result**
+> ```
+> AGENT-LOG.md
+> DEMO.md
+> PARALLEL-AGENTS.md
+> WORKSTREAMS.md
+> issues
+> parity
+> --- issues ---
+> A1-auth-sessions-tenancy.md
+> A2-tenancy-suite.md
+> A3-admin-shell.md
+> A4-settings-hub.md
+> A5-production-stack.md
+> B1-products-api.md
+> B2-files-media.md
+> B3-collections-api.md
+> B4-inventory-locations-api.md
+> B5-products-admin-ui.md
+> B6-collections-inventory-admin-ui.md
+> C1-discounts-engine.md
+> C2-orders-api.md
+> C3-fulfillment-refund-api.md
+> C4-customers-api.md
+> C5-orders-admin-ui.md
+> C6-customers-discounts-admin-ui.md
+> C7-orders-index-filters.md
+> D1-vault.md
+> D2-processor-adapters.md
+> D3-payment-router.md
+> D4-payments-settings-ui.md
+> E1-storefront-api-cart.md
+> E2-storefront-pages.md
+> E3-checkout-api.md
+> E4-checkout-ui.md
+> E5-customer-ac
+> … [truncated, 576 more chars]
+> ```
+
+🔧 **Bash**
+```
+sed -n '1,60p' e2e/tests/smoke.spec.ts && echo ... && grep -n "test(" e2e/tests/smoke.spec.ts
+```
+
+> **↳ result**
+> ```
+> import { expect, test } from '@playwright/test';
+> import {
+>   ADMIN_URL,
+>   API_URL,
+>   addSocksToCartAndOpenCheckout,
+>   adminApi,
+>   fillCheckoutAddressAndPickStandard,
+>   loginAsOwner,
+>   payWithApprovedCard,
+>   STOREFRONT_URL,
+>   searchAdminIndex,
+>   signupFreshShop,
+>   storefrontUrlFor,
+>   uniqueSuffix,
+> } from './helpers.ts';
+> 
+> /**
+>  * SPEC §14.4 — the five mandatory flows. Owner: WS-H.
+>  *
+>  * These are the whole e2e budget. Do not add a sixth without cutting one.
+>  *
+>  * The exact money strings come from the seed: Basin Wool Socks (M) is $18.00,
+>  * Standard shipping is $8.95, tax is a flat 8.5% on the discounted subtotal.
+>  * No discount: 1800 + 895 + round(1800 × 8.5%) = 2848 → $28.48.
+>  * WELCOME10:   1
+> … [truncated, 2,231 more chars]
+> ```
+
+🔧 **Bash**
+```
+cat docs/DEMO.md
+```
+
+🔧 **Bash**
+```
+sed -n '1,80p' docs/issues/INDEX.md
+```
+
+> **↳ result**
+> ```
+> # Demo script
+> 
+> A timed presenter script for Merchant. Fourteen minutes end to end, plus two
+> optional beats. Read it once, run it once, then present it.
+> 
+> Every beat has three parts: **Do** (what you click), **Say** (out loud), and
+> **Point at** (the number on screen that carries the beat). The numbers below are
+> the seeded ones — they are exact, so if the screen disagrees, something is
+> wrong and it is worth stopping to find out.
+> 
+> Names used here: the store is **Aurora Supply Co.**, the platform is
+> **Merchant**. Never say the other company's name; you are showing an admin that
+> happens to look familiar.
+> 
+> ---
+> 
+> ## Beat 0 — Before the clock starts
+> 
+> Five minutes of setup, none of it on camera.
+> 
+> ```ba
+> … [truncated, 11,889 more chars]
+> ```
+
+> **↳ result**
+> ```
+> # Issue index
+> 
+> One line per issue. **Do not edit this file to track status** — status lives in
+> `docs/AGENT-LOG.md` (append-only, conflict-free); this file only changes when an
+> issue is added or re-scoped. Sizes: S ≈ ≤2h, M ≈ half-day, L ≈ full-day.
+> 
+> Grab order: anything whose deps are all landed. At the start, that is
+> **A1, C1, D1, D2, F1, G1** (+ A5, which is dep-free but scheduled for
+> Day 2) — six agents can start immediately, and A1 unblocks the rest of the
+> swarm, so it goes first to the strongest agent.
+> 
+> **UI issues**: [PARITY.md](PARITY.md) is the shared, binding description of
+> what Shopify actually looks like — the defense against eight agents shipping
+> eight interpretations. Read your
+> … [truncated, 4,350 more chars]
+> ```
+
+### 🤖 Claude
+
+You already have a full presenter script at [docs/DEMO.md](docs/DEMO.md) — 14 minutes, 10 beats. Here's how I'd rank what's in it, in case you have less than 14 minutes or something breaks live.
+
+## The four that carry the demo
+
+**1. The money path — storefront → checkout → admin → refund** (Beats 4–6, 8)
+Browse Basin Wool Socks → add to cart → decline with `4000 0000 0000 0002` → pay with `4242` → order #1041 in the admin at the same total → refund it. This is the spine: it's the only flow that touches every workstream, and it's the one where the audience decides whether this is real software. The decline beat is the best 20 seconds in the demo — the card never hit your checkout server, and a decline doesn't cascade to another processor.
+
+**2. Second shop from nothing** (Beat 9)
+Sign up Northwind Goods live, land on `/store/northwind-goods`, empty products state, then `northwind-goods.lvh.me:3002` serving a real themed storefront with none of Aurora's data. This is the beat that proves it's a platform and not one store. Nothing about it is prepared, which is exactly why it lands.
+
+**3. AI storefront builder** (Beat 3)
+Chat → real theme document → validated → published → the storefront in Beat 4 is visibly the thing you just generated. It's the only part of the demo that isn't "Shopify, rebuilt" — everything else is parity, this is the differentiator. Do it *before* Beat 4 so the shop you open is the shop you just built.
+
+**4. The admin tour** (Beat 2)
+Products two-column form + the contextual save bar, orders index with mixed badges. Two minutes, no detail. This is the KPI itself — it's where they stop reading the UI and start believing it.
+
+## Supporting, in order of what I'd cut last
+
+**5. Analytics / email / webhook after the live order** (Beat 7) — three tabs, a minute total. Worth keeping because it's the proof the order actually did something: Orders goes 0→1 for Today, Mailpit has the confirmation, the echo receiver shows both topics signature-verified.
+
+Cut first if you're short: inventory adjust, customers, the Apps delivery log, and both optional beats (failover, charge-saved-card). Keep failover and saved-card in your pocket — they're the two best answers to the two questions you'll actually get.
+
+## Two things to guard
+
+- **AI builder needs `ANTHROPIC_API_KEY`.** No key → the three presets, and Monochrome still publishes cleanly. Decide which one you're doing before you're on camera.
+- **60-second theme cache.** Publish in Beat 3, keep talking, open the shop in Beat 4. If it's stale, reload once.
+
+Reassuring signal: flows 1–4 above are exactly the five blocking Playwright smoke tests (SPEC §14.4), so CI is green on the same paths you're presenting.
+
+Want me to run the stack and walk the top four end to end to confirm they're clean right now?
+
+### 👤 User
+
+give more detailed overview on how to do each demo. where to start and what to do
+
+🔧 **Bash**
+```
+cat e2e/tests/helpers.ts
+```
+
+🔧 **Bash**
+```
+sed -n '111,310p' e2e/tests/smoke.spec.ts
+```
+
+> **↳ result**
+> ```
+> /**
+>  * Shared plumbing for the smoke flows (SPEC §14.4). Owner: WS-H.
+>  *
+>  * Not a test file — the five flows + health check in smoke.spec.ts are the
+>  * whole e2e budget.
+>  */
+> import { type APIResponse, expect, type Page } from '@playwright/test';
+> 
+> export const ADMIN_URL = process.env.ADMIN_URL ?? 'http://admin.lvh.me:3000';
+> export const STOREFRONT_URL = process.env.STOREFRONT_URL ?? 'http://demo.lvh.me:3002';
+> export const API_URL = process.env.API_URL ?? 'http://localhost:3001';
+> 
+> /**
+>  * The API origin the ADMIN app authenticates against. Cleanup calls must hit
+>  * this exact origin — the session cookie is host-scoped, so a request to the
+>  * probe URL above (`localhost`) would go out unauthenti
+> … [truncated, 5,630 more chars]
+> ```
+
+> **↳ result**
+> ```
+> test('b) storefront: browse → add to cart → checkout with 4242 → confirmation → order in admin → refund', async ({
+>     page,
+>   }) => {
+>     const email = `smoke-b-${uniqueSuffix()}@example.dev`;
+>     const expectedTotal = '$28.48';
+>     let orderNumber = '';
+> 
+>     await test.step('buy the socks on the storefront', async () => {
+>       await addSocksToCartAndOpenCheckout(page);
+>       await fillCheckoutAddressAndPickStandard(page, email);
+>       // The literal figure the admin order must later repeat.
+>       await expect(page.getByText(expectedTotal)).toBeVisible();
+>       await payWithApprovedCard(page);
+>     });
+> 
+>     await test.step('thank-you page shows the order number', async () => {
+>       const c
+> … [truncated, 8,888 more chars]
+> ```
+
+🔧 **Bash**
+```
+grep -rn "4000000000000002\|4000 0000 0000 0002\|0000000000000119\|4000000000000119" packages/pay/src apps/api/src docs 2>/dev/null | head -20; echo "=== worker echo script ==="; grep -n "\"echo\"\|echo" apps/worker/package.json | head
+```
+
+> **↳ result**
+> ```
+> packages/pay/src/vault.test.ts:36:    ['visa (mock decline card)', '4000000000000002'],
+> packages/pay/src/adapters/mock.ts:6: *   4000000000000002 → declined
+> packages/pay/src/adapters/maverick.test.ts:133:      maverickAdapter.authorize(req(), card('4000000000000002'), {}),
+> packages/pay/src/adapters/maverick.test.ts:142:      maverickAdapter.authorize(req(), card('4000000000000119'), {}),
+> packages/pay/src/adapters/mock.test.ts:16:const DECLINED = '4000000000000002';
+> packages/pay/src/adapters/mock.test.ts:18:const HARD_FAILURE = '4000000000000119';
+> packages/pay/src/adapters/test-cards.ts:11: * itself being at fault, and `4000000000000119` (Stripe's "processing error"
+> packages/pay/src/adapters/
+> … [truncated, 853 more chars]
+> ```
+
+🔧 **Bash**
+```
+grep -rn "label" apps/admin/src/navigation/items/*.ts | sed 's/ *//' | head -40
+```
+
+> **↳ result**
+> ```
+> apps/admin/src/navigation/items/analytics.ts:4:  label: 'Analytics',
+> apps/admin/src/navigation/items/customers.ts:4:  label: 'Customers',
+> apps/admin/src/navigation/items/apps.ts:4:  label: 'Apps',
+> apps/admin/src/navigation/items/home.ts:2:export const home: NavItem = { key: 'home', label: 'Home', url: '/', icon: 'HomeIcon' };
+> apps/admin/src/navigation/items/discounts.ts:4:  label: 'Discounts',
+> apps/admin/src/navigation/items/orders.ts:4:  label: 'Orders',
+> apps/admin/src/navigation/items/marketing.ts:5:  label: 'Marketing',
+> apps/admin/src/navigation/items/settings.ts:4:  label: 'Settings',
+> apps/admin/src/navigation/items/products.ts:4:  label: 'Products',
+> apps/admin/src/navigation/items/produ
+> … [truncated, 272 more chars]
+> ```
+
+🔧 **Bash**
+```
+node -e "const p=require('./package.json');console.log(Object.keys(p.scripts).join('\n'))"
+```
+
+🔧 **Bash**
+```
+grep -rn "WELCOME10\|basin-wool-socks\|Aurora Supply" packages/db/prisma/seed*/**/*.ts packages/db/prisma/*.ts 2>/dev/null | head -12; echo "=== presets ==="; grep -rn "id:\|name:" packages/theme-engine/src/presets* 2>/dev/null | head -20
+```
+
+> **↳ result**
+> ```
+> dev
+> dev:localhost
+> build
+> typecheck
+> test
+> lint
+> lint:fix
+> format
+> db:generate
+> db:migrate
+> db:setup
+> db:reset
+> db:query
+> seed
+> e2e
+> verify
+> setup:git
+> sync
+> stack
+> worktree:env
+> ```
+
+> **↳ result**
+> ```
+> (eval):1: no matches found: packages/db/prisma/*.ts
+> === presets ===
+> packages/theme-engine/src/presets/index.ts:25:export function presetThemeDoc(name: ThemePreset): ThemeDoc {
+> packages/theme-engine/src/presets/bloom.ts:29:        id: 'home-announcement',
+> packages/theme-engine/src/presets/bloom.ts:38:        id: 'home-slideshow',
+> packages/theme-engine/src/presets/bloom.ts:62:        id: 'home-featured',
+> packages/theme-engine/src/presets/bloom.ts:73:        id: 'home-story',
+> packages/theme-engine/src/presets/bloom.ts:83:        id: 'home-grid',
+> packages/theme-engine/src/presets/bloom.ts:88:        id: 'home-newsletter',
+> packages/theme-engine/src/presets/bloom.ts:99:        id: 'product-detail'
+> … [truncated, 920 more chars]
+> ```
+
+🔧 **Skill**
+```
+{"skill": "artifact-design"}
+```
+
+> **↳ result**
+> ```
+> Launching skill: artifact-design
+> ```
+
+### 👤 User
+
+Approach this as the design lead at a small studio known for their versatility, giving every client a visual identity pitched at the treatment the task actually calls for. Make deliberate choices about palette, typography, and layout that are specific to this subject, and avoid templated designs.
+
+## Read the request first
+
+Calibrate treatment, not whether to design. A doc deserves the same craft as a landing page - what changes is the treatment that craft is delivered in. Format is not part of this read: author HTML, and publish Markdown only when a loaded skill explicitly instructs it - a Markdown publish keeps its filename as its title and takes almost none of the craft below, and is never a way to save time.
+
+Many requests call for a more utilitarian treatment: a plan, a memo, a demo. Make it polished: include real typographic hierarchy, considered spacing, and a proper palette, but avoid over-designing. Most pages do not need a flashy, gigantic hero. Keep flourishes tasteful and limited.
+
+Some requests call for an editorial treatment: a landing page, a game, an app or tool they'll keep or share.
+
+When unsure: a well-composed page is never the wrong answer; an over-designed visual identity sometimes is.
+
+Fundamentals below apply to everything. The editorial process after that runs only when the read above says so.
+
+## Fundamentals for every artifact
+
+**Honor what's already there** Look for an existing design system first - CLAUDE.md, a tokens or theme file, existing component styles. When one exists, apply it; everything below fills gaps and never overrides. Precedence is always: the user's own words, then the project's existing system, then your choices.
+
+**Ground it in the subject.** If the subject isn't already clear, pin it: one concrete subject, its audience, and the page's single job. The subject's own world - its materials, instruments, vernacular - is where distinctive choices come from. Build with real content throughout, never lorem.
+
+**Pair typefaces** Typography carries the page even when the page isn't about typography. Google Fonts is the one font host the Artifact CSP admits - link it directly (`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=...&display=swap">`); a face from anywhere else must be inlined as a @font-face data URI or it falls back silently. Either way, declare a real fallback stack. Keep running text near 65 characters wide; set a type scale and stay on it; give headings `text-wrap: balance`, body text room to breathe, and uppercase labels a touch of letter-spacing.
+
+**Choose neutrals, don't default to them.** A pure mid-grey reads as unconsidered; a grey with a slight hue bias toward the page's accent reads as chosen. Pure white and near-black are fine grounds when they suit the subject - the point is that the neutral was picked, not inherited.
+
+**Design both themes.** The page renders in the viewer's theme, and the viewer has three states, not two: an explicit choice stamps `data-theme="dark"` / `data-theme="light"` on the root element, and the default "system" setting stamps *nothing* - most viewers see the un-stamped document, where only `prefers-color-scheme` separates light from dark. Structure the CSS token-level for all three: the bare `:root` block defines the complete light palette (for a deliberately dark-first design, swap light and dark consistently through this whole pattern); `@media (prefers-color-scheme: dark)` redefines only the tokens, guarded as `:root:not([data-theme="light"])` so an explicit light choice beats a dark OS; `:root[data-theme="dark"]` redefines them again so the toggle also wins in the other direction. Style components through the tokens, never directly inside a media or `[data-theme]` block - a color whose only definition sits behind `[data-theme]` never applies in the un-stamped state, and the page renders one theme's text on the other theme's ground. Two more rules keep each theme resolving as a set: the artifact composites over a ground the viewer paints in *its* theme, so `body` must set an explicit `background` from a token - a transparent body silently borrows the host's ground; and every element that sets a color takes it from the same token set as the surface behind it, never a literal that only works in one theme. Before publishing, scan the stylesheet for any color declared only inside a media or `[data-theme]` block - that is the classic unreadable-artifact bug. Give the second theme the same care as the first - don't naively invert; keep contrast legible and the accent working on both grounds. A design that deliberately commits to one visual world (a neon arcade screen, a letterpress invitation) may stay single-theme - then skip the media query and stamps entirely but still paint the background and every color explicitly, so the page holds on either host ground; make it a choice, not an omission.
+
+**Let layout do the spacing.** Lay out sibling groups with flex or grid and `gap`, not per-element margins that silently collapse or double. Wide content - tables, code, diagrams - gets `overflow-x: auto` on its own container so the page body never scrolls sideways. Reach for `font-variant-numeric: tabular-nums` wherever digits line up in columns.
+
+**Avoid AI-generated design** AI-generated design currently clusters around a few looks: warm cream (#F4F1EA) with a serif display and terracotta accent; near-black with a lone acid-green or vermilion pop; broadsheet hairline rules with dense columns; a purple-to-blue gradient hero on white; Inter or Space Grotesk as the "safe" face; emoji as section markers; everything centered; `rounded-lg` everywhere; accent bar/rail on rounded cards. Where the user pins down a visual direction, follow it exactly - their words always win, including when they ask for one of these looks. Where nothing is specified, don't spend that freedom on one of these defaults.
+
+**Build cleanly** Be cognizant of overlapping elements, cascade collisions, silent font fallbacks; visual bugs hide in the gap between source and output. Close every non-void element, double-quote attributes, give keyboard focus a visible state, respect `prefers-reduced-motion`. For generative or decorative graphics, reach for Canvas or WebGL rather than hand-authoring long SVG path data.
+
+**CSS rules** When writing the CSS, watch your selector specificities. It is easy to generate classes that cancel each other out - a type-based selector like `.section` fighting an element-based one like `.cta` over padding and margins between sections. Structure the cascade so it doesn't silently undo your spacing.
+
+**Writing the copy** Words are design material, not decoration. Write from the user's side of the screen - name things by what people recognize, not how the system is built (a person manages *notifications*, not *webhook config*). Active voice; a control says exactly what happens ("Publish", then a toast that says "Published"). Errors explain what went wrong and how to fix it - no apologies, no vagueness. Specific beats clever.
+
+**Name the page like a product, not a caption.** The `<title>` is the artifact's name in the gallery and the browser tab, and it sets the reader's first impression of care. Give the page a real name: a short noun phrase, typically two to four words, specific to the subject - or, for a page that exists to answer one question, that question itself, which is then the page's name. Stop at the name - a title that carries its own explainer after a dash or colon reads as generated filler. The name must also identify the page among many: in the gallery it sits beside dozens of other artifacts, and a generic category label that could sit on any of them fails as a name just as surely as an appended explainer. When a candidate title pairs the name with a generic word - a greeting, a category, a page-type label - the name is the half to keep; a trim that drops the identity and keeps the generic word produces exactly the title that could sit on any page. And the rule removes explainers, it does not impose brevity: a multi-word title that already reads as one specific name is finished, and shortening it further only makes it generic. The one-sentence publish `description` is where the explanation belongs; the gallery shows it right under the title.
+
+**Structure is information** Structural devices, numbering, eyebrows, dividers, labels, should encode something true about the content, not decorate it. Many generic designs use numbered markers (01 / 02 / 03), but that's only appropriate if the content actually is a sequence - like a real process or a typed timeline where order carries information the reader needs. Question if choices like numbered markers actually make sense before incorporating them.
+
+**When it's a UI, not a document** A dashboard or tool is scanned and operated, not read top-to-bottom, so the craft shifts from typography to information design. Surface the summary before the detail; encode state in form as well as number - a pill, a chip, a severity stripe - so what needs attention reads at a glance. Semantic color (good / warning / critical) is separate from the accent hue and doesn't count as your accent. Give sparklines and charts the same care as type: an area fill, a faint grid, an emphasized endpoint. What's interactive should look interactive.
+
+
+
+## Process
+
+Before writing code, sketch a short design plan - a compact token system with color, type, and layout:
+- **Color**: describe the palette as 4-6 named hex values.
+- **Type**: typefaces for 2+ roles - a characterful display face used with restraint, a complementary body face, and a utility face for captions or data if needed.
+- **Layout**: a layout concept in one or two sentences.
+
+Then build, following the plan and deriving every color and type decision from it.
+
+## When the request is editorial
+
+The stance shifts: the client has already rejected proposals that felt templated, and is paying for a distinctive point of view. Make opinionated calls, and take one real aesthetic risk where it serves the work.
+
+Review the design plan against the subject before building: if any part of it reads like the generic default you would produce for any similar page, revise that part, and note what you changed and why. Only after you've confirmed the plan's uniqueness do you write the code, following the revised plan exactly.
+
+**Principles** 
+
+- The hero is a thesis: open with the most characteristic thing in the subject's world - headline, image, live demo, interactive moment. 
+- Typography carries the personality of the page. Pair the display and body faces deliberately, not the same families you would reach for on any other project, and set a clear type scale with intentional weights, widths, and spacing. Make the type treatment itself a memorable part of the design, not a neutral delivery vehicle for the content. 
+- Leverage motion deliberately. Think about where and if animation can serve the subject: a page-load sequence, a scroll-triggered reveal, hover micro-interactions, ambient atmosphere. An orchestrated moment usually lands harder than scattered effects; choose what the direction calls for. However, sometimes less is more, and extra animation contributes to the feeling that the design is AI-generated. 
+- Match complexity to the vision. Maximalist directions need elaborate execution; minimal directions need precision in spacing, type, and detail. Elegance is executing the chosen vision well.
+- Spend your boldness in one place; keep everything around it quiet. If the accent fights the ground, shift it toward analogous or drop saturation rather than replacing it.
+
+🔧 **Bash**
+```
+grep -rn "BRAND_NAME" packages/config/src/constants.ts; grep -n "Shopify\|Merchant" DECISIONS.md | tail -6
+```
+
+> **↳ result**
+> ```
+> packages/config/src/constants.ts:8:export const BRAND_NAME = 'Shopify';
+> 205:2026-08-28T23:55Z | WS-H | Refunds now return the refunded units' tax: `calculateRefund` allocates `order.taxTotal` across taxable lines by net, then across units (largest remainder, exact-sum), because tax is stored per order, not per line. Previously items+shipping refunds stranded the tax, so a fully-returned taxed order could never reach `refunded` — the UI even advertised the full order total as "available to refund". Shopify refunds tax with items; the refund summary gained a Tax row and `refundCalculationSchema` a `taxAmount` field (additive).
+> 206:2026-08-28T20:20Z | WS-H | Admin page titles come from a `layou
+> … [truncated, 2,780 more chars]
+> ```
+
+🔧 **Bash**
+```
+mkdir -p /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify/b2e3b231-9376-4b8f-acc1-9a67615ee6fe/scratchpad && echo ok
+```
+
+> **↳ result**
+> ```
+> ok
+> ```
+
+🔧 **Write**
+```
+/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify/b2e3b231-9376-4b8f-acc1-9a67615ee6fe/scratchpad/demo-runbook.html
+```
+
+> **↳ result**
+> ```
+> File created successfully at: /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify/b2e3b231-9376-4b8f-acc1-9a67615ee6fe/scratchpad/demo-runbook.html (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Artifact**
+```
+{"file_path": "/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify/b2e3b231-9376-4b8f-acc1-9a67615ee6fe/scratchpad/demo-runbook.html", "description": "Cue-by-cue presenter runbook for the 14-minute Aurora Supply Co. demo, with exact click paths, spoken lines and recovery steps.", "favicon": "🎬"}
+```
+
+> **↳ result**
+> ```
+> Published /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify/b2e3b231-9376-4b8f-acc1-9a67615ee6fe/scratchpad/demo-runbook.html at https://claude.ai/code/artifact/3db0dd24-1c7c-4858-8dc5-af005034aa83
+> 
+> Live subscription: arming in the background — not connected yet, so this is not a watch until `status` shows it connected (you are told if it cannot connect, unless this turn is interrupted first). Once connected, this session is notified when this artifact is republished elsewhere; a comment on it sent to Claude also reaches this session while this artifact's status row says auto-replies armed, and plain comments never notify — read them with action "comments" when asked.
+> 
+> To
+> … [truncated, 610 more chars]
+> ```
+
+### 🤖 Claude
+
+**Runbook → https://claude.ai/code/artifact/3db0dd24-1c7c-4858-8dc5-af005034aa83** — eight cues in run order, each with the exact click path, the line to say, the number to point at, and what to do when it misbehaves. Open it on a second screen while you present.
+
+The shape of it:
+
+**Setup, 5 min off camera** — `docker compose up -d`, `pnpm db:reset`, `pnpm dev`, plus the echo receiver in its own terminal. Then create the "Fulfilment partner" app with two webhook subscriptions pointed at `localhost:4100`, and park five tabs. The one check that matters: the last seeded order is **#1040**, so your live one is **#1041** and every number downstream is predictable.
+
+**The run** — 1 Log in (0:00) · 2 Admin tour (1:00) · 3 AI builder + publish (3:30) · 4 Open the shop, add socks (5:30) · 5 Checkout: decline then pay (6:30) · 6 Order + analytics + email + webhook (8:30) · 7 Refund (11:00) · 8 Second store from nothing (12:00) · close at 13:30.
+
+Three things I'd flag beyond the click paths:
+
+- **Cue 3 before cue 4 is load-bearing.** Publishing the theme starts a 60-second cache window, and the tour transition covers it. Also decide *before* you're on camera whether `ANTHROPIC_API_KEY` is set — live generation is the better beat, the Monochrome preset is the safe one, and picking on stage is the worst of both.
+- **Don't improvise the product.** Basin Wool Socks (M) is $18.00 with one option and sits under the free-shipping threshold, which is why the $8.95 / $1.53 / **$28.48** chain holds. Any other product and your sidebar stops matching the script.
+- **`docs/DEMO.md` has one stale instruction.** It tells you to call the platform "Merchant" and never say the other company's name — but `DECISIONS.md:250` reversed that on 2026-08-29 and `BRAND_NAME` is now `'Shopify'`, so the admin chrome and the bag mark say Shopify on screen. Reading from the old script would have you narrating against your own UI. The runbook drops that line. Want me to fix it in `docs/DEMO.md` too?
+
+I verified the labels and totals against `e2e/tests/smoke.spec.ts` and its helpers rather than trusting the prose — everything in cues 4–8 is a path the blocking suite actually walks. What I have *not* done is run the stack and click through it; say the word and I'll do that end to end before you present.
+
+### 👤 User
+
+too complicated. i want simple. i will tell claude to run the app. open it. and show some important flows in a non formal manner. so i will first show a existing website with admin panels about it? then create a new website with ai? and show sales working live and products etc?
+
+### 🤖 Claude
+
+Yeah, drop the whole webhook/echo-receiver/Mailpit setup — that's where the ceremony was. Your arc works with one change.
+
+## The problem with your order
+
+"Create a new website with AI" and "show sales working" fight each other. A brand-new store has **zero products**, so you can't sell anything on it, and the AI preview looks sparse because the product sections have nothing to render. The AI builder styles a store's theme; it doesn't conjure a catalog.
+
+So sell on **Aurora** (the seeded store, 32 products, 40 orders), and use the new store purely as the "and it's a platform" punchline at the end.
+
+## The arc
+
+**1. Here's a real store** (~2 min)
+`admin.lvh.me:3000` → `owner@demo.dev` / `password123`. Click through Products (open one — point at the save bar when you edit the title), Orders (mixed Paid / Refunded / Partially fulfilled badges), Analytics. Fast. You're just establishing that it's furnished.
+
+**2. Build its storefront by chat** (~2 min)
+Nav → **Storefront**. Chat left, live preview right. Type something concrete ("make it a winter outfitter, near-black, big type") or hit **Apply** on a preset if there's no API key. **Publish**.
+
+**3. Go shop on it** (~3 min) — *this is the one that matters*
+`demo.lvh.me:3002`. The theme you just made is live. Basin Wool Socks → size M → add to cart → check out. Pay with `4000 0000 0000 0002` first — it declines, checkout stays open and filled in, and you get to say the card never touched your server. Then `4242 4242 4242 4242` and it goes through. $28.48.
+
+**4. The order is already there** (~1 min)
+Back to admin → Orders → your new order at the same $28.48, Paid, customer created from the checkout email. Refund it if you want a bonus beat.
+
+**5. Now a whole second store** (~1 min)
+`admin.lvh.me:3000/signup` → "Northwind Goods" → you land in a brand-new tenant, Products says "Add your first product," and `northwind-goods.lvh.me:3002` is a real storefront with none of Aurora's stuff. Aurora is untouched.
+
+~9 minutes, no prep beyond `pnpm dev`.
+
+## Three things that will bite you
+
+- **60-second theme cache.** Publish in step 2, keep talking, it's live by step 3. If not, reload once.
+- **Shipping rates only appear once the address is complete** — fill every field and tab out of ZIP, or you'll be stuck wondering why there's no rate to pick.
+- **Present in a real browser, not the in-app preview pane** — it blocks `*.lvh.me` subresources and both apps come up unstyled.
+
+Want me to cut [docs/DEMO.md](docs/DEMO.md) down to this version? The 14-minute one is more than you need.
