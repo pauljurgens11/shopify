@@ -18,11 +18,19 @@ import {
 
 const CATALOG = {
   products: [
-    { handle: 'alpine-merino-crewneck', title: 'Alpine Merino Crewneck' },
+    {
+      handle: 'alpine-merino-crewneck',
+      title: 'Alpine Merino Crewneck',
+      imageUrl: 'https://assets.example.dev/alpine-merino-crewneck.jpg',
+    },
     { handle: 'gale-shell-jacket', title: 'Gale Shell Jacket' },
   ],
   collections: [
-    { handle: 'featured', title: 'Featured' },
+    {
+      handle: 'featured',
+      title: 'Featured',
+      imageUrl: 'https://assets.example.dev/featured.jpg',
+    },
     { handle: 'outerwear', title: 'Outerwear' },
   ],
 };
@@ -92,8 +100,54 @@ describe('collectReferencedHandles', () => {
   });
 });
 
+describe('image rules', () => {
+  it('puts the shop’s real photography in the prompt as the only legal inventory', () => {
+    const message = buildUserMessage(CONTEXT);
+    expect(message).toContain('Image library');
+    expect(message).toContain('https://assets.example.dev/alpine-merino-crewneck.jpg');
+    expect(message).toContain('https://assets.example.dev/featured.jpg');
+  });
+
+  it('rejects an invented image URL the way it rejects an invented handle', async () => {
+    const hallucinated = presetThemeDoc('aurora');
+    const hero = hallucinated.pages.home.find((s) => s.type === 'hero');
+    if (hero?.type === 'hero') {
+      hero.settings.image = 'https://images.unsplash.com/photo-not-a-real-id?w=2400';
+    }
+
+    const generate = vi
+      .fn<ThemeGenerator>()
+      .mockResolvedValueOnce({ doc: hallucinated, summary: 'first' })
+      .mockResolvedValueOnce({ doc: presetThemeDoc('aurora'), summary: 'second' });
+
+    const result = await runThemeGeneration(CONTEXT, generate);
+
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[1]?.[0]?.retryFeedback).toContain('photo-not-a-real-id');
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a URL the merchant pasted into the chat', async () => {
+    const doc = presetThemeDoc('aurora');
+    const hero = doc.pages.home.find((s) => s.type === 'hero');
+    if (hero?.type === 'hero') hero.settings.image = 'https://cdn.example.dev/my-banner.jpg';
+
+    const generate = vi.fn<ThemeGenerator>().mockResolvedValue({ doc, summary: 'Done.' });
+    const result = await runThemeGeneration(
+      { ...CONTEXT, prompt: 'Use my banner https://cdn.example.dev/my-banner.jpg as the hero' },
+      generate,
+    );
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
+  });
+});
+
 describe('runThemeGeneration', () => {
-  const valid = presetThemeDoc('bloom');
+  // The current doc's own preset: its images are already on screen, so they are
+  // in the allowed set — a candidate carrying another preset's photography
+  // would now (correctly) be rejected as images from nowhere.
+  const valid = presetThemeDoc('aurora');
 
   it('accepts a valid document on the first attempt', async () => {
     const generate = vi.fn<ThemeGenerator>().mockResolvedValue({ doc: valid, summary: 'Done.' });
