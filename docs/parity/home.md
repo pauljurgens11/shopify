@@ -4,7 +4,8 @@ Source: `admin.shopify.com/store/…` (store root), 1054×719 and 1316×898.
 Confidence: **high for this variant** — complete accessibility-tree capture, every card,
 every button label and href transcribed. Re-verified after a hard refresh.
 
-**Confidence that this is the Home we should clone: still low.** See below.
+**Confidence that this is the Home we should clone: still low** — for the *seeded* store.
+We build both variants and switch between them; see "Delta vs our build" below.
 
 ## Two variants, and which one we need
 
@@ -24,12 +25,13 @@ to the dashboard. **A populated Dashboard Home is not obtainable from this accou
 Re-checked with a hard refresh: the onboarding variant is deterministic here, not a
 loading artifact.
 
-→ **Build our Home from [dashboard.md](dashboard.md)**, which captures the real dashboard
-chrome — date-range picker, comparison period, metric tiles, two-series charts, per-card
-empty states — from Analytics, which renders it even with zero data.
+→ **Build the seeded Home from [dashboard.md](dashboard.md)**, which captures the real
+dashboard chrome — date-range picker, comparison period, metric tiles, two-series charts,
+per-card empty states — from Analytics, which renders it even with zero data.
 
-This file is complete and accurate for the onboarding case. Use it if we ever render a
-genuinely empty tenant; do not use it for the seeded demo.
+This file is complete and accurate for the onboarding case, and that case is real for us:
+every shop created at signup starts with no orders. So both are built — this page for a
+genuinely empty tenant, `dashboard.md`'s for a store with history.
 
 ## Layout
 
@@ -70,7 +72,7 @@ whole surface is personalised setup guidance rather than a dashboard.
 Progress lines render **above** the heading as a circle glyph plus text. Cards 1–6 have
 no progress line.
 
-## Patterns worth stealing, even though we skip this page
+## Patterns worth stealing
 
 - **Every card independently dismissible**, and the welcome block too. Onboarding is
   treated as disposable chrome, not permanent furniture.
@@ -81,10 +83,30 @@ no progress line.
 
 ## Delta vs our build
 
-**None, deliberately.** Diffing our seeded Home against an onboarding page would produce
-confident, wrong findings. Our Home is **unverified** against real Shopify.
+**Built, 2026-08-29.** We serve both variants, switched on store state exactly as Shopify
+does: `apps/admin/src/app/store/[slug]/onboarding-home.tsx` renders this page while a shop
+has never taken an order, `dashboard-home.tsx` takes over once it has. The old
+`Setup guide` card — our invention, not Shopify's — is gone.
 
-Nearest verified substitute: [dashboard.md](dashboard.md).
+Do **not** diff the *seeded* Home against this file: Aurora has 40 orders, so it gets the
+dashboard, and the nearest verified reference for that page is
+[dashboard.md](dashboard.md).
+
+What this page carries, against the capture above:
+
+| Captured | Ours |
+|---|---|
+| No page header, single centred column | same |
+| Trial promo pill, split, `Select a plan` | same, → `/settings/plan`, currency from the shop |
+| Welcome heading, two lines, `Close` + `Dismiss` | same — `Close` on the pill, `Dismiss` on the block |
+| AI prompt input, rotating placeholder, `+` and `Send` | same minus `+`; Send posts to the storefront builder |
+| 8 setup cards, two-column `<ul>`, each dismissible | 5 cards, same grid, each dismissible |
+| Progress line above the heading | not rendered — none of our five cards has sub-steps |
+| Illustration per card | none — README §Do not |
+
+The three dropped cards (custom domain, `Optimize your store in Estonia`, EU right of
+withdrawal) need features we do not ship and a country we do not store; rationale and the
+rest of the deviations are in `DECISIONS.md`.
 
 ## To close this gap for real
 

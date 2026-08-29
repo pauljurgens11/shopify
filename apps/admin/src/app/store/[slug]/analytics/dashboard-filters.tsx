@@ -69,10 +69,13 @@ function Pill({
   icon,
   label,
   items,
+  disclosure = true,
 }: {
   icon: IconSource;
   label: string;
   items: { content: string; active: boolean; helpText?: string; onAction: () => void }[];
+  /** The currency pill carries no chevron in the capture — it has one option. */
+  disclosure?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -84,7 +87,7 @@ function Pill({
       activator={
         <Button
           icon={icon}
-          disclosure={open ? 'up' : 'down'}
+          {...(disclosure ? { disclosure: open ? ('up' as const) : ('down' as const) } : {})}
           onClick={() => setOpen((was) => !was)}
         >
           {label}
@@ -105,6 +108,23 @@ function Pill({
       />
     </Popover>
   );
+}
+
+/**
+ * `USD $`, `EUR €` — the code and the symbol, the way the capture reads
+ * (`[⇄ EUR € ]`). The symbol alone is ambiguous across dollar currencies and
+ * the code alone drops the glyph every figure on the page is prefixed with.
+ */
+function currencyLabel(currencyCode: string): string {
+  const symbol = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+    currencyDisplay: 'narrowSymbol',
+  })
+    .formatToParts(0)
+    .find((part) => part.type === 'currency')?.value;
+
+  return symbol && symbol !== currencyCode ? `${currencyCode} ${symbol}` : currencyCode;
 }
 
 export function DashboardFilterRow({
@@ -136,10 +156,11 @@ export function DashboardFilterRow({
 
       <Pill
         icon={CurrencyConvertIcon}
-        label={currencyCode}
+        disclosure={false}
+        label={currencyLabel(currencyCode)}
         items={[
           {
-            content: currencyCode,
+            content: currencyLabel(currencyCode),
             helpText: 'Your store’s currency',
             active: true,
             onAction: () => undefined,

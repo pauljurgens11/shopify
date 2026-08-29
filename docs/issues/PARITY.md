@@ -90,9 +90,11 @@ primary button. **Skeleton page on load, never a spinner-only screen.**
 
 ## Home & Analytics (G3)
 
-- Home: "Good {morning/afternoon}, {shop name}" heading; onboarding guide
-  card with progress ("2 of 4 tasks complete"), collapsible task rows with
-  checkmark circles; metric cards row below.
+- Home, two variants — SUPERSEDED by docs/parity/home.md and
+  docs/parity/dashboard.md, which were read off the real admin; those win.
+  A store with no orders gets the onboarding page (welcome heading, assistant
+  prompt, dismissible setup-card grid, no page header); one with orders gets
+  the dashboard under a "Good {morning/afternoon}, {shop name}" heading.
 - Analytics: date-range picker top-left (`Today ▾` + compare toggle); grid
   of metric cards each = small label, big number, delta arrow+percent;
   full-width Sales-over-time chart; smaller cards in a 2–3 column masonry
@@ -148,7 +150,7 @@ transition, no transitions on things Shopify keeps static).
   simply appear.
 - **IndexTable header ↔ bulk-actions bar**: swap in place when rows are
   selected; the table below does not move.
-- **Collapsible** content (onboarding guide tasks, filter disclosure):
+- **Collapsible** content (filter disclosure, settings sections):
   Polaris `Collapsible` motion only.
 
 ### What does NOT animate
