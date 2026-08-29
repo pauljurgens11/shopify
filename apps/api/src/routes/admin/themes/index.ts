@@ -36,6 +36,7 @@ import {
   PREVIEW_TOKEN_TTL_SECONDS,
   signPreviewToken,
 } from '../../../services/themes/preview-token.ts';
+import { revalidateStorefrontTheme } from '../../../services/themes/revalidate.ts';
 import {
   createDraft,
   getVersion,
@@ -82,9 +83,15 @@ export default async function routes(app: FastifyInstance) {
     return toDetail(await getVersion(request.db, request.params.id));
   });
 
-  app.post<{ Params: { id: string } }>('/versions/:id/publish', builder, async (request) =>
-    toSummary(await publishVersion(request.db, request.params.id)),
-  );
+  app.post<{ Params: { id: string } }>('/versions/:id/publish', builder, async (request) => {
+    const published = toSummary(await publishVersion(request.db, request.params.id));
+    // Bust the storefront's 60s theme cache so Publish is visible immediately.
+    // Fire-and-forget: the rows are already flipped, and a down storefront
+    // must not fail the publish — it just falls back to the 60s window.
+    const shop = await request.db.shop.findFirst({ select: { slug: true } });
+    if (shop) revalidateStorefrontTheme(shop.slug, request.log);
+    return published;
+  });
 
   app.post<{ Params: { id: string } }>('/versions/:id/restore', builder, async (request, reply) => {
     const created = await restoreVersion(request.db, request.shopId as string, request.params.id);
