@@ -12,13 +12,14 @@
  * Deliberately absent: per-field PUT round-trips and address validation
  * (SPEC §14 forbids CRUD sweeps; §10 puts address validation out of scope).
  */
-import { CART_COOKIE } from '@merchant/config/constants';
+import { CART_COOKIE, CUSTOMER_SESSION_COOKIE } from '@merchant/config/constants';
 import { newId } from '@merchant/config/ids';
 import { dbAdmin } from '@merchant/db/client';
 import { dbForShop } from '@merchant/db/tenant';
 import { tokenizeCard } from '@merchant/pay/vault';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { saveCardForCustomer } from '../src/services/checkout/complete.ts';
 import { getCustomer } from '../src/services/customers/customers.ts';
 import { buildTestApp, createTestShop, deleteTestShops, type TestShop } from './helpers.ts';
 
@@ -116,10 +117,14 @@ async function readyToPay(
 function pay(
   token: string,
   card: string,
-  options: { idempotencyKey?: string; cookie?: string } = {},
+  options: { idempotencyKey?: string; cookie?: string; saveCard?: boolean } = {},
 ) {
   return req('POST', `/storefront/api/checkouts/${token}/complete`, {
-    payload: { cardTokenId: card, idempotencyKey: options.idempotencyKey ?? newId('event') },
+    payload: {
+      cardTokenId: card,
+      idempotencyKey: options.idempotencyKey ?? newId('event'),
+      ...(options.saveCard === undefined ? {} : { saveCard: options.saveCard }),
+    },
     ...(options.cookie ? { cookie: options.cookie } : {}),
   });
 }
@@ -838,5 +843,158 @@ describe('complete', () => {
         data: { taxSettings: { ratePercentage: TAX_RATE, pricesIncludeTax: false } },
       });
     }
+  });
+});
+
+/**
+ * E6 — "Save this card for future purchases".
+ *
+ * `saveCard` was accepted and ignored for a week, which is the failure mode
+ * SPEC §5 warns about: the caller is told yes and nothing happens. What earns a
+ * test is the rule that decides WHO a card may be saved against, because every
+ * plausible shortcut here is wrong in a way nobody would notice:
+ *
+ *   - saving for anyone who ticks the box attaches a card to an email a
+ *     stranger typed, and E5's register CLAIMS a guest row by email — so the
+ *     next person to sign up on that address inherits it;
+ *   - saving whenever a session exists ignores the flag entirely;
+ *   - saving to the session's customer when the shopper typed someone else's
+ *     email files the card under the wrong account.
+ *
+ * And the invariant that outranks all of them: the card was already charged by
+ * the time any of this runs, so nothing here may fail the order.
+ */
+describe('save this card', () => {
+  /** A registered, signed-in shopper: returns their id and session cookie. */
+  async function signedInShopper(email: string) {
+    const registered = await req('POST', '/storefront/api/customers/register', {
+      payload: { email, password: 'password123', firstName: 'Sam', lastName: 'Reyes' },
+    });
+    if (registered.statusCode !== 201) throw new Error(`register failed: ${registered.body}`);
+    const cookieValue = registered.cookies.find((c) => c.name === CUSTOMER_SESSION_COOKIE)?.value;
+    if (!cookieValue) throw new Error('no customer session cookie');
+    return {
+      customerId: registered.json().customer.id as string,
+      cookie: `${CUSTOMER_SESSION_COOKIE}=${cookieValue}`,
+    };
+  }
+
+  /** Buy one pair of socks and return the completed order's id. */
+  async function buy(options: {
+    email: string;
+    cookie?: string;
+    saveCard?: boolean;
+    card?: string;
+  }) {
+    const { checkout } = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    await readyToPay(checkout.token, { email: options.email });
+    const response = await pay(checkout.token, options.card ?? tok.approved, {
+      ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...(options.saveCard === undefined ? {} : { saveCard: options.saveCard }),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().status).toBe('success');
+    return response.json().orderId as string;
+  }
+
+  const savedFor = (customerId: string) =>
+    dbAdmin.paymentMethod.findMany({ where: { shopId: shop.shopId, customerId } });
+
+  it('links the charged card to the signed-in shopper', async () => {
+    const shopper = await signedInShopper('saver@example.com');
+    await buy({ email: 'saver@example.com', cookie: shopper.cookie, saveCard: true });
+
+    const saved = await savedFor(shopper.customerId);
+    expect(saved, 'exactly one saved card').toHaveLength(1);
+    // The token that was charged, not a fresh one: the admin's charge-saved-card
+    // block detokenizes this id, so a mismatch is an unchargeable row.
+    expect(saved[0]?.cardTokenId).toBe(tok.approved);
+    expect(saved[0]?.brand).toBe('visa');
+    expect(saved[0]?.last4).toBe('4242');
+    expect(saved[0]?.isDefault, 'the first card is the default to charge').toBe(true);
+  });
+
+  it('saves nothing for a guest, and still completes the order', async () => {
+    // No session cookie. The customer row exists — checkout always creates one
+    // by email — so "no customer" is NOT what makes this a skip; the missing
+    // session is.
+    const orderId = await buy({ email: 'guest-saver@example.com', saveCard: true });
+
+    const order = await dbAdmin.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.customerId, 'the order still has a customer').toBeTruthy();
+    expect(await savedFor(order.customerId as string)).toHaveLength(0);
+  });
+
+  it('does not save when the shopper leaves the box unticked', async () => {
+    const shopper = await signedInShopper('unticked@example.com');
+    await buy({ email: 'unticked@example.com', cookie: shopper.cookie });
+    expect(await savedFor(shopper.customerId), 'the flag is read, not assumed').toHaveLength(0);
+  });
+
+  it('refuses to file a card under an account the shopper only typed the email of', async () => {
+    // Signed in as one shopper, checking out as another. The order belongs to
+    // the typed email; the session proves nothing about it.
+    const shopper = await signedInShopper('account-holder@example.com');
+    const orderId = await buy({
+      email: 'someone-else@example.com',
+      cookie: shopper.cookie,
+      saveCard: true,
+    });
+
+    const order = await dbAdmin.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.customerId).not.toBe(shopper.customerId);
+    expect(await savedFor(shopper.customerId), 'not the session’s account').toHaveLength(0);
+    expect(await savedFor(order.customerId as string), 'not the typed one either').toHaveLength(0);
+  });
+
+  it('does not stack a second row when the same card is saved again', async () => {
+    // A second purchase re-tokenizes the same physical card, so the vault ids
+    // differ — dedupe has to be on what the shopper sees, not on the token.
+    const shopper = await signedInShopper('repeat@example.com');
+    const second = await tokenizeCard(dbForShop(shop.shopId), shop.shopId, {
+      number: '4242424242424242',
+      expMonth: 12,
+      expYear: new Date().getUTCFullYear() + 2,
+      cvc: '123',
+    });
+
+    await buy({ email: 'repeat@example.com', cookie: shopper.cookie, saveCard: true });
+    await buy({
+      email: 'repeat@example.com',
+      cookie: shopper.cookie,
+      saveCard: true,
+      card: second.cardTokenId,
+    });
+
+    expect(await savedFor(shopper.customerId), 'one card, not one per order').toHaveLength(1);
+  });
+
+  it('never saves a card the processor refused', async () => {
+    // A declined card is not a card the shopper can be billed on later. The
+    // save has to sit behind the charge, not beside it.
+    const shopper = await signedInShopper('declined-saver@example.com');
+    const { checkout } = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    await readyToPay(checkout.token, { email: 'declined-saver@example.com' });
+
+    const response = await pay(checkout.token, tok.declined, {
+      cookie: shopper.cookie,
+      saveCard: true,
+    });
+    expect(response.json()).toMatchObject({ status: 'failed', code: 'declined' });
+    expect(await savedFor(shopper.customerId)).toHaveLength(0);
+  });
+
+  it('swallows a save that cannot happen — the card was already charged', async () => {
+    // The vault row is gone (deleted, or a token from another shop). Letting
+    // `savePaymentMethod` throw here would turn a paid order into a 500 in
+    // front of the shopper.
+    const shopper = await signedInShopper('vaultless@example.com');
+    await expect(
+      saveCardForCustomer(dbForShop(shop.shopId), shop.shopId, {
+        customerId: shopper.customerId,
+        cardTokenId: newId('cardToken'),
+      }),
+    ).resolves.toBeUndefined();
+    expect(await savedFor(shopper.customerId)).toHaveLength(0);
   });
 });

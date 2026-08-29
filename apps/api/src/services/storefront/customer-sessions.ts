@@ -69,6 +69,25 @@ export function clearCustomerSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(CUSTOMER_SESSION_COOKIE, { path: '/' });
 }
 
+/**
+ * The signed-in customer for this shop, or null — for the routes where being
+ * signed in changes what happens but is not required to proceed. Checkout is
+ * the one that matters: a guest must be able to pay, and only a proven session
+ * may attach a saved card to an account (E6).
+ *
+ * Same per-shop check as `requireCustomer`: a session minted on one storefront
+ * and presented on another is nobody here, even though its signature verifies.
+ */
+export async function currentCustomerId(
+  request: FastifyRequest,
+  shopId: string,
+): Promise<string | null> {
+  const sessionId = customerSessionIdFromRequest(request);
+  if (!sessionId) return null;
+  const session = await getCustomerSession(sessionId);
+  return session && session.shopId === shopId ? session.customerId : null;
+}
+
 /** The session id from the cookie, or null if absent or tampered with. */
 export function customerSessionIdFromRequest(request: FastifyRequest): string | null {
   const raw = request.cookies[CUSTOMER_SESSION_COOKIE];
