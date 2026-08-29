@@ -32,56 +32,44 @@ Next prints this on every such boot:
   Use "node .next/standalone/server.js" instead.
 ```
 
-It is not a cosmetic warning. Reproduced on `main`, storefront on a
-prod-build stack:
+**Correction (2026-08-29, while building this):** the add-to-cart failure this
+issue originally blamed on `output: 'standalone'` is NOT caused by it. It
+reproduces on a plain `next start` production build with standalone off, and on
+the standalone `server.js` the Docker image actually runs. It is a real
+storefront bug and it is now **E8**; this issue is only about the unsupported
+boot mode and the warning.
 
-- Add to cart on a PDP. The item **is** added (the cart row is in Postgres),
-  but the Server Action's `revalidatePath` never lands on the client: the POST
-  to the page is `200` and then `net::ERR_ABORTED`.
-- The button stays on **"Adding…"**, disabled, indefinitely — a shopper cannot
-  add a second item without a full reload.
-- The header cart badge keeps its server-rendered count, which is the exact
-  thing `cartRequest`'s `revalidatePath(pathname)` comment says it exists to
-  prevent.
-
-The same steps under `pnpm dev` work perfectly: the button returns to
-"Add to cart" and the badge goes 2 → 3.
-
-So the mandatory §14 Playwright suite runs the apps in a third configuration
-that is neither the dev server the demo uses nor the standalone server the
-Dockerfile ships — and one where a visible storefront bug is present and the
-suite stays green (the flows navigate to `/cart` rather than watching the
-button, so only server state is asserted).
-
-**Not the demo path.** `pnpm dev` is unaffected, and the Docker images run
-`server.js` correctly. This is about test fidelity and a booby-trapped `start`
-script, not a broken demo.
+What is left here is still worth fixing: `next start` cannot serve a standalone
+build, Next says so on every boot, and the mandatory §14 Playwright suite was
+therefore exercising a configuration that is neither the dev server the demo
+uses nor the standalone server the image ships.
 
 ## Build
-Pick one, and log which in DECISIONS.md:
+**Done:** option 1. `output` is now
+`process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined` in both
+apps, and both Dockerfiles set `NEXT_OUTPUT=standalone` in their build stage.
+`next start` and the e2e suite get a supported server; the image still gets its
+standalone tree, and if that env var is ever dropped the image build fails loudly
+on the missing `.next/standalone` rather than shipping something subtly broken.
 
-1. **Gate `output`** on an env var the Dockerfiles set
-   (`output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined`),
-   so `next start` and the e2e suite run a supported server. Cheapest; the
-   trade-off is that e2e then exercises a slightly different server from the
-   image.
-2. **Make `start` run the standalone server** — copy `.next/static` and
-   `public` into `.next/standalone/apps/<app>/` and `node server.js`. Highest
-   fidelity (e2e then tests exactly what ships), but duplicates the copy dance
-   the Dockerfile already does.
-
-Either way the warning must be gone from the e2e output.
+Option 2 (make `start` run the standalone server) was rejected: the standalone
+server does not evaluate `next.config.ts` at runtime, so it never loads the
+monorepo's root `.env` — `pnpm start` would need every variable passed in by
+hand, which is a worse local story than the drift it removes.
 
 ## Acceptance
 - Booting the admin and the storefront the way `pnpm e2e` does prints no
-  `"next start" does not work with "output: standalone"` warning.
-- On that stack, adding to cart from a PDP returns the button to
-  "Add to cart" and bumps the header badge — verify by hand, once.
+  `"next start" does not work with "output: standalone"` warning. **Verified**
+  on both apps.
+- Building with `NEXT_OUTPUT=standalone` still emits
+  `.next/standalone/apps/<app>/server.js` — the path both Dockerfiles COPY.
+  **Verified** on both apps, and the emitted storefront server was booted and
+  served a product page.
+- (Moved to E8) Add to cart returning to its idle label on a production build.
 - `docker compose -f docker-compose.prod.yml --profile mail up -d --build`
   still serves the admin and a storefront (A5's path must not regress).
 - `pnpm e2e` green.
 
 ## Test plan
-No new unit tests — this is a build-configuration fix. Add one assertion to
-smoke flow (b) or (c) that the Add to cart button returns to its idle label
-after a successful add: that is the assertion whose absence let this hide.
+No new unit tests — this is a build-configuration fix, and `pnpm verify` covers
+it. The Add-to-cart assertion moved to E8, where the bug it would catch lives.

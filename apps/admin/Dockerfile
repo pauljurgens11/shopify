@@ -14,6 +14,10 @@ ARG STOREFRONT_BASE_DOMAIN=lvh.me:3002
 ENV API_URL=$API_URL \
     STOREFRONT_PROTOCOL=$STOREFRONT_PROTOCOL \
     STOREFRONT_BASE_DOMAIN=$STOREFRONT_BASE_DOMAIN
+# next.config.ts only emits .next/standalone when this is set, because
+# `next start` cannot serve that output and the local/e2e path uses it. The
+# runtime stage below COPYs .next/standalone, so dropping this fails the build.
+ENV NEXT_OUTPUT=standalone
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @merchant/db generate

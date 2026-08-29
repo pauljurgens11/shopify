@@ -5,6 +5,10 @@ RUN corepack enable
 WORKDIR /app
 
 FROM base AS build
+# next.config.ts only emits .next/standalone when this is set, because
+# `next start` cannot serve that output and the local/e2e path uses it. The
+# runtime stage below COPYs .next/standalone, so dropping this fails the build.
+ENV NEXT_OUTPUT=standalone
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @merchant/db generate

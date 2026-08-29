@@ -58,6 +58,7 @@ eight interpretations. Read your page's section before writing JSX.
 | [E7](E7-theme-publish-revalidation.md) | Theme publish revalidates the storefront cache | E | S | E2, F3 |
 | [H5](H5-demo-seed-gaps.md) | Seed: jane's orders, a demo app, abandoned checkouts | H | S | H1 |
 | [H6](H6-next-start-standalone.md) | CI/`pnpm start` boot the Next apps in an unsupported mode | H | S | — |
+| [E8](E8-storefront-action-hang-in-production.md) | Storefront Server Actions never settle in a production build | E | M | E1, E2 |
 
 Deferred hardening (explicitly NOT issues — do not build unless promoted via
 `DECISIONS.md`): per-app env sub-schemas so each app parses only its own vars
