@@ -28,8 +28,10 @@ $COMPOSE up -d --build --remove-orphans
 
 echo "==> waiting for services to be healthy"
 for i in $(seq 1 60); do
+  # Docker prints "(health: starting)", "(unhealthy)", or "Restarting (…)" —
+  # matching bare "starting" covers all three (and "Restarting" contains it).
   BAD=$($COMPOSE ps --format '{{.Service}} {{.Status}}' \
-    | awk '/\((starting|unhealthy)\)|Restarting/ {print $1}' | tr '\n' ' ')
+    | awk '/starting|unhealthy/ {print $1}' | tr '\n' ' ')
   if [ -z "$BAD" ]; then break; fi
   [ "$i" -eq 60 ] && {
     echo "!! not healthy after 5 min: $BAD" >&2
