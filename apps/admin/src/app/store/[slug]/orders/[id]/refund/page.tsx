@@ -14,6 +14,7 @@ import type { OrderDetail, RefundCalculation } from '@merchant/contracts/orders'
 import {
   Banner,
   BlockStack,
+  Box,
   Button,
   Card,
   Checkbox,
@@ -25,10 +26,11 @@ import {
   TextField,
   Thumbnail,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, OrderIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../../lib/api.ts';
@@ -135,10 +137,18 @@ export default function RefundPage() {
   // crash rather than a missing order.
   if (!detail) {
     return (
-      <Page title="Refund" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
-        <Card>
-          <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
-        </Card>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={OrderIcon}
+            title="Refund"
+            backUrl={`/store/${slug}/orders`}
+            backLabel={'Orders'}
+          />
+          <Card>
+            <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
+          </Card>
+        </BlockStack>
       </Page>
     );
   }
@@ -181,180 +191,186 @@ export default function RefundPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: `#${detail.orderNumber}`, url: `/store/${slug}/orders/${id}` }}
-      title={`Refund · #${detail.orderNumber}`}
-    >
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="400">
+    <Page>
+      <PageBreadcrumb
+        icon={OrderIcon}
+        backUrl={`/store/${slug}/orders/${id}`}
+        backLabel={`#${detail.orderNumber}`}
+        title={`Refund · #${detail.orderNumber}`}
+      />
+
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">
+                    Items
+                  </Text>
+                  {refundable.length === 0 ? (
+                    <Text as="p" tone="subdued">
+                      Every item on this order has already been refunded.
+                    </Text>
+                  ) : (
+                    refundable.map((line) => {
+                      const max = remainingToRefund(line);
+                      return (
+                        <InlineStack
+                          key={line.id}
+                          align="space-between"
+                          blockAlign="center"
+                          gap="400"
+                        >
+                          <InlineStack gap="300" blockAlign="center" wrap={false}>
+                            <Thumbnail
+                              source={line.imageUrl ?? ImageIcon}
+                              alt={line.title}
+                              size="small"
+                            />
+                            <BlockStack gap="050">
+                              <Text as="span" variant="bodyMd" fontWeight="medium">
+                                {line.title}
+                              </Text>
+                              <Text as="span" variant="bodySm" tone="subdued">
+                                {format(line.price)} each
+                              </Text>
+                            </BlockStack>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center">
+                            <div style={{ width: 80 }}>
+                              <TextField
+                                label="Quantity"
+                                labelHidden
+                                type="number"
+                                min={0}
+                                max={max}
+                                autoComplete="off"
+                                value={quantities[line.id] ?? '0'}
+                                onChange={(value) =>
+                                  setQuantities((current) => ({ ...current, [line.id]: value }))
+                                }
+                              />
+                            </div>
+                            <Text as="span" tone="subdued">
+                              of {max}
+                            </Text>
+                          </InlineStack>
+                        </InlineStack>
+                      );
+                    })
+                  )}
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Refund shipping
+                  </Text>
+                  <TextField
+                    label="Shipping amount"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    // Display-layer conversion through the money helper — never `/ 100`.
+                    max={toDecimal(detail.shippingTotal)}
+                    prefix="$"
+                    autoComplete="off"
+                    value={shipping}
+                    onChange={setShipping}
+                    error={shippingError ?? undefined}
+                    helpText={`${format(detail.shippingTotal)} was charged for shipping.`}
+                  />
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Reason for refund
+                  </Text>
+                  <TextField
+                    label="Reason"
+                    labelHidden
+                    autoComplete="off"
+                    placeholder="Only you and other staff can see this reason"
+                    value={reason}
+                    onChange={setReason}
+                  />
+                </BlockStack>
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Items
+                  Summary
                 </Text>
-                {refundable.length === 0 ? (
-                  <Text as="p" tone="subdued">
-                    Every item on this order has already been refunded.
-                  </Text>
-                ) : (
-                  refundable.map((line) => {
-                    const max = remainingToRefund(line);
-                    return (
-                      <InlineStack
-                        key={line.id}
-                        align="space-between"
-                        blockAlign="center"
-                        gap="400"
-                      >
-                        <InlineStack gap="300" blockAlign="center" wrap={false}>
-                          <Thumbnail
-                            source={line.imageUrl ?? ImageIcon}
-                            alt={line.title}
-                            size="small"
-                          />
-                          <BlockStack gap="050">
-                            <Text as="span" variant="bodyMd" fontWeight="medium">
-                              {line.title}
-                            </Text>
-                            <Text as="span" variant="bodySm" tone="subdued">
-                              {format(line.price)} each
-                            </Text>
-                          </BlockStack>
-                        </InlineStack>
-                        <InlineStack gap="200" blockAlign="center">
-                          <div style={{ width: 80 }}>
-                            <TextField
-                              label="Quantity"
-                              labelHidden
-                              type="number"
-                              min={0}
-                              max={max}
-                              autoComplete="off"
-                              value={quantities[line.id] ?? '0'}
-                              onChange={(value) =>
-                                setQuantities((current) => ({ ...current, [line.id]: value }))
-                              }
-                            />
-                          </div>
-                          <Text as="span" tone="subdued">
-                            of {max}
-                          </Text>
-                        </InlineStack>
-                      </InlineStack>
-                    );
-                  })
-                )}
-              </BlockStack>
-            </Card>
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Refund shipping
-                </Text>
-                <TextField
-                  label="Shipping amount"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  // Display-layer conversion through the money helper — never `/ 100`.
-                  max={toDecimal(detail.shippingTotal)}
-                  prefix="$"
-                  autoComplete="off"
-                  value={shipping}
-                  onChange={setShipping}
-                  error={shippingError ?? undefined}
-                  helpText={`${format(detail.shippingTotal)} was charged for shipping.`}
-                />
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Reason for refund
-                </Text>
-                <TextField
-                  label="Reason"
-                  labelHidden
-                  autoComplete="off"
-                  placeholder="Only you and other staff can see this reason"
-                  value={reason}
-                  onChange={setReason}
-                />
-              </BlockStack>
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Summary
-              </Text>
-
-              {calcError ? (
-                <Banner tone="critical" title="Couldn’t calculate this refund">
-                  <Text as="p">
-                    {calcError.field ? `${calcError.field}: ` : ''}
-                    {calcError.message}
-                  </Text>
-                </Banner>
-              ) : null}
-
-              <BlockStack gap="200">
-                <InlineStack align="space-between">
-                  <Text as="span">Items subtotal</Text>
-                  <Text as="span" numeric>
-                    {format(calculation?.subtotal ?? { amount: 0, currencyCode })}
-                  </Text>
-                </InlineStack>
-                <InlineStack align="space-between">
-                  <Text as="span">Tax</Text>
-                  <Text as="span" numeric>
-                    {format(calculation?.taxAmount ?? { amount: 0, currencyCode })}
-                  </Text>
-                </InlineStack>
-                <InlineStack align="space-between">
-                  <Text as="span">Shipping</Text>
-                  <Text as="span" numeric>
-                    {format(calculation?.shippingAmount ?? { amount: 0, currencyCode })}
-                  </Text>
-                </InlineStack>
-                <Divider />
-                <InlineStack align="space-between">
-                  <Text as="span" fontWeight="semibold">
-                    Refund total
-                  </Text>
-                  <Text as="span" numeric fontWeight="semibold">
-                    {format(total)}
-                  </Text>
-                </InlineStack>
-                {calculation ? (
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {format(calculation.maximumRefundable)} available to refund.
-                  </Text>
+                {calcError ? (
+                  <Banner tone="critical" title="Couldn’t calculate this refund">
+                    <Text as="p">
+                      {calcError.field ? `${calcError.field}: ` : ''}
+                      {calcError.message}
+                    </Text>
+                  </Banner>
                 ) : null}
+
+                <BlockStack gap="200">
+                  <InlineStack align="space-between">
+                    <Text as="span">Items subtotal</Text>
+                    <Text as="span" numeric>
+                      {format(calculation?.subtotal ?? { amount: 0, currencyCode })}
+                    </Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span">Tax</Text>
+                    <Text as="span" numeric>
+                      {format(calculation?.taxAmount ?? { amount: 0, currencyCode })}
+                    </Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span">Shipping</Text>
+                    <Text as="span" numeric>
+                      {format(calculation?.shippingAmount ?? { amount: 0, currencyCode })}
+                    </Text>
+                  </InlineStack>
+                  <Divider />
+                  <InlineStack align="space-between">
+                    <Text as="span" fontWeight="semibold">
+                      Refund total
+                    </Text>
+                    <Text as="span" numeric fontWeight="semibold">
+                      {format(total)}
+                    </Text>
+                  </InlineStack>
+                  {calculation ? (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {format(calculation.maximumRefundable)} available to refund.
+                    </Text>
+                  ) : null}
+                </BlockStack>
+
+                <Checkbox label="Restock refunded items" checked={restock} onChange={setRestock} />
+
+                <Button
+                  variant="primary"
+                  size="large"
+                  fullWidth
+                  loading={saving}
+                  disabled={!canRefund}
+                  onClick={() => void submit()}
+                >
+                  {total.amount > 0 ? `Refund ${format(total)}` : 'Refund'}
+                </Button>
               </BlockStack>
-
-              <Checkbox label="Restock refunded items" checked={restock} onChange={setRestock} />
-
-              <Button
-                variant="primary"
-                size="large"
-                fullWidth
-                loading={saving}
-                disabled={!canRefund}
-                onClick={() => void submit()}
-              >
-                {total.amount > 0 ? `Refund ${format(total)}` : 'Refund'}
-              </Button>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Box>
     </Page>
   );
 }

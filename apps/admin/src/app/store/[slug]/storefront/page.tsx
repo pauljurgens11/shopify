@@ -8,9 +8,11 @@
  * to the admin; the two panes are our own surface, drawn with `--p-*` tokens.
  */
 import { Banner, Box, Page } from '@shopify/polaris';
+import { StoreOnlineIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import type { ApiError } from '../../../../lib/api.ts';
@@ -102,18 +104,22 @@ export default function StorefrontBuilderPage() {
 
   if (versions.isPending || conversation.isPending) {
     return (
-      <Page title="Storefront">
+      <Page fullWidth>
         <PageSkeleton />
       </Page>
     );
   }
 
   return (
-    <Page
-      fullWidth
-      title="Storefront"
-      subtitle="Describe the storefront you want and watch it build."
-    >
+    <Page fullWidth>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={StoreOnlineIcon}
+          title="Online Store"
+          subtitle="Describe the storefront you want and watch it build."
+        />
+      </Box>
+
       {/* Without this a failed request is indistinguishable from "no versions yet". */}
       {versions.error ? (
         <Box paddingBlockEnd="400">

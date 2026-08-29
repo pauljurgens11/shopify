@@ -26,7 +26,9 @@ import {
   SkeletonDisplayText,
   Text,
 } from '@shopify/polaris';
+import { ChartVerticalIcon } from '@shopify/polaris-icons';
 import { useParams } from 'next/navigation';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { SalesBreakdownCard } from './breakdown-card.tsx';
 import { DashboardFilterRow, NoDataForRange, useDashboardFilters } from './dashboard-filters.tsx';
@@ -63,8 +65,9 @@ export default function AnalyticsPage() {
   // content lands with zero layout shift (PARITY.md §Motion).
   if (isLoading) {
     return (
-      <Page title="Analytics">
+      <Page>
         <BlockStack gap="400">
+          <PageBreadcrumb icon={ChartVerticalIcon} title="Analytics" />
           {controls}
           <Grid>
             {(['sales', 'orders', 'sessions', 'aov'] as const).map((metric) => (
@@ -104,8 +107,9 @@ export default function AnalyticsPage() {
 
   if (error || !data) {
     return (
-      <Page title="Analytics">
+      <Page>
         <BlockStack gap="400">
+          <PageBreadcrumb icon={ChartVerticalIcon} title="Analytics" />
           {controls}
           <Card>
             <Box padding="800">
@@ -132,8 +136,9 @@ export default function AnalyticsPage() {
     : null;
 
   return (
-    <Page title="Analytics">
+    <Page>
       <BlockStack gap="400">
+        <PageBreadcrumb icon={ChartVerticalIcon} title="Analytics" />
         {controls}
 
         <Grid>

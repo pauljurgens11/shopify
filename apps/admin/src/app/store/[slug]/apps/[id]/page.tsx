@@ -24,9 +24,11 @@ import {
   Page,
   Text,
 } from '@shopify/polaris';
+import { AppsIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
@@ -81,10 +83,18 @@ export default function AppDetailPage() {
 
   if (app.error || !app.data) {
     return (
-      <Page backAction={{ content: 'Apps', url: `/store/${slug}/apps` }} title="App">
-        <Banner tone="critical" title="This app could not be loaded">
-          <p>{app.error?.message ?? 'It may have been uninstalled.'}</p>
-        </Banner>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={AppsIcon}
+            title="App"
+            backUrl={`/store/${slug}/apps`}
+            backLabel={'Apps'}
+          />
+          <Banner tone="critical" title="This app could not be loaded">
+            <p>{app.error?.message ?? 'It may have been uninstalled.'}</p>
+          </Banner>
+        </BlockStack>
       </Page>
     );
   }
@@ -135,24 +145,28 @@ export default function AppDetailPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: 'Apps', url: `/store/${slug}/apps` }}
-      title={app.data.name}
-      subtitle={`Created ${formatDateTime(app.data.createdAt)}`}
-      secondaryActions={[
-        {
-          content: 'Uninstall app',
-          destructive: true,
-          onAction: () => setConfirmUninstall(true),
-        },
-      ]}
-    >
+    <Page>
       <SaveBar
         dirty={dirty}
         saving={saving}
         onSave={saveScopes}
         onDiscard={() => setDraftScopes(null)}
       />
+
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={AppsIcon}
+          backUrl={`/store/${slug}/apps`}
+          backLabel={'Apps'}
+          title={app.data.name}
+          subtitle={`Created ${formatDateTime(app.data.createdAt)}`}
+          actions={
+            <Button tone="critical" variant="tertiary" onClick={() => setConfirmUninstall(true)}>
+              Uninstall app
+            </Button>
+          }
+        />
+      </Box>
 
       <BlockStack gap="500">
         {revealedToken ? (
