@@ -7,11 +7,11 @@
  */
 'use client';
 
+import { format } from '@merchant/config/money';
 import type { Checkout } from '@merchant/contracts/checkout';
 import { useState } from 'react';
 
-const money = (amount: number, currency: string) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / 100);
+const money = (amount: number, currency: string) => format({ amount, currencyCode: currency });
 
 export function OrderSummary({
   checkout,
