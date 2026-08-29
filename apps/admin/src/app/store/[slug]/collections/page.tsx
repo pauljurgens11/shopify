@@ -11,6 +11,8 @@ import type { Collection } from '@merchant/contracts/collections';
 import type { Paginated } from '@merchant/contracts/common';
 import {
   Badge,
+  Box,
+  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -22,7 +24,7 @@ import {
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { CollectionIcon, ImageIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -32,6 +34,7 @@ import {
   IndexNoMatchState,
   IndexTableSkeleton,
 } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
@@ -103,11 +106,19 @@ export default function CollectionsPage() {
     !loading && rows.length === 0 && query.trim() === '' && !type && cursorStack.length === 0;
 
   return (
-    <Page
-      fullWidth
-      title="Collections"
-      primaryAction={{ content: 'Create collection', url: `/store/${slug}/collections/new` }}
-    >
+    <Page fullWidth>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={CollectionIcon}
+          title="Collections"
+          actions={
+            <Button variant="primary" url={`/store/${slug}/collections/new`}>
+              Create collection
+            </Button>
+          }
+        />
+      </Box>
+
       <Card padding="0">
         {empty ? (
           <IndexEmptyState

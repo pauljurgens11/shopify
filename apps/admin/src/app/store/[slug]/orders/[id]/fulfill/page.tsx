@@ -11,6 +11,7 @@ import type { Location } from '@merchant/contracts/locations';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import {
   BlockStack,
+  Box,
   Button,
   Card,
   InlineStack,
@@ -21,10 +22,11 @@ import {
   TextField,
   Thumbnail,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, OrderIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../../lib/api.ts';
@@ -68,10 +70,18 @@ export default function FulfillPage() {
   // crash rather than a missing order.
   if (!detail) {
     return (
-      <Page title="Fulfill items" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
-        <Card>
-          <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
-        </Card>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={OrderIcon}
+            title="Fulfill items"
+            backUrl={`/store/${slug}/orders`}
+            backLabel={'Orders'}
+          />
+          <Card>
+            <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
+          </Card>
+        </BlockStack>
       </Page>
     );
   }
@@ -110,126 +120,137 @@ export default function FulfillPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: `#${detail.orderNumber}`, url: `/store/${slug}/orders/${id}` }}
-      title={`Fulfill items · #${detail.orderNumber}`}
-    >
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Unfulfilled items
-              </Text>
-              {fulfillable.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  Everything on this order has already shipped.
+    <Page>
+      <PageBreadcrumb
+        icon={OrderIcon}
+        backUrl={`/store/${slug}/orders/${id}`}
+        backLabel={`#${detail.orderNumber}`}
+        title={`Fulfill items · #${detail.orderNumber}`}
+      />
+
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">
+                  Unfulfilled items
                 </Text>
-              ) : (
-                fulfillable.map((line) => {
-                  const max = remainingToFulfil(line);
-                  return (
-                    <InlineStack key={line.id} align="space-between" blockAlign="center" gap="400">
-                      <InlineStack gap="300" blockAlign="center" wrap={false}>
-                        <Thumbnail
-                          source={line.imageUrl ?? ImageIcon}
-                          alt={line.title}
-                          size="small"
-                        />
-                        <BlockStack gap="050">
-                          <Text as="span" variant="bodyMd" fontWeight="medium">
-                            {line.title}
-                          </Text>
-                          {line.variantTitle ? (
-                            <Text as="span" variant="bodySm" tone="subdued">
-                              {line.variantTitle}
-                            </Text>
-                          ) : null}
-                        </BlockStack>
-                      </InlineStack>
-                      <InlineStack gap="200" blockAlign="center">
-                        <div style={{ width: 80 }}>
-                          <TextField
-                            label="Quantity"
-                            labelHidden
-                            type="number"
-                            min={0}
-                            max={max}
-                            autoComplete="off"
-                            value={quantities[line.id] ?? '0'}
-                            onChange={(value) =>
-                              setQuantities((current) => ({ ...current, [line.id]: value }))
-                            }
+                {fulfillable.length === 0 ? (
+                  <Text as="p" tone="subdued">
+                    Everything on this order has already shipped.
+                  </Text>
+                ) : (
+                  fulfillable.map((line) => {
+                    const max = remainingToFulfil(line);
+                    return (
+                      <InlineStack
+                        key={line.id}
+                        align="space-between"
+                        blockAlign="center"
+                        gap="400"
+                      >
+                        <InlineStack gap="300" blockAlign="center" wrap={false}>
+                          <Thumbnail
+                            source={line.imageUrl ?? ImageIcon}
+                            alt={line.title}
+                            size="small"
                           />
-                        </div>
-                        <Text as="span" tone="subdued">
-                          of {max}
-                        </Text>
+                          <BlockStack gap="050">
+                            <Text as="span" variant="bodyMd" fontWeight="medium">
+                              {line.title}
+                            </Text>
+                            {line.variantTitle ? (
+                              <Text as="span" variant="bodySm" tone="subdued">
+                                {line.variantTitle}
+                              </Text>
+                            ) : null}
+                          </BlockStack>
+                        </InlineStack>
+                        <InlineStack gap="200" blockAlign="center">
+                          <div style={{ width: 80 }}>
+                            <TextField
+                              label="Quantity"
+                              labelHidden
+                              type="number"
+                              min={0}
+                              max={max}
+                              autoComplete="off"
+                              value={quantities[line.id] ?? '0'}
+                              onChange={(value) =>
+                                setQuantities((current) => ({ ...current, [line.id]: value }))
+                              }
+                            />
+                          </div>
+                          <Text as="span" tone="subdued">
+                            of {max}
+                          </Text>
+                        </InlineStack>
                       </InlineStack>
-                    </InlineStack>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Location
+                  </Text>
+                  <Select
+                    label="Fulfil from"
+                    labelHidden
+                    options={(locations.data?.data ?? []).map((location) => ({
+                      label: location.name,
+                      value: location.id,
+                    }))}
+                    value={locationId}
+                    onChange={setLocationId}
+                  />
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Tracking
+                  </Text>
+                  <TextField
+                    label="Tracking number"
+                    autoComplete="off"
+                    value={trackingNumber}
+                    onChange={setTrackingNumber}
+                  />
+                  <TextField
+                    label="Tracking URL"
+                    autoComplete="off"
+                    placeholder="https://"
+                    value={trackingUrl}
+                    onChange={setTrackingUrl}
+                  />
+                </BlockStack>
+              </Card>
+
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                loading={saving}
+                disabled={totalUnits === 0 || !locationId}
+                onClick={() => void submit()}
+              >
+                {totalUnits === 0
+                  ? 'Fulfill items'
+                  : `Fulfill ${totalUnits} item${totalUnits === 1 ? '' : 's'}`}
+              </Button>
             </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Location
-                </Text>
-                <Select
-                  label="Fulfil from"
-                  labelHidden
-                  options={(locations.data?.data ?? []).map((location) => ({
-                    label: location.name,
-                    value: location.id,
-                  }))}
-                  value={locationId}
-                  onChange={setLocationId}
-                />
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Tracking
-                </Text>
-                <TextField
-                  label="Tracking number"
-                  autoComplete="off"
-                  value={trackingNumber}
-                  onChange={setTrackingNumber}
-                />
-                <TextField
-                  label="Tracking URL"
-                  autoComplete="off"
-                  placeholder="https://"
-                  value={trackingUrl}
-                  onChange={setTrackingUrl}
-                />
-              </BlockStack>
-            </Card>
-
-            <Button
-              variant="primary"
-              size="large"
-              fullWidth
-              loading={saving}
-              disabled={totalUnits === 0 || !locationId}
-              onClick={() => void submit()}
-            >
-              {totalUnits === 0
-                ? 'Fulfill items'
-                : `Fulfill ${totalUnits} item${totalUnits === 1 ? '' : 's'}`}
-            </Button>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+          </Layout.Section>
+        </Layout>
+      </Box>
     </Page>
   );
 }

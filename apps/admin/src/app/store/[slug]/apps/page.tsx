@@ -10,10 +10,12 @@
 import type { App } from '@merchant/contracts/apps';
 import type { Paginated } from '@merchant/contracts/common';
 import { BlockStack, Box, Button, Card, IndexTable, Page, Text } from '@shopify/polaris';
+import { AppsIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { IndexFooterHelp } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
@@ -48,11 +50,19 @@ export default function AppsPage() {
   const empty = rows.length === 0 && !paging.hasPrevious;
 
   return (
-    <Page
-      title="Apps"
-      primaryAction={{ content: 'Create app', onAction: () => setCreating(true) }}
-      fullWidth
-    >
+    <Page fullWidth>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={AppsIcon}
+          title="Apps"
+          actions={
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              Create app
+            </Button>
+          }
+        />
+      </Box>
+
       <Card padding="0">
         {empty ? (
           // Hand-built rather than Polaris `EmptyState`, which requires an

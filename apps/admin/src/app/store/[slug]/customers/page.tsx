@@ -16,6 +16,8 @@ import type { Customer } from '@merchant/contracts/customers';
 import {
   Badge,
   Banner,
+  Box,
+  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -23,6 +25,7 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { PersonIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
@@ -31,6 +34,7 @@ import {
   IndexNoMatchState,
   IndexTableSkeleton,
 } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
@@ -113,14 +117,23 @@ export default function CustomersPage() {
   // Chrome first, skeleton only the data region (docs/parity/index-tables.md).
   const loading = customers.isPending;
 
+  // Shared by the error state and the loaded page, so the header cannot drift
+  // between them.
+  const addCustomer = (
+    <Button variant="primary" url={`/store/${slug}/customers/new`}>
+      Add customer
+    </Button>
+  );
+
   // A failed load must never read as "no customers yet" — that empty state
   // invites the merchant to re-add customers they already have.
   if (customers.isError) {
     return (
-      <Page
-        title="Customers"
-        primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
-      >
+      <Page>
+        <Box paddingBlockEnd="400">
+          <PageBreadcrumb icon={PersonIcon} title="Customers" actions={addCustomer} />
+        </Box>
+
         <Banner
           tone="critical"
           title="Customers could not be loaded"
@@ -140,11 +153,13 @@ export default function CustomersPage() {
   const segmentEmpty = query.trim() === '' && segment ? SEGMENT_EMPTY[segment] : undefined;
 
   return (
-    <Page
-      fullWidth
-      title="Customers"
-      primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
-    >
+    <Page fullWidth>
+      {/* The real header also carries `Export` and `Import`; both are out of
+          scope, so they are absent rather than disabled (CLAUDE.md §8). */}
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb icon={PersonIcon} title="Customers" actions={addCustomer} />
+      </Box>
+
       <Card padding="0">
         {empty ? (
           <IndexEmptyState

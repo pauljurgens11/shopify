@@ -16,30 +16,54 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { storeHref } from '../../lib/nav.ts';
 import { type SearchHit, useDebouncedValue, useSearch } from '../../lib/search.ts';
 import { useLogout } from '../../lib/session.ts';
+import { BrandWordmark } from './brand-logo.tsx';
 
 /**
  * The keyboard hint sitting inside the search field. Polaris's `SearchField`
  * takes no children, so this is the §7 escape hatch: plain JSX, `--p-*` tokens
- * only, positioned over the field the way Shopify's admin shows `⌘K`.
+ * only, positioned over the field the way Shopify's admin shows it.
+ *
+ * docs/parity/admin-shell.md: TWO small keycaps (`⌘` then `K`), not one chip
+ * with both characters in it.
  */
-function ShortcutHint({ label }: { label: string }) {
+function Keycap({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 'var(--p-space-500)',
+        height: 'var(--p-space-500)',
+        color: 'var(--p-color-text-inverse-secondary)',
+        fontFamily: 'var(--p-font-family-sans)',
+        fontSize: 'var(--p-font-size-275)',
+        lineHeight: 1,
+        padding: '0 var(--p-space-100)',
+        border: 'var(--p-border-width-025) solid var(--p-color-border-inverse)',
+        borderRadius: 'var(--p-border-radius-100)',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function ShortcutHint({ keys }: { keys: readonly string[] }) {
   return (
     <span
       aria-hidden="true"
       style={{
         position: 'absolute',
-        right: 'var(--p-space-300)',
+        right: 'var(--p-space-200)',
+        display: 'inline-flex',
+        gap: 'var(--p-space-100)',
         pointerEvents: 'none',
-        color: 'var(--p-color-text-inverse-secondary)',
-        fontFamily: 'var(--p-font-family-sans)',
-        fontSize: 'var(--p-font-size-300)',
-        lineHeight: 'var(--p-font-line-height-400)',
-        padding: '0 var(--p-space-150)',
-        border: 'var(--p-border-width-025) solid var(--p-color-border-inverse)',
-        borderRadius: 'var(--p-border-radius-100)',
       }}
     >
-      {label}
+      {keys.map((key) => (
+        <Keycap key={key}>{key}</Keycap>
+      ))}
     </span>
   );
 }
@@ -72,10 +96,10 @@ export function AdminTopBar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // Set after mount, never during render: the server has no navigator, and
-  // guessing would print "Ctrl K" on a Mac for one frame and then swap it.
-  const [shortcut, setShortcut] = useState<string | null>(null);
+  // guessing would print "Ctrl" on a Mac for one frame and then swap it.
+  const [shortcut, setShortcut] = useState<readonly string[] | null>(null);
   useEffect(() => {
-    setShortcut(/Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K');
+    setShortcut(/Mac|iPhone|iPad/.test(navigator.userAgent) ? ['\u2318', 'K'] : ['Ctrl', 'K']);
   }, []);
 
   // Debounced: a word is one request, not one per keystroke. The raw query
@@ -190,6 +214,10 @@ export function AdminTopBar({
     <TopBar
       showNavigationToggle
       onNavigationToggle={onNavigationToggle}
+      // docs/parity/admin-shell.md: the bar opens with the wordmark AND the
+      // glyph. `Frame.logo` only takes an image src, so the wordmark rides in
+      // through the slot Polaris leaves right after it.
+      logoSuffix={<BrandWordmark size={18} tone="inverse" />}
       searchResultsVisible={hasQuery}
       searchField={
         // The wrapper inherits the search field's own flex sizing, so the field
@@ -213,7 +241,7 @@ export function AdminTopBar({
             onCancel={dismissSearch}
           />
           {/* Hidden once the field is in use: the clear button lives there. */}
-          {shortcut && !hasQuery && !searchFocused ? <ShortcutHint label={shortcut} /> : null}
+          {shortcut && !hasQuery && !searchFocused ? <ShortcutHint keys={shortcut} /> : null}
         </div>
       }
       searchResults={searchResults}

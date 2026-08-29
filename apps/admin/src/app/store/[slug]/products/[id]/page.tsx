@@ -7,8 +7,10 @@ import type { Product } from '@merchant/contracts/products';
  * A product the tenant does not own is a 404 from the API, and it renders as
  * one here rather than as an empty form the merchant could type into.
  */
-import { Banner, Page } from '@shopify/polaris';
+import { Banner, BlockStack, Page } from '@shopify/polaris';
+import { ProductIcon } from '@shopify/polaris-icons';
 import { useParams } from 'next/navigation';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../../lib/api.ts';
 import { useSession } from '../../../../../lib/session.ts';
@@ -23,10 +25,18 @@ export default function EditProductPage() {
 
   if (product.error || !product.data || !session.data) {
     return (
-      <Page backAction={{ content: 'Products', url: `/store/${slug}/products` }} title="Product">
-        <Banner tone="critical" title="This product could not be loaded">
-          <p>{product.error?.message ?? 'It may have been deleted.'}</p>
-        </Banner>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={ProductIcon}
+            title="Product"
+            backUrl={`/store/${slug}/products`}
+            backLabel={'Products'}
+          />
+          <Banner tone="critical" title="This product could not be loaded">
+            <p>{product.error?.message ?? 'It may have been deleted.'}</p>
+          </Banner>
+        </BlockStack>
       </Page>
     );
   }

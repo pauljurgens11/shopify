@@ -6,7 +6,7 @@
  * looking selected. Both are pure functions, so both get tested.
  */
 import { describe, expect, it } from 'vitest';
-import { MAIN_NAV, NAVIGATION, type NavItem } from '../navigation/index.ts';
+import { MAIN_NAV, NAV_SECTIONS, NAVIGATION, type NavItem } from '../navigation/index.ts';
 import { isItemSelected, isSubItemSelected, storeHref, type Viewer, visibleNav } from './nav.ts';
 
 const owner: Viewer = { role: 'owner', permissions: {} };
@@ -45,6 +45,40 @@ describe('visibleNav', () => {
 
     // A permission explicitly set false is not held, same as absent.
     expect(visibleNav(NAVIGATION, staff({ products: false })).map((i) => i.key)).toEqual(['home']);
+  });
+});
+
+describe('NAV_SECTIONS', () => {
+  // docs/parity/admin-shell.md: the main list is unlabelled, then two bold
+  // section headers, then Settings pinned at the bottom. Getting the order or
+  // the labels wrong is the kind of drift nobody notices in review.
+  it('is the unlabelled main list, then Sales channels, then Apps', () => {
+    expect(NAV_SECTIONS.map((s) => s.title)).toEqual([undefined, 'Sales channels', 'Apps']);
+  });
+
+  it('routes every item above Settings into exactly one section', () => {
+    const sectioned = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
+    // Nothing dropped, nothing rendered twice — a missing `section` on a leaf
+    // file would otherwise silently vanish that item from the nav.
+    expect([...sectioned].sort()).toEqual(MAIN_NAV.map((i) => i.key).sort());
+    expect(sectioned).not.toContain('settings');
+  });
+
+  it('keeps the main list in the order Shopify renders it', () => {
+    expect(NAV_SECTIONS[0]?.items.map((i) => i.label)).toEqual([
+      'Home',
+      'Orders',
+      'Products',
+      'Customers',
+      'Marketing',
+      'Discounts',
+      'Analytics',
+    ]);
+  });
+
+  it('names the shop\u2019s own channel the way Shopify does', () => {
+    const salesChannels = NAV_SECTIONS.find((s) => s.title === 'Sales channels');
+    expect(salesChannels?.items.map((i) => i.label)).toEqual(['Online Store']);
   });
 });
 

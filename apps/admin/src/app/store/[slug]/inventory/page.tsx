@@ -29,11 +29,12 @@ import {
   Thumbnail,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, InventoryIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { IndexFooterHelp } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { SaveBar } from '../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
@@ -108,7 +109,7 @@ export default function InventoryPage() {
     row.levels.find((level) => level.locationId === activeLocation?.id)?.available ?? 0;
 
   return (
-    <Page title="Inventory" fullWidth>
+    <Page fullWidth>
       {/* The dirty grid uses the same contextual save bar as every other admin
           form (PARITY.md → Global chrome), not a second pair of buttons. */}
       <SaveBar
@@ -117,6 +118,10 @@ export default function InventoryPage() {
         onSave={saveEdits}
         onDiscard={() => setDrafts({})}
       />
+
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb icon={InventoryIcon} title="Inventory" />
+      </Box>
 
       <BlockStack gap="300">
         {activeLocation ? (

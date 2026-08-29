@@ -16,6 +16,7 @@ import {
   ActionList,
   Badge,
   BlockStack,
+  Box,
   Button,
   Card,
   IndexFilters,
@@ -25,6 +26,7 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { DiscountIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
@@ -33,6 +35,7 @@ import {
   IndexNoMatchState,
   IndexTableSkeleton,
 } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
@@ -141,7 +144,13 @@ export default function DiscountsPage() {
   );
 
   return (
-    <Page title="Discounts" primaryAction={createMenu} fullWidth>
+    <Page fullWidth>
+      {/* The real header also carries a disabled `Export`; a control that can
+          never do anything is not rendered here (CLAUDE.md §8). */}
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb icon={DiscountIcon} title="Discounts" actions={createMenu} />
+      </Box>
+
       <Card padding="0">
         {empty ? (
           // Kind A with Shopify's verbatim copy, minus its "compare at prices"
