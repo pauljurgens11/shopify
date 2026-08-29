@@ -121,7 +121,7 @@ test.describe('mandatory smoke flows', () => {
     let orderNumber = '';
 
     await test.step('buy the socks on the storefront', async () => {
-      await addSocksToCartAndOpenCheckout(page);
+      await addSocksToCartAndOpenCheckout(page, { exerciseQuantityStepper: true });
       await fillCheckoutAddressAndPickStandard(page, email);
       // The literal figure the admin order must later repeat.
       await expect(page.getByText(expectedTotal)).toBeVisible();

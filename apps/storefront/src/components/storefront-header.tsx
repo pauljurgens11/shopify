@@ -2,11 +2,13 @@
  * Theme navigation header (SPEC §10). Owner: WS-E.
  *
  * Server Component: the only moving part is the cart count, which the layout
- * already fetched. Token-driven throughout — a hardcoded colour here would
- * break theme switching (H2 flow d) just as surely as one inside a section.
+ * already fetched and `CartCount` keeps in step with adds made on the page.
+ * Token-driven throughout — a hardcoded colour here would break theme
+ * switching (H2 flow d) just as surely as one inside a section.
  */
 import type { ThemeDoc } from '@merchant/contracts/theme';
 import { CART_PATH, HOME_PATH, SEARCH_PATH } from '@merchant/theme-engine/shared';
+import { CartCount } from './cart-count.tsx';
 
 export function StorefrontHeader({
   shopName,
@@ -47,11 +49,7 @@ export function StorefrontHeader({
           </a>
           <a href={CART_PATH} className="opacity-80 hover:opacity-100">
             Cart
-            {itemCount > 0 ? (
-              <span className="ml-1.5 inline-flex min-w-5 justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-background tabular-nums">
-                {itemCount}
-              </span>
-            ) : null}
+            <CartCount initial={itemCount} />
           </a>
         </div>
       </nav>

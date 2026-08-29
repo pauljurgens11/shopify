@@ -12,8 +12,9 @@
  * Shopify product page behaves.
  */
 import type { StorefrontProduct } from '@merchant/contracts/storefront';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { addToCart } from '../lib/cart-actions.ts';
+import { publishCartCount } from '../lib/cart-count.ts';
 
 type Variant = StorefrontProduct['variants'][number];
 
@@ -31,7 +32,14 @@ export function ProductForm({ product }: { product: StorefrontProduct }) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
-  const [pending, startTransition] = useTransition();
+  // Deliberately not `useTransition`. `isPending` is defined to stay true until
+  // every update the transition caused has committed — including the one Next
+  // schedules from a Server Action's own response — so it is only as reliable
+  // as that commit. `cart-actions.ts` has removed the revalidation that made
+  // the commit unreliable (E8), and this keeps the button independent of it:
+  // plain state settles on the promise this component actually awaits, so a
+  // revalidation added back later cannot strand the control again.
+  const [pending, setPending] = useState(false);
 
   const selected: Variant | undefined = useMemo(
     () =>
@@ -41,14 +49,27 @@ export function ProductForm({ product }: { product: StorefrontProduct }) {
   );
 
   const submit = () => {
-    if (!selected) return;
+    if (!selected || pending) return;
     setError(null);
     setAdded(false);
-    startTransition(async () => {
-      const result = await addToCart(selected.id, quantity);
-      if (result.ok) setAdded(true);
-      else setError(result.message ?? 'We could not add that to your cart.');
-    });
+    setPending(true);
+    addToCart(selected.id, quantity)
+      .then(
+        (result) => {
+          if (!result.ok) {
+            setError(result.message ?? 'We could not add that to your cart.');
+            return;
+          }
+          setAdded(true);
+          // The header is server-rendered, so the badge only moves if the count
+          // the action just returned is handed to it.
+          if (result.itemCount !== undefined) publishCartCount(result.itemCount);
+        },
+        // Second argument rather than a chained `.catch`, so a throw from the
+        // success handler is not reported as a failed add.
+        () => setError('We could not add that to your cart.'),
+      )
+      .finally(() => setPending(false));
   };
 
   const soldOut = selected ? !selected.available : true;

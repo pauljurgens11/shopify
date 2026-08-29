@@ -9,12 +9,27 @@
  * the browser to `api.lvh.me` would also be cross-origin, and the cookie would
  * never be sent.
  *
- * Every action revalidates `/cart` so the page and the header badge agree.
+ * No action calls `revalidatePath`, and that is the fix for E8 rather than a
+ * tidy-up. A revalidating action makes Next re-render the route and stream the
+ * new tree back on the action's own response, and on a production build that
+ * update frequently never commits: React reads the whole flight and closes the
+ * stream cleanly and still does not apply it. Measured on this page, same
+ * build, two buttons side by side — the same mutating action settles 0/8 with
+ * the revalidation and 12/12 without. (E8's own notes list revalidatePath as
+ * excluded; it does not reproduce that way here. Method in DECISIONS.md.)
+ *
+ * Nothing here needs it either. The cart is fetched `no-store`, every
+ * storefront page is dynamic, and the chrome navigates with plain `<a href>` —
+ * so a real navigation always re-reads the cart from the server. What has to
+ * move WITHOUT a navigation is returned instead: `itemCount` drives the header
+ * badge through `cart-count.ts`.
+ *
+ * The dependency that buys: this holds only while the storefront chrome stays
+ * on plain anchors. Swapping one for `next/link` reintroduces Next's client
+ * router cache, and with it a stale cart page and a stale badge.
  */
 import { CART_COOKIE } from '@merchant/config/constants';
-import { revalidatePath } from 'next/cache';
-import { cookies, headers } from 'next/headers';
-import { PATHNAME_HEADER } from '../middleware.ts';
+import { cookies } from 'next/headers';
 import { storefrontApiUrl } from './api.ts';
 import { cartTokenFromSetCookie } from './set-cookie.ts';
 import { resolveShopSlug } from './tenant.ts';
@@ -69,13 +84,6 @@ async function cartRequest(
   }
 
   const cart = (await response.json()) as { itemCount: number };
-  revalidatePath('/cart');
-  // …and the page the shopper is actually on, or the header's cart badge keeps
-  // the count it was server-rendered with until they navigate — adding from a
-  // product page would look like nothing happened. The middleware puts the
-  // path on a header, which is also set for the Server Action's own POST.
-  const pathname = (await headers()).get(PATHNAME_HEADER);
-  if (pathname && pathname !== '/cart') revalidatePath(pathname);
   return { ok: true, itemCount: cart.itemCount };
 }
 
