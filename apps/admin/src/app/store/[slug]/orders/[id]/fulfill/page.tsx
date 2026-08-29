@@ -64,7 +64,7 @@ export default function FulfillPage() {
     if (first && !locationId) setLocationId(first.id);
   }, [locations.data, locationId]);
 
-  if (order.isPending || locations.isPending) return <PageSkeleton />;
+  if (order.isPending || locations.isPending) return <PageSkeleton layout="detail" />;
   const detail = order.data;
   // A bare `return null` here paints a blank white page, which reads as a
   // crash rather than a missing order.

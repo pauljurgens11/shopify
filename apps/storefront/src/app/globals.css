@@ -28,3 +28,24 @@ body {
   color: var(--color-text);
   font-family: var(--font-body);
 }
+
+/*
+ * PARITY.md §Motion: prefers-reduced-motion collapses every transition and
+ * animation to instant. Polaris handles its own in the admin; this covers the
+ * Tailwind storefront, checkout, and every theme-engine section (which all
+ * render under this stylesheet, including inside the builder preview iframe).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank utility classes */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank utility classes */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank utility classes */
+    transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank utility classes */
+    scroll-behavior: auto !important;
+  }
+}

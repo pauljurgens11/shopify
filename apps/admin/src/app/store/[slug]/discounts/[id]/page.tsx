@@ -17,7 +17,7 @@ export default function EditDiscountPage() {
   const session = useSession();
   const discount = useApiQuery<Discount>(['discount', id], `/admin/api/discounts/${id}`);
 
-  if (discount.isPending || session.isPending) return <PageSkeleton />;
+  if (discount.isPending || session.isPending) return <PageSkeleton layout="detail" />;
 
   // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
   if (discount.error || !discount.data || !session.data) {

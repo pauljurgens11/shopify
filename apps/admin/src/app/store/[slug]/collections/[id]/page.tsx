@@ -14,7 +14,7 @@ export default function EditCollectionPage() {
   const session = useSession();
   const collection = useApiQuery<Collection>(['collection', id], `/admin/api/collections/${id}`);
 
-  if (collection.isPending || session.isPending) return <PageSkeleton />;
+  if (collection.isPending || session.isPending) return <PageSkeleton layout="detail" />;
 
   if (collection.error || !collection.data || !session.data) {
     return (

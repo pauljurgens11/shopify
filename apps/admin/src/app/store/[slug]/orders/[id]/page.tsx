@@ -93,7 +93,7 @@ export default function OrderDetailPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['order', id] });
 
-  if (query.isPending) return <PageSkeleton />;
+  if (query.isPending) return <PageSkeleton layout="detail" />;
   if (!order) {
     return (
       <Page title="Order" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>

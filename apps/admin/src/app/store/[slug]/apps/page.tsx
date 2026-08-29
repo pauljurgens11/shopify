@@ -39,7 +39,7 @@ export default function AppsPage() {
     return `/admin/api/apps?${search.toString()}`;
   }, [paging.cursor]);
 
-  const apps = useApiQuery<Paginated<App>>(['apps', path], path);
+  const apps = useApiQuery<Paginated<App>>(['apps', path], path, { keepPreviousData: true });
   const rows = apps.data?.data ?? [];
 
   if (apps.isPending) return <PageSkeleton />;

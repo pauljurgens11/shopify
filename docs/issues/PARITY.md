@@ -119,6 +119,77 @@ primary button. **Skeleton page on load, never a spinner-only screen.**
   "Confirmation #… / Thank you, {first name}!", "Order details" card;
   right — same summary sidebar; `Continue shopping` button.
 
+## Motion & interaction (H4) — binding for every app
+
+Shopify's motion is calm, fast, and rare. **Over-animation is the parity
+killer: when in doubt, no animation.** Polaris v13 ships every animation
+below inside its components, driven by `--p-motion-*` tokens — our job is
+not to add motion but to not break it (no re-mounts of things that should
+transition, no transitions on things Shopify keeps static).
+
+### What animates — and only this
+
+- **Contextual save bar**: slides down over the TopBar when a form goes
+  dirty, slides back up on discard/save-complete. Never fades, never pops.
+- **Toasts**: rise from bottom-center, auto-dismiss (~4–5s). One at a time.
+- **Modals**: fade + slight scale in; overlay fades. Closing is faster than
+  opening. Modal stays mounted with `open={...}` — conditionally unmounting
+  it (`{open && <Modal/>}`) kills the exit transition.
+- **Popovers / action menus / autocomplete panels**: scale in from their
+  activator over ~100ms; disappear instantly or near-instantly.
+- **Nav subitems** (Collections/Inventory under Products): expand when the
+  section becomes active. No animated accordion chevrons anywhere else.
+- **Button loading**: spinner replaces the label *inside* the button; the
+  button does not change width or height. Applies to Save, `Pay now`,
+  dialog confirms.
+- **Skeleton → content**: an in-place swap with **zero layout shift** —
+  the skeleton mirrors the loaded page's structure and reserves heights
+  (charts are the classic offender). No cross-fade, no slide; content may
+  simply appear.
+- **IndexTable header ↔ bulk-actions bar**: swap in place when rows are
+  selected; the table below does not move.
+- **Collapsible** content (onboarding guide tasks, filter disclosure):
+  Polaris `Collapsible` motion only.
+
+### What does NOT animate
+
+Everything else. In particular: hover states on rows, buttons, links and
+cards are **instant** (no `transition` on color/background); tab and filter
+changes re-render without a full-page flash or a fade; badges, banners and
+inline field errors appear instantly; page navigation has no entrance
+animation — pages must not "assemble" on first paint; focus rings appear
+on keyboard navigation only (`:focus-visible`), never on mouse click.
+
+### Storefront (Tailwind — design ours, feel Shopify-fast)
+
+- Add to cart: immediate feedback (button state + cart count/drawer update)
+  with **no full reload**.
+- Variant select → gallery image swap: instant, client-side.
+- Product cards: a subtle hover affordance is allowed (e.g. image
+  opacity/scale ≤150ms, `transform`/`opacity` only); nothing bouncy.
+- Images reserve dimensions (width/height or aspect-ratio) — zero layout
+  shift as they load.
+
+### Checkout — nearly motionless (1:1 Shopify parity)
+
+Field errors appear instantly; `Pay now` shows an in-button processing
+state; the decline banner appears with **no** animation; shipping-rate and
+summary updates swap in place. Any flourish beyond this list is a bug —
+remove it.
+
+### Hygiene (all apps)
+
+- Animate **only `transform` and `opacity`** — never `height`, `top`,
+  `margin`, `width`, `max-height` (layout jank). Anything janky at 4× CPU
+  throttle gets fixed or removed.
+- Custom (escape-hatch) elements animate with `--p-motion-*` tokens in the
+  admin and plain short CSS transitions in the storefront — **no
+  hand-rolled cubic-beziers, no animation libraries** (stack is locked).
+- `prefers-reduced-motion` collapses every transition/animation to
+  instant. Polaris handles its own; our Tailwind/custom CSS must too.
+- No transition fires on first paint.
+- Console free of React warnings on every page.
+
 ## Words we never render
 
 `Shopify`, Shopify logos/glyphs, `Powered by …`. Brand string is

@@ -71,6 +71,7 @@ export default function InventoryPage() {
 
   const inventory = useApiQuery<Paginated<InventoryRow>>(['inventory', path], path, {
     enabled: Boolean(activeLocation),
+    keepPreviousData: true,
   });
   const rows = inventory.data?.data ?? [];
 

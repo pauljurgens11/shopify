@@ -94,7 +94,9 @@ export default function OrdersPage() {
     return `/admin/api/orders?${search.toString()}`;
   }, [selectedTab, query, sortKey, sortOrder, cursor]);
 
-  const orders = useApiQuery<Paginated<OrderSummary>>(['orders', path], path);
+  const orders = useApiQuery<Paginated<OrderSummary>>(['orders', path], path, {
+    keepPreviousData: true,
+  });
   const rows = orders.data?.data ?? [];
 
   const resetPaging = () => setCursorStack([]);

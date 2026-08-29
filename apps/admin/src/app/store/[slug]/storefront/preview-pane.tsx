@@ -133,9 +133,10 @@ export function PreviewPane({
           padding: device === 'mobile' ? 'var(--p-space-400)' : 0,
         }}
       >
+        {/* The iframe has no key={device}: toggling Desktop/Mobile only resizes
+            it — remounting would reload the whole storefront (white flash). */}
         {!ready ? null : (
           <iframe
-            key={device}
             title="Storefront preview"
             src={src}
             style={{

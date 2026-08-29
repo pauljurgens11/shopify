@@ -91,8 +91,8 @@ export function SlideshowControls({
               onClick={() => scrollToSlide(index)}
               className={
                 index === active
-                  ? 'h-2 w-6 rounded-theme bg-primary transition-all'
-                  : 'h-2 w-2 rounded-theme bg-text/25 transition-all'
+                  ? 'h-2 w-6 rounded-theme bg-primary'
+                  : 'h-2 w-2 rounded-theme bg-text/25'
               }
             />
           ))}

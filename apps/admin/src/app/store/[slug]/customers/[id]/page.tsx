@@ -146,7 +146,7 @@ export default function CustomerDetailPage() {
     }
   };
 
-  if (customer.isPending) return <PageSkeleton />;
+  if (customer.isPending) return <PageSkeleton layout="detail" />;
 
   // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
   if (!loaded) {

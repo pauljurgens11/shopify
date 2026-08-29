@@ -103,7 +103,9 @@ export default function DiscountsPage() {
     return `/admin/api/discounts?${search.toString()}`;
   }, [status, query, cursor]);
 
-  const discounts = useApiQuery<Paginated<Discount>>(['discounts', path], path);
+  const discounts = useApiQuery<Paginated<Discount>>(['discounts', path], path, {
+    keepPreviousData: true,
+  });
   const rows = discounts.data?.data ?? [];
 
   const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =

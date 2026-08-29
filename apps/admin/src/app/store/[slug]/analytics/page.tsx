@@ -25,11 +25,12 @@ import {
   Layout,
   Page,
   Popover,
+  SkeletonBodyText,
+  SkeletonDisplayText,
   Text,
 } from '@shopify/polaris';
 import { CalendarIcon } from '@shopify/polaris-icons';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { FunnelCard } from './funnel-card.tsx';
 import { LiveCard } from './live-card.tsx';
@@ -53,9 +54,12 @@ export default function AnalyticsPage() {
   // and so the query key stays stable across re-renders.
   const query = useMemo(() => rangeQueryString(preset, new Date()), [preset]);
 
+  // keepPreviousData: switching the range keeps the previous period's cards on
+  // screen while the new one loads, instead of flashing back to the skeleton.
   const { data, isLoading, error } = useApiQuery<AnalyticsDashboard>(
     ['analytics', 'dashboard', preset],
     `/admin/api/analytics?${query}`,
+    { keepPreviousData: true },
   );
 
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === preset)?.label ?? 'Today';
@@ -90,7 +94,54 @@ export default function AnalyticsPage() {
     </InlineStack>
   );
 
-  if (isLoading) return <PageSkeleton />;
+  // First-load skeleton mirrors the loaded layout — controls row, 4-up metric
+  // grid, chart card with its exact 280px reservation, then the two-column
+  // tail — so content lands with zero layout shift (PARITY.md §Motion). The
+  // real controls render immediately: they need no data, and unmounting them
+  // would remount the range Popover mid-transition.
+  if (isLoading) {
+    return (
+      <Page title="Analytics">
+        <BlockStack gap="400">
+          {controls}
+          <Grid>
+            {(['sales', 'orders', 'sessions', 'aov'] as const).map((metric) => (
+              <Grid.Cell key={metric} columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                <Card>
+                  <BlockStack gap="200">
+                    <SkeletonBodyText lines={1} />
+                    <SkeletonDisplayText size="small" />
+                  </BlockStack>
+                </Card>
+              </Grid.Cell>
+            ))}
+          </Grid>
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <SkeletonBodyText lines={1} />
+                <SkeletonDisplayText size="small" />
+              </BlockStack>
+              {/* Matches SalesChart's fixed plot height so nothing jumps. */}
+              <div style={{ height: 280, width: '100%' }} />
+            </BlockStack>
+          </Card>
+          <Layout>
+            <Layout.Section variant="oneHalf">
+              <Card>
+                <SkeletonBodyText lines={6} />
+              </Card>
+            </Layout.Section>
+            <Layout.Section variant="oneHalf">
+              <Card>
+                <SkeletonBodyText lines={6} />
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </BlockStack>
+      </Page>
+    );
+  }
 
   if (error || !data) {
     return (

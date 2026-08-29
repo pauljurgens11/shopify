@@ -68,7 +68,7 @@ export function CheckoutSkeleton() {
     <div
       role="status"
       aria-busy="true"
-      className="mx-auto grid min-h-screen max-w-6xl animate-pulse grid-cols-1 lg:grid-cols-[1.15fr_1fr]"
+      className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 lg:grid-cols-[1.15fr_1fr]"
     >
       <span className="sr-only">Loading checkout</span>
       <div className="order-2 px-6 py-8 lg:order-1 lg:px-10 lg:py-12">
@@ -94,7 +94,7 @@ export function ThankYouSkeleton() {
     <div
       role="status"
       aria-busy="true"
-      className="mx-auto grid min-h-screen max-w-6xl animate-pulse grid-cols-1 lg:grid-cols-[1.15fr_1fr]"
+      className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 lg:grid-cols-[1.15fr_1fr]"
     >
       <span className="sr-only">Loading your order confirmation</span>
       <div className="order-2 px-6 py-8 lg:order-1 lg:px-10 lg:py-12">

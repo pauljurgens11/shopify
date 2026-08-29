@@ -35,7 +35,7 @@ import {
 } from '@shopify/polaris';
 import { ChevronDownIcon, ChevronUpIcon, DeleteIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SettingsPage } from '../../../../../components/settings/settings-page.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -55,11 +55,11 @@ const RULES_KEY = ['payments', 'routing-rules'];
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
 
 /** The three adapters SPEC §11 ships. `mock` connects with one click. */
-const PROVIDERS: Array<{ key: ProcessorKey; name: string; description: string }> = [
+const PROVIDERS = [
   { key: 'mock', name: 'Mock Gateway', description: 'Deterministic test cards for the demo.' },
   { key: 'stripe', name: 'Stripe', description: 'Charge real or test cards with your own keys.' },
   { key: 'maverick', name: 'Maverick', description: 'Simulated without credentials.' },
-];
+] as const satisfies ReadonlyArray<{ key: ProcessorKey; name: string; description: string }>;
 
 const BRAND_CHOICES = [
   { label: 'Visa', value: 'visa' },
@@ -80,10 +80,12 @@ function brandsLabel(brands: string[]): string {
 /* --- connect modal --------------------------------------------------------- */
 
 function ConnectModal({
+  open,
   provider,
   onClose,
   onConnected,
 }: {
+  open: boolean;
   provider: (typeof PROVIDERS)[number];
   onClose: () => void;
   onConnected: () => void;
@@ -95,6 +97,18 @@ function ConnectModal({
   const [testMode, setTestMode] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The modal stays mounted so Polaris can play its open/close transition
+  // (PARITY.md §Motion) — reset the credential fields on open, not on mount.
+  useEffect(() => {
+    if (open) {
+      setSecretKey('');
+      setApiKey('');
+      setMerchantId('');
+      setTestMode(true);
+      setError(null);
+    }
+  }, [open]);
 
   const connect = () => {
     setSaving(true);
@@ -126,7 +140,7 @@ function ConnectModal({
 
   return (
     <Modal
-      open
+      open={open}
       onClose={onClose}
       title={`Connect ${provider.name}`}
       primaryAction={{
@@ -195,7 +209,12 @@ function ConnectModal({
 
 function ProvidersCard({ configs, refresh }: { configs: ProcessorConfig[]; refresh: () => void }) {
   const toast = useToast();
-  const [connecting, setConnecting] = useState<(typeof PROVIDERS)[number] | null>(null);
+  // `provider` is sticky on close so the modal's content doesn't blank out
+  // while Polaris plays the exit transition.
+  const [connecting, setConnecting] = useState<{
+    open: boolean;
+    provider: (typeof PROVIDERS)[number];
+  }>({ open: false, provider: PROVIDERS[0] });
   const [disconnecting, setDisconnecting] = useState<ProcessorConfig | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -283,7 +302,9 @@ function ProvidersCard({ configs, refresh }: { configs: ProcessorConfig[]; refre
                   ) : (
                     <Button
                       onClick={
-                        provider.key === 'mock' ? connectMock : () => setConnecting(provider)
+                        provider.key === 'mock'
+                          ? connectMock
+                          : () => setConnecting({ open: true, provider })
                       }
                       loading={provider.key === 'mock' && busy}
                     >
@@ -297,13 +318,12 @@ function ProvidersCard({ configs, refresh }: { configs: ProcessorConfig[]; refre
         </BlockStack>
       </BlockStack>
 
-      {connecting ? (
-        <ConnectModal
-          provider={connecting}
-          onClose={() => setConnecting(null)}
-          onConnected={refresh}
-        />
-      ) : null}
+      <ConnectModal
+        open={connecting.open}
+        provider={connecting.provider}
+        onClose={() => setConnecting((current) => ({ ...current, open: false }))}
+        onConnected={refresh}
+      />
 
       <Modal
         open={disconnecting !== null}
