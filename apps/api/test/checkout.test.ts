@@ -538,6 +538,14 @@ describe('complete', () => {
     const paid = await pay(first.checkout.token, tok.approved);
     expect(paid.statusCode, paid.body).toBe(200);
 
+    // The completed checkout re-prices on every read (the thank-you page), and
+    // its own order's redemption must not count as PRIOR usage — the shopper
+    // would see their paid-for discount rejected on the receipt.
+    const receipt = await req('GET', `/storefront/api/checkouts/${first.checkout.token}`);
+    expect(receipt.json().rejectedDiscount).toBeNull();
+    expect(receipt.json().appliedDiscounts[0]?.code).toBe('ONCE15');
+    expect(receipt.json().totals.total.amount).toBe(priced.totals.total.amount);
+
     // The same shopper again — case-folded, like the customer identity is. The
     // code is rejected inline, not applied and silently unwound later.
     const second = await openCheckout([{ variantId: v.socks, quantity: 1 }]);

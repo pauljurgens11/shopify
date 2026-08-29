@@ -97,6 +97,7 @@ async function priorUsageFor(
   db: TenantClient,
   email: string | null,
   discounts: Discount[],
+  excludeOrderId: string | null,
 ): Promise<DiscountPriorUsage | undefined> {
   if (!email || !discounts.some((d) => d.oncePerCustomer)) return undefined;
 
@@ -108,7 +109,14 @@ async function priorUsageFor(
 
   const counts = await db.discountRedemption.groupBy({
     by: ['discountId'],
-    where: { customerId: customer.id, discountId: { in: discounts.map((d) => d.id) } },
+    where: {
+      customerId: customer.id,
+      discountId: { in: discounts.map((d) => d.id) },
+      // A completed checkout re-prices on every read (its thank-you page);
+      // this checkout's own order is not PRIOR usage, or the receipt rejects
+      // the very code the shopper just paid with.
+      ...(excludeOrderId ? { orderId: { not: excludeOrderId } } : {}),
+    },
     _count: true,
   });
   return Object.fromEntries(counts.map((c) => [c.discountId, c._count]));
@@ -163,7 +171,7 @@ export async function priceCheckout(db: TenantClient, row: CheckoutRow): Promise
     candidateDiscounts(db, row.discountCode),
     collectionsByProduct(db, [...new Set(lines.map((line) => line.productId))]),
   ]);
-  const priorUsage = await priorUsageFor(db, row.email, discounts);
+  const priorUsage = await priorUsageFor(db, row.email, discounts, row.completedOrderId);
 
   const pricing = computeCheckoutTotals({
     currencyCode: settings.currencyCode,
