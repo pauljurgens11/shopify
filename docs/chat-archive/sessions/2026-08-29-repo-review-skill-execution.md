@@ -4,9 +4,9 @@
 |---|---|
 | **Session** | `a9918601-791d-4748-b2b8-ab6ee2dfee8f` |
 | **Started** | 2026-08-29T10:32:34.938Z |
-| **Ended** | 2026-08-29T13:36:18.231Z |
+| **Ended** | 2026-08-29T14:02:55.541Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/repo-review-skill-d78732` |
-| **Branch** | `ws-qa/demo-polish` |
+| **Branch** | `claude/repo-review-skill-d78732` |
 | **Pull request** | #111 (MERGED) |
 | **Model** | `claude-fable-5` |
 | **Claude Code** | 2.1.247 |
@@ -6611,3 +6611,544 @@ Contract chain is complete on the API side. Waiting for the build, then I'll boo
 ```
 until grep -q "BUILD_OK" /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-review-skill-d78732/a9918601-791d-4748-b2b8-ab6ee2dfee8f/tasks/bspnv4sub.output 2>/dev/null; do sleep 3; done; echo built
 ```
+
+> **↳ result**
+> ```
+> Command did not complete within its 420s timeout and was moved to the background (ID: bvpu1rvlv). Output is being written to: /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-review-skill-d78732/a9918601-791d-4748-b2b8-ab6ee2dfee8f/tasks/bvpu1rvlv.output. You will be notified when it completes. To check interim output, use Read on that file path.
+> ```
+
+🔧 **Bash**
+```
+tail -20 /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-review-skill-d78732/a9918601-791d-4748-b2b8-ab6ee2dfee8f/tasks/bspnv4sub.output
+```
+
+> **↳ result**
+> ```
+> 4300 free
+> 4301 free
+> ○  (Static)   prerendered as static content
+> ƒ  (Dynamic)  server-rendered on demand
+> 
+> cp: apps/admin/.next/standalone/apps/admin/.next: No such file or directory
+> 
+> [exited with code 1]
+> ```
+
+### 🤖 Claude
+
+Right — #114 made standalone opt-in, so the plain build now runs under a supported `next start`. Booting api + admin that way.
+
+🔧 **Bash**
+```
+cd /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-review-skill-d78732
+SCRATCH=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-review-skill-d78732/a9918601-791d-4748-b2b8-ab6ee2dfee8f/scratchpad
+set -a; source .env; set +a
+export ADMIN_URL=http://127.0.0.1:4300 API_URL=http://127.0.0.1:4301 STOREFRONT_BASE_DOMAIN=localhost:4302 API_PORT=4301
+nohup pnpm --filter @merchant/api start > "$SCRATCH/logs/api.log" 2>&1 & disown; echo api $!
+nohup pnpm --filter @merchant/admin exec next start --port 4300 > "$SCRATCH/logs/admin.log" 2>&1
+… [truncated, 163 more chars]
+```
+
+> **↳ result**
+> ```
+> api 80801
+> admin 80802
+> READY
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://127.0.0.1:4300/login"}}, {"name": "computer", "input": {"action": "wait", "duration": 2}}, {"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> actions[0] (navigate) failed: The Browser pane isn't open yet, and a `browser_batch` step can't open it. Call `navigate` with this url on its own, outside `browser_batch` (that opens the pane), then batch the rest. (0 completed, 2 remaining)
+> ```
+
+🔧 **mcp__Claude_Browser__navigate**
+```
+{"url": "http://127.0.0.1:4300/login"}
+```
+
+> **↳ result**
+> ```
+> {
+>   "serverId": "preview-local_182686d2-c9fd-4376-8554-f0cff8c1ab97",
+>   "tabId": "seed",
+>   "reused": false,
+>   "type": "browser",
+>   "navOk": true
+> }
+> Browser pane opened. Use serverId "preview-local_182686d2-c9fd-4376-8554-f0cff8c1ab97" with read_page / computer / navigate.
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Log in · Shopify" (http://127.0.0.1:4300)
+> [image]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [399, 220]}}, {"name": "computer", "input": {"action": "type", "text": "owner@demo.dev"}}, {"name": "computer", "input": {"action": "left_click", "coordinate": [399, 265]}}, {"name": "computer", "input": {"action": "type", "text": "password123"}}, {"name": "computer", "input": {"action": "left_click", "coordinate": [399, 294]}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "navigate", "input": {"url": "http://127.0.0.1:4300/store/demo/orders"}}, {"name": "computer", "input": {"action
+… [truncated, 85 more chars]
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (399, 220)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Log in · Shopify" (http://127.0.0.1:4300)
+> [computer:type] typed 14 chars
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Log in · Shopify" (http://127.0.0.1:4300)
+> [computer:left_click] left_click at (399, 265)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Log in · Shopify" (http://127.0.0.1:4300)
+> [computer:type] typed 11 chars
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Log in · Shopify" (http://127.0.0.1:4300)
+> [computer:left_click] left_click at (399, 294)
+> 
+> 
+> Tab Context:
+> - Executed
+> … [truncated, 717 more chars]
+> ```
+
+### 🤖 Claude
+
+#111's fixes verified live: "Aug 29 at 2:12 pm" dates and "1 item" singular. Now opening #1035 to fulfill with a carrier and check the payment card.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [183, 371]}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (183, 371)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [image]
+> ```
+
+### 🤖 Claude
+
+"Paid with Mock Gateway" and the en-US header date both live. Now the fulfill flow with a carrier.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [528, 112]}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (528, 112)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [image]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [673, 207]}}, {"name": "computer", "input": {"action": "type", "text": "1Z999AA10123456784"}}, {"name": "find", "input": {"query": "Shipping carrier"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (673, 207)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:type] typed 18 chars
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [find] Found 1 match(es) for "Shipping carrier":
+> - generic "Shipping carrier" [ref_86]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> ```
+
+🔧 **mcp__Claude_Browser__read_page**
+```
+{"filter": "interactive", "max_chars": 1500}
+```
+
+> **↳ result**
+> ```
+> link [ref_1] href="#AppFrameMain"
+> link [ref_4] href="/store/demo"
+> textbox "Search" [ref_7] type="search" placeholder="Search"
+> button "Notifications" [ref_8] type="button"
+> button "Store menu" [ref_9] type="button"
+> link [ref_18] href="/store/demo"
+> link [ref_21] href="/store/demo/orders"
+> link [ref_25] href="/store/demo/products"
+> link [ref_28] href="/store/demo/customers"
+> link [ref_31] href="/store/demo/marketing"
+> link [ref_34] href="/store/demo/discounts"
+> link [ref_37] href="/store/demo/analytics"
+> link [ref_40] href="/store/demo/storefront"
+> link [ref_43] href="/store/demo/apps"
+> link [ref_47] href="/store/demo/settings"
+> link "#1035" [ref_53] href="/store/demo/orders/ord_01M16J3PA3QWB3G5P3FM2DMD4
+> … [truncated, 353 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__read_page**
+```
+{"filter": "all", "ref_id": "ref_86", "max_chars": 1200}
+```
+
+> **↳ result**
+> ```
+> generic "Shipping carrier" [ref_86]
+> 
+> Viewport: 1280x720
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> ```
+
+🔧 **mcp__Claude_Browser__find**
+```
+{"query": "Select carrier"}
+```
+
+> **↳ result**
+> ```
+> Found 3 match(es) for "Select carrier":
+> - combobox "Select carrier" [ref_87]
+> - generic "Select carrier" [ref_88]
+> - generic "Select carrier" [ref_95]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> ```
+
+🔧 **mcp__Claude_Browser__form_input**
+```
+{"ref": "ref_87", "value": "UPS"}
+```
+
+> **↳ result**
+> ```
+> filled ref_87 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "find", "input": {"query": "Fulfill 3 items"}}]}
+```
+
+> **↳ result**
+> ```
+> [find] Found 1 match(es) for "Fulfill 3 items":
+> - generic "Fulfill 3 items" [ref_100]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_100"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (1079, 532) [ref_100]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Orders · Shopify" (http://127.0.0.1:4300)
+> [image]
+> ```
+
+### 🤖 Claude
+
+Carrier flow verified end-to-end — "UPS · 1Z999AA10123456784" on the fulfillment card. Last check: the discount summary date.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://127.0.0.1:4300/store/demo/discounts"}}, {"name": "computer", "input": {"action": "wait", "duration": 2}}, {"name": "computer", "input": {"action": "screenshot"}}, {"name": "computer", "input": {"action": "left_click", "coordinate": [180, 143]}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "computer", "input": {"action": "screenshot"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://127.0.0.1:4300
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Discounts · Shopify" (http://127.0.0.1:4300)
+> [computer:wait] waited 2s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Discounts · Shopify" (http://127.0.0.1:4300)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Discounts · Shopify" (http://127.0.0.1:4300)
+> [image]
+> [computer:left_click] left_click at (180, 143)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Discounts · Shopify" (http://127.0.0.1:4300)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> -
+> … [truncated, 280 more chars]
+> ```
+
+### 🤖 Claude
+
+All three verified live. Committing and opening the PR, then shutting the stack down.
+
+🔧 **Bash**
+```
+git add -A && git commit -q -m "fix(shared): demo polish — processor display name, shipping carrier on fulfil, formatted discount dates
+
+Repo-review follow-ups, each verified in the browser on a prod-build stack:
+
+- The order payment card read 'Paid with mock' — the raw processor enum at
+  the exact spot DEMO.md beat 6 (and the failover beat) points at. It now
+  uses the same display names Settings → Payments shows: 'Paid with Mock
+  Gateway'.
+- The fulfil page had no carrier control though createFulfillmentInput and
+  the Fulfillment DTO carry trackingCompany end to end — the fulfillment
+  ca
+… [truncated, 854 more chars]
+```
+
+> **↳ result**
+> ```
+> Checked 4 files in 65ms. No fixes applied.
+> remote: 
+> remote: Create a pull request for 'ws-qa/demo-polish' on GitHub by visiting:        
+> remote:      https://github.com/pauljurgens11/shopify/pull/new/ws-qa/demo-polish        
+> remote: 
+> https://github.com/pauljurgens11/shopify/pull/118
+> ```
+
+🔧 **Bash**
+```
+gh pr merge 118 --auto --squash --delete-branch >/dev/null 2>&1; gh pr view 118 --json autoMergeRequest,mergeable --jq '{auto: (.autoMergeRequest != null), mergeable}'
+kill 80801 80802 2>/dev/null; lsof -ti :4301 -sTCP:LISTEN | xargs kill 2>/dev/null; sleep 0
+for p in 4300 4301; do lsof -ti :$p -sTCP:LISTEN >/dev/null 2>&1 && echo "$p held" || echo "$p freed"; done
+cat >> docs/AGENT-LOG.md <<'EOF'
+EOF
+git checkout -q claude/repo-review-skill-d78732 && echo back-on-review-branch
+```
+
+> **↳ result**
+> ```
+> {"auto":true,"mergeable":"MERGEABLE"}
+> 4300 held
+> 4301 freed
+> back-on-review-branch
+> ```
+
+🔧 **Bash**
+```
+pid=$(lsof -ti :4300 -sTCP:LISTEN | head -1); cwd=$(lsof -p $pid 2>/dev/null | awk '$4=="cwd"{print $NF}' | head -1); echo "pid=$pid cwd=$cwd"; case "$cwd" in *repo-review-skill-d78732*) kill $pid && echo killed;; *) echo "not mine — leaving";; esac; git status --short | head -3; git log origin/main --oneline -3
+```
+
+> **↳ result**
+> ```
+> pid= cwd=
+> not mine — leaving
+> 34fa87e docs(shared): archive every Claude Code session behind this build (#117)
+> e04af57 feat(ws-g): Home serves both Shopify variants — onboarding page and dashboard (#116)
+> fee606d docs(shared): repo-review findings — E9/B7 filed, DEMO timing realigned, third-pass log (#115)
+> ```
+
+### 🤖 Claude
+
+Done. Everything from the review that wasn't already filed as an issue got triaged demo-first — three things were worth it, all fixed, verified live in the browser, and landed as [#118](https://github.com/pauljurgens11/shopify/pull/118) (auto-merge armed, CI running):
+
+**Fixed — each one sits on a demo sight-line:**
+1. **"Paid with mock" → "Paid with Mock Gateway"** on the order payment card ([payment-card.tsx](apps/admin/src/app/store/[slug]/orders/_components/payment-card.tsx)). That's the exact line DEMO.md's beat 6 points at, and the failover beat's "payment record naming the processor". Verified on order #1035.
+2. **Shipping carrier on the fulfill page** ([fulfill/page.tsx](apps/admin/src/app/store/[slug]/orders/[id]/fulfill/page.tsx)). `trackingCompany` was contract-complete end-to-end with no UI on either side — added Shopify's carrier select (curated list, §7 simplest-idiomatic) and the fulfillment card now reads **"UPS · 1Z999AA10123456784"** instead of a bare number. Verified by actually fulfilling an order through it.
+3. **Discount summary dates** — the right-rail card printed raw ISO ("Active from 2026-05-31"); it now reads "Active from May 31, 2026", with mid-edit values passing through untouched. Verified on WELCOME10.
+
+`pnpm verify` green before push; one incidental discovery along the way: #114's standalone opt-in means a plain build now boots correctly under `next start`, which is how I verified.
+
+**Deliberately not fixed** (invisible to a demo, or settled decisions I won't relitigate): the dead `webhooks.ts` contract vintage and stale `orderListResponse`/`productListResponse` shapes, `shopSchema.onboarding` furniture, the CLAUDE.md-vs-biome `dbAdmin` allowlist prose drift, orders-index row checkboxes (DECISIONS-239 precedent — a checkbox with no bulk actions is a lying control), and the discounts status-filter short pages (DECISIONS-186, logged trade-off). All of these are already on record in AGENT-LOG for their owners.
+
+### 👤 User
+
+is it merged and done? stop running tasks then
+
+🔧 **Bash**
+```
+gh pr view 118 --json state,mergedAt --jq '{state,mergedAt}'; gh pr list --author "@me" --state open --json number,title --jq '.[] | "\(.number) \(.title)"'
+```
+
+> **↳ result**
+> ```
+> {"mergedAt":"2026-08-29T13:48:22Z","state":"MERGED"}
+> 120 feat(ws-a): make the production stack deployable on a real domain
+> 119 feat(ws-a): admin shell parity — top bar, nav sections, page header
+> ```
+
+🔧 **Bash**
+```
+ps ax -o pid,command | grep -F "repo-review-skill-d78732" | grep -vE "grep|Claude|\.output" | head -5; echo "---"; for p in 4100 4103 4300 4301 4302; do lsof -ti :$p -sTCP:LISTEN >/dev/null 2>&1 && echo "port $p held" || true; done; echo "port check done"
+```
+
+> **↳ result**
+> ```
+> ---
+> port 4100 held
+> port 4300 held
+> port check done
+> ```
+
+🔧 **Bash**
+```
+for p in 4100 4300; do pid=$(lsof -ti :$p -sTCP:LISTEN | head -1); cwd=$(lsof -p $pid 2>/dev/null | awk '$4=="cwd"{print $NF}' | head -1); echo "port $p pid=$pid cwd=$cwd"; done
+```
+
+> **↳ result**
+> ```
+> port 4100 pid=95736 cwd=/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/product-form-parity-58c056/apps/admin
+> port 4300 pid=97447 cwd=/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/admin-shell-ui-parity-65b222/apps/admin
+> ```
+
+🔧 **mcp__Claude_Browser__tabs_close**
+```
+{"tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Closed tab seed. That was the last tab, so the Browser pane is now closed — use `preview_start` to open it again.
+> ```
+
+### 🤖 Claude
+
+Yes — merged and done, and everything I was running is stopped.
+
+- **[#118](https://github.com/pauljurgens11/shopify/pull/118) merged** at 13:48Z. That closes out all five of my PRs from this review (#111, #112, #113, #115, #118) — nothing of mine is pending.
+- **All my tasks are stopped**: the wind-down monitor and every background build/test job finished long ago; my api/worker/admin/storefront/echo processes were killed and their ports released; the browser pane is closed. A process check confirms zero processes left running from my worktree.
+- The two ports still held (4100, 4300) belong to **other live agent sessions** (product-form-parity and admin-shell-ui-parity worktrees), so I left them alone — same for the two open PRs #119/#120, which are their work.

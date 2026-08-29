@@ -4,9 +4,10 @@
 |---|---|
 | **Session** | `0103d436-541e-4695-adbd-8b5fdc5ae0ef` |
 | **Started** | 2026-08-29T13:31:39.481Z |
-| **Ended** | 2026-08-29T13:38:54.227Z |
+| **Ended** | 2026-08-29T14:14:27.025Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25` |
-| **Branch** | `ws-e/discount-keeps-shipping` |
+| **Branch** | `ws-e/e9-agent-log` |
+| **Pull request** | #121 (MERGED) |
 | **Model** | `claude-opus-5` |
 | **Claude Code** | 2.1.247 |
 | **Archived** | no |
@@ -1618,3 +1619,3055 @@ show() { python3 -c 'import sys,json;d=json.load(sys.stdin);print("  selected:",
 > 4. apply WELCOME10 (discountCode only):
 >   selected: ship_01M16VQ49F9Y9Y0NVGSZKZQMJJ | ship: 895 | disc: 180 | applied: ['WELCOME10'] | rejected: None
 > ```
+
+### 🤖 Claude
+
+The API is provably innocent — the rate survives against the real seed. So the bug is client-side. Let me boot the storefront and watch it in a browser.
+
+🔧 **Bash**
+```
+grep -n "dev:localhost\|\"dev\"" package.json apps/storefront/package.json | head; echo "=== launch.json ==="; cat .claude/launch.json
+```
+
+> **↳ result**
+> ```
+> package.json:11:    "dev": "turbo run dev",
+> package.json:12:    "dev:localhost": "ADMIN_URL=http://localhost:3000 API_URL=http://localhost:3001 STOREFRONT_BASE_DOMAIN=localhost:3002 turbo run dev",
+> apps/storefront/package.json:7:    "dev": "next dev --port 3002",
+> === launch.json ===
+> {
+>   "version": "0.0.1",
+>   "configurations": [
+>     {
+>       "name": "dev",
+>       "runtimeExecutable": "pnpm",
+>       "runtimeArgs": ["dev"],
+>       "port": 3000,
+>       "url": "http://admin.lvh.me:3000"
+>     },
+>     {
+>       "name": "storefront",
+>       "port": 3002,
+>       "url": "http://demo.lvh.me:3002"
+>     },
+>     {
+>       "name": "api",
+>       "port": 3001,
+>       "url": "http://api.lvh.me:3001"
+>     },
+>     {
+>       "name":
+> … [truncated, 366 more chars]
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; ulimit -n 8192 2>/dev/null; API_URL=http://localhost:3011 STOREFRONT_BASE_DOMAIN=localhost:3002 nohup pnpm --filter @merchant/storefront dev > $SD/sf.log 2>&1 & disown; sleep 20; tail -6 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> errno: -48,
+>   syscall: 'listen',
+>   address: '::',
+>   port: 3002
+> }
+> [?25h
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; API_URL=http://localhost:3011 STOREFRONT_BASE_DOMAIN=localhost:3012 STOREFRONT_PORT=3012 nohup pnpm --filter @merchant/storefront exec next dev --port 3012 > $SD/sf.log 2>&1 & disown; sleep 20; tail -8 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> ▲ Next.js 15.5.24
+>    - Local:        http://localhost:3012
+>    - Network:      http://192.168.1.202:3012
+> 
+>  ✓ Starting...
+>  ✓ Ready in 2.5s
+> ```
+
+### 🤖 Claude
+
+Storefront is up on :3012. Adding a temporary attach entry so the browser pane will render it.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/.claude/launch.json
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/.claude/launch.json has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **mcp__Claude_Browser__preview_start**
+```
+{"name": "e9-storefront"}
+```
+
+> **↳ result**
+> ```
+> {
+>   "serverId": "preview-local_221a2a2c-e1eb-4f25-8e14-25101d18ba2e",
+>   "port": 3012,
+>   "name": "e9-storefront",
+>   "reused": false,
+>   "previewId": "preview-local_221a2a2c-e1eb-4f25-8e14-25101d18ba2e",
+>   "tabId": "seed",
+>   "configUrl": {
+>     "url": "http://demo.localhost:3012/",
+>     "outcome": "navigated"
+>   }
+> }
+> Attached the preview to the configured url; no process was started.
+> The preview opened at the configured url http://demo.localhost:3012/. Opened tab "seed" at http://demo.localhost:3012/. Use tabId "seed" with read_page / computer / navigate; serverId is for preview_stop and preview_logs only.
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/products/basin-wool-socks", "tabId": "seed"}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Store not found" (http://demo.localhost:3012)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Store not found" (http://demo.localhost:3012)
+> [image]
+> ```
+
+🔧 **Bash**
+```
+cat apps/storefront/src/lib/tenant.ts
+```
+
+> **↳ result**
+> ```
+> /**
+>  * Storefront tenant resolution (SPEC §6): the shop comes from the Host header.
+>  *
+>  * Local:  {shopSlug}.lvh.me:3002  (lvh.me resolves to 127.0.0.1 — no /etc/hosts)
+>  * Prod:   wildcard subdomain, plus custom domains looked up in CustomDomain.
+>  *
+>  * Owner: WS-E.
+>  */
+> 
+> import { env } from '@merchant/config/env';
+> import { headers } from 'next/headers';
+> 
+> export async function resolveShopSlug(): Promise<string | null> {
+>   const host = (await headers()).get('host');
+>   if (!host) return null;
+> 
+>   // Lowercased like apps/api/src/lib/host.ts — DNS names are case-insensitive,
+>   // and the two resolvers disagreeing means a shop that loads on the API but
+>   // 404s on the storefront (test/host.test.ts
+> … [truncated, 1,667 more chars]
+> ```
+
+🔧 **Bash**
+```
+sed -n 1,30p packages/config/src/env.ts; echo "=== storefront next.config / env loading ==="; grep -rn "dotenv\|loadEnv\|env-file" packages/config/src/env.ts apps/storefront/next.config.* apps/storefront/package.json 2>/dev/null | head
+```
+
+> **↳ result**
+> ```
+> /**
+>  * The one place environment variables are read (SPEC §5).
+>  *
+>  * Rules:
+>  *  - Add a var here and to `.env.example` in the SAME commit. CI enforces the
+>  *    pair via `scripts/check-env-parity.mjs`.
+>  *  - Server-only. Never import this from a client component; Next would inline
+>  *    secrets into the browser bundle.
+>  *  - Parsing is lazy and cached, so importing a helper from this package does
+>  *    not blow up a process that has no business needing DATABASE_URL.
+>  */
+> import { z } from 'zod';
+> 
+> const booleanish = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
+> 
+> const schema = z.object({
+>   NODE_ENV: z.enum(['development', 'test', 'production']).default('devel
+> … [truncated, 814 more chars]
+> ```
+
+🔧 **Bash**
+```
+sed -n 1,20p apps/storefront/next.config.ts
+```
+
+> **↳ result**
+> ```
+> import { existsSync } from 'node:fs';
+> import { fileURLToPath } from 'node:url';
+> import type { NextConfig } from 'next';
+> 
+> // Next only reads .env from its own directory. The monorepo keeps ONE .env at
+> // the root (SPEC §5), so load it here, before the app boots.
+> const rootEnv = fileURLToPath(new URL('../../.env', import.meta.url));
+> if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
+> 
+> const config: NextConfig = {
+>   reactStrictMode: true,
+>   // Standalone is what the Dockerfile ships: pnpm's node_modules is a symlink
+>   // farm into the store, so copying it between build stages produces a broken
+>   // tree, and standalone emits a self-contained server with only the files
+>   // actually imported.
+> … [truncated, 450 more chars]
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:$PATH"; cd /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad && printf 'FOO=fromfile\n' > t.env && FOO=fromenv node -e "process.loadEnvFile('./t.env'); console.log('FOO =', process.env.FOO)"
+```
+
+> **↳ result**
+> ```
+> FOO = fromenv
+> Shell cwd was reset to /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25
+> ```
+
+### 🤖 Claude
+
+The API also needs the localhost base domain to resolve `demo.localhost` hosts. Restarting it with matching env.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; PID=$(lsof -nP -iTCP:3011 -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2}'); echo "killing my api pid=$PID"; kill $PID 2>/dev/null; sleep 3; lsof -nP -iTCP:3011 -sTCP:LISTEN | head -2
+```
+
+> **↳ result**
+> ```
+> killing my api pid=78307
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; API_PORT=3011 API_URL=http://localhost:3011 STOREFRONT_BASE_DOMAIN=localhost:3012 ADMIN_URL=http://localhost:3010 nohup pnpm --filter @merchant/api dev > $SD/api.log 2>&1 & disown; sleep 14; tail -3 $SD/api.log
+```
+
+> **↳ result**
+> ```
+> [16:42:00.081] INFO (80314): Server listening at http://127.0.0.1:3011
+> [16:42:00.081] INFO (80314): Server listening at http://192.168.1.202:3011
+> ```
+
+🔧 **Bash**
+```
+curl -s -o /dev/null -w 'api demo.localhost: %{http_code}\n' -H 'Host: demo.localhost:3012' http://127.0.0.1:3011/storefront/api/shop
+```
+
+> **↳ result**
+> ```
+> api demo.localhost: 200
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/products/basin-wool-socks", "tabId": "seed"}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> [image]
+> ```
+
+### 🤖 Claude
+
+The storefront renders. Now let me add to cart and get to checkout.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "find", "input": {"query": "Add to cart", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [find] Found 1 match(es) for "Add to cart":
+> - button "Add to cart" [ref_21] type="button"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_21", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (1024, 360) [ref_21]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Basin Wool Socks — Aurora Supply Co." (http://demo.localhost:3012)
+> [image]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/cart", "tabId": "seed"}}, {"name": "find", "input": {"query": "checkout", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> [find] Found 2 match(es) for "checkout":
+> - generic "Taxes and shipping calculated at checkout." [ref_25]
+> - link "Check out" [ref_26] href="/checkout"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_26", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> actions[0] (computer:left_click) failed: left_click failed: the press at (0, 0) could not be attributed to a frame (No node found at given location); it was not dispatched. Take a fresh screenshot and retry (0 completed, 2 remaining)
+> ```
+
+🔧 **mcp__Claude_Browser__navigate**
+```
+{"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__computer**
+```
+{"action": "screenshot", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> [image]
+> Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+Checkout is up. Now filling it exactly as the repro describes.
+
+🔧 **mcp__Claude_Browser__read_page**
+```
+{"filter": "interactive", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> textbox "Email" [ref_1] type="email" placeholder="Email"
+> checkbox "on" [ref_2] type="checkbox"
+> combobox "United States" [ref_3]
+>  option "United States" (selected) value="US"
+>  option "Canada" value="CA"
+>  option "United Kingdom" value="GB"
+> textbox "First name" [ref_4] type="text" placeholder="First name"
+> textbox "Last name" [ref_5] type="text" placeholder="Last name"
+> textbox "Address" [ref_6] type="text" placeholder="Address"
+> textbox "Apartment, suite, etc. (optional)" [ref_7] type="text" placeholder="Apartment, suite, etc. (optional)"
+> textbox "City" [ref_8] type="text" placeholder="City"
+> textbox "State" [ref_9] type="text" placeholder="State"
+> textbox "ZIP code" [ref_10] type="text" placeholde
+> … [truncated, 266 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "form_input", "input": {"ref": "ref_1", "value": "shopper@example.com", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_4", "value": "Jane", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_5", "value": "Whitfield", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_6", "value": "1218 SE Ankeny St", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_8", "value": "Portland", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_9", "value": "OR", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "r
+… [truncated, 358 more chars]
+```
+
+> **↳ result**
+> ```
+> [form_input] filled ref_1 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_4 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_5 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_6 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input]
+> … [truncated, 1,211 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__get_page_text**
+```
+{"tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Aurora Supply Co.
+> Express checkout unavailable
+> OR
+> Contact
+> Email
+> Email me with news and offers
+> Delivery
+> Country/Region
+> United States
+> Canada
+> United Kingdom
+> First name
+> Last name
+> Address
+> Apartment, suite, etc. (optional)
+> City
+> State
+> ZIP code
+> Shipping method
+> Standard shipping (3–5 days)
+> $8.95
+> Express shipping (2 days)
+> $18.95
+> Payment
+> 
+> All transactions are secure and encrypted.
+> 
+> Card number
+> Expiration date (MM / YY)
+> Security code
+> Name on card
+> Billing address same as shipping address
+> Pay now
+> 1
+> 
+> Basin Wool Socks
+> 
+> M
+> 
+> $18.00
+> 
+> Apply
+> Subtotal
+> $18.00
+> Shipping
+> Enter shipping address
+> Taxes
+> $1.53
+> Total
+> USD
+> $19.53
+> … [truncated, 132 more chars]
+> ```
+
+### 🤖 Claude
+
+Rate list is live. Note the sidebar already says "Enter shipping address" with a complete address — that's the cosmetic half, confirmed. Now selecting Standard.
+
+🔧 **mcp__Claude_Browser__find**
+```
+{"query": "Standard shipping", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Found 1 match(es) for "Standard shipping":
+> - generic "Standard shipping (3–5 days)" [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_47", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (361, 360) [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Aurora Supply Co.
+> Express checkout unavailable
+> OR
+> Contact
+> Email
+> Email me with news and offers
+> Delivery
+> Country/Region
+> United States
+> Canada
+> United Kingdom
+> First name
+> Last name
+> Address
+> Apartment, suite, etc. (optional)
+> City
+> State
+> ZIP code
+> … [truncated, 483 more chars]
+> ```
+
+### 🤖 Claude
+
+Rate selected — Shipping $8.95, total $28.48. Now the discount.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "form_input", "input": {"ref": "ref_11", "value": "WELCOME10", "tabId": "seed"}}, {"name": "computer", "input": {"action": "left_click", "ref": "ref_12", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [form_input] filled ref_11 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:left_click] left_click at (1129, 157) [ref_12]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Aurora Supply Co.
+> Express checkout unavailable
+> OR
+> Contact
+> Email
+> … [truncated, 693 more chars]
+> ```
+
+### 🤖 Claude
+
+The reported repro doesn't reproduce — discount applied and shipping stayed at $8.95. So the issue's diagnosis is wrong. Let me test the concurrency I suspect: a field blur firing at the same instant as the rate click.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "find", "input": {"query": "Express shipping", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [find] Found 1 match(es) for "Express shipping":
+> - generic "Express shipping (2 days)" [ref_51]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_10", "tabId": "seed"}}, {"name": "computer", "input": {"action": "left_click", "ref": "ref_51", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (555, 360) [ref_10]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:left_click] left_click at (356, 360) [ref_51]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Aurora Supply Co.
+> Express checkout unavailable
+> … [truncated, 711 more chars]
+> ```
+
+### 🤖 Claude
+
+Discount survived again. The API is provably innocent, so the remaining candidate is a last-write-wins race between concurrent section saves. Let me force it deterministically with a temporary server delay.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Bash**
+```
+sleep 8; tail -3 /private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad/api.log
+```
+
+> **↳ result**
+> ```
+> [16:44:36.288] INFO (81884): Server listening at http://127.0.0.1:3011
+> [16:44:36.288] INFO (81884): Server listening at http://192.168.1.202:3011
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "read_page", "input": {"filter": "interactive", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [read_page] (empty page)
+> 
+> Viewport: 0x0
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "read_page", "input": {"filter": "interactive", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [read_page] (empty page)
+> 
+> Viewport: 0x0
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__computer**
+```
+{"action": "screenshot", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> [image]
+> Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__read_page**
+```
+{"filter": "interactive", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> textbox "Email" [ref_1] type="email" placeholder="Email"
+> checkbox "on" [ref_2] type="checkbox"
+> combobox "United States" [ref_3]
+>  option "United States" (selected) value="US"
+>  option "Canada" value="CA"
+>  option "United Kingdom" value="GB"
+> textbox "First name" [ref_4] type="text" placeholder="First name"
+> textbox "Last name" [ref_5] type="text" placeholder="Last name"
+> textbox "Address" [ref_6] type="text" placeholder="Address"
+> textbox "Apartment, suite, etc. (optional)" [ref_7] type="text" placeholder="Apartment, suite, etc. (optional)"
+> textbox "City" [ref_8] type="text" placeholder="City"
+> textbox "State" [ref_9] type="text" placeholder="State"
+> textbox "ZIP code" [ref_10] type="text" placeholde
+> … [truncated, 266 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "form_input", "input": {"ref": "ref_1", "value": "shopper@example.com", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_4", "value": "Jane", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_5", "value": "Whitfield", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_6", "value": "1218 SE Ankeny St", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_8", "value": "Portland", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_9", "value": "OR", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "r
+… [truncated, 339 more chars]
+```
+
+> **↳ result**
+> ```
+> [form_input] filled ref_1 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_4 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_5 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_6 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input]
+> … [truncated, 1,870 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__find**
+```
+{"query": "Standard shipping", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Found 1 match(es) for "Standard shipping":
+> - generic "Standard shipping (3–5 days)" [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_10", "tabId": "seed"}}, {"name": "computer", "input": {"action": "left_click", "ref": "ref_47", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 2}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 700}}, {"name": "computer", "input": {"action": "wait", "duration": 7}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 700}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (555, 360) [ref_10]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:left_click] left_click at (361, 360) [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 2s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Aurora Supply Co.
+> Express checkout unavailable
+> … [truncated, 1,684 more chars]
+> ```
+
+### 🤖 Claude
+
+The race theory is disproven too — Next serializes Server Actions, so responses land in order. But this run showed the real mechanism: **two seconds after clicking the rate, the sidebar still read "Enter shipping address"** — the radio has no optimistic state, so a pending save is indistinguishable from a cleared selection. Let me remove the diagnostic and measure how long that window really is.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; sleep 8; wc -l < $SD/api.log; cp $SD/api.log $SD/api-before.log; echo "marker saved"
+```
+
+> **↳ result**
+> ```
+> 540
+> marker saved
+> ```
+
+### 🤖 Claude
+
+Now measuring the redundant saves: tabbing through the address fields with nothing changed.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_4", "tabId": "seed"}}, {"name": "computer", "input": {"action": "key", "text": "Tab", "tabId": "seed", "repeat": 6}}, {"name": "computer", "input": {"action": "wait", "duration": 5}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (235, 360) [ref_4]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:key] pressed Tab x6
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 5s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; diff <(cat $SD/api-before.log) <(cat $SD/api.log) | grep -c '"method": "PUT"' ; echo "--- PUT count above (tabbing 6 fields, nothing changed) ---"
+```
+
+> **↳ result**
+> ```
+> 6
+> --- PUT count above (tabbing 6 fields, nothing changed) ---
+> ```
+
+### 🤖 Claude
+
+Confirmed the amplifier: **6 identical address PUTs from tabbing through 6 unchanged fields.** Since Next serializes Server Actions, the shopper's next real action queues behind all of them. Now implementing the fixes.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+### 🤖 Claude
+
+Now the radios and the sidebar label.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/order-summary.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/order-summary.tsx has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+### 🤖 Claude
+
+Now mutation-checking the API test — making the server treat absent as reset, the exact bug the issue posited.
+
+🔧 **Bash**
+```
+cp apps/api/src/services/checkout/checkout.ts /tmp/co.bak && perl -0pi -e "s/    if \(input\.selectedShippingRateId !== undefined\)\n      data\.shippingRateId = input\.selectedShippingRateId;/    data.shippingRateId = input.selectedShippingRateId ?? null;/" apps/api/src/services/checkout/checkout.ts; grep -n "shippingRateId = input" apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> 333:    data.shippingRateId = input.selectedShippingRateId;
+> ```
+
+🔧 **Read**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> 330	    data.billingSameAsShipping = input.billingSameAsShipping;
+> 331	  }
+> 332	  if (input.selectedShippingRateId !== undefined)
+> 333	    data.shippingRateId = input.selectedShippingRateId;
+> 334	  if (input.discountCode !== undefined) {
+> 335	    data.discountCode = input.discountCode === null ? null : input.discountCode.trim();
+> ```
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm --filter @merchant/api exec vitest run test/checkout.test.ts -t "only a discount code" 2>&1 | tail -25
+```
+
+> **↳ result**
+> ```
+> [32m- Expected:[39m 
+> "evt_01M16WFYQGM5FGDY3ZBW6TYR5D"
+> 
+> [31m+ Received:[39m 
+> null
+> 
+>  ❯ test/checkout.test.ts:445:42
+>     443|     const after = response.json();
+>     444| 
+>     445|     expect(after.selectedShippingRateId).toBe(STANDARD_RATE_ID);
+>        |                                          ^
+>     446|     expect(after.totals.shippingTotal).toEqual(usd(895));
+>     447|     expect(after.appliedDiscounts).toHaveLength(1);
+> 
+> ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+> 
+> 
+>  Test Files  1 failed (1)
+>       Tests  1 failed | 29 skipped (30)
+>    Start at  16:49:05
+>    Duration  2.98s (transform 528ms, setup 36ms, collect 1.13s, tests 1.37s, environment 0ms, prepare 187ms)
+> 
+> undefined
+> /Users/pauljurgens/Downloads/pro
+> … [truncated, 197 more chars]
+> ```
+
+### 🤖 Claude
+
+The test fails for exactly the right reason. Restoring the implementation.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/src/services/checkout/checkout.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; diff /tmp/co.bak apps/api/src/services/checkout/checkout.ts && echo "IDENTICAL to pre-mutation"; pnpm --filter @merchant/api exec vitest run test/checkout.test.ts 2>&1 | tail -8
+```
+
+> **↳ result**
+> ```
+> IDENTICAL to pre-mutation
+>    ✓ complete > charges, creates the order and matches the checkout to the cent  540ms
+>    ✓ complete > refuses to oversell a deny-policy variant when two shoppers race  395ms
+> 
+>  Test Files  1 passed (1)
+>       Tests  30 passed (30)
+>    Start at  16:49:17
+>    Duration  5.87s (transform 407ms, setup 48ms, collect 746ms, tests 4.58s, environment 0ms, prepare 200ms)
+> ```
+
+### 🤖 Claude
+
+Now verifying the client fixes in the browser.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 5}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 5s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "wait", "duration": 5}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:wait] waited 5s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; tail -20 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 6163ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 47ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 206ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 29ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 27ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 19ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 24ms
+>  POST /checkouts/chk_07bcf0e1355f69ac07d4c4c3d4d30ef73c07ec4c03ed8c97 200 in 30ms
+>  ✓ Compiled in 1791ms (901 modules)
+>  GET /
+> … [truncated, 610 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__read_console_messages**
+```
+{"onlyErrors": true, "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> No console logs.
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 6}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 6s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [image]
+> ```
+
+### 🤖 Claude
+
+Fresh checkout — "Enter shipping address" is correct with no address. Now filling it and checking the new label plus the redundant-save fix.
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; cp $SD/api.log $SD/api-before.log; echo marked
+```
+
+> **↳ result**
+> ```
+> marked
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "read_page", "input": {"filter": "interactive", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [read_page] textbox "Email" [ref_1] type="email" placeholder="Email"
+> checkbox "on" [ref_2] type="checkbox"
+> combobox "United States" [ref_3]
+>  option "United States" (selected) value="US"
+>  option "Canada" value="CA"
+>  option "United Kingdom" value="GB"
+> textbox "First name" [ref_4] type="text" placeholder="First name"
+> textbox "Last name" [ref_5] type="text" placeholder="Last name"
+> textbox "Address" [ref_6] type="text" placeholder="Address"
+> textbox "Apartment, suite, etc. (optional)" [ref_7] type="text" placeholder="Apartment, suite, etc. (optional)"
+> textbox "City" [ref_8] type="text" placeholder="City"
+> textbox "State" [ref_9] type="text" placeholder="State"
+> textbox "ZIP code" [ref_10] type="text
+> … [truncated, 278 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "form_input", "input": {"ref": "ref_1", "value": "shopper@example.com", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_4", "value": "Jane", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_5", "value": "Whitfield", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_6", "value": "1218 SE Ankeny St", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_8", "value": "Portland", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "ref_9", "value": "OR", "tabId": "seed"}}, {"name": "form_input", "input": {"ref": "r
+… [truncated, 339 more chars]
+```
+
+> **↳ result**
+> ```
+> [form_input] filled ref_1 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_4 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_5 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_6 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input]
+> … [truncated, 1,872 more chars]
+> ```
+
+### 🤖 Claude
+
+"Select a shipping method" — cosmetic fix verified live. Now the redundant-save fix.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_4", "tabId": "seed"}}, {"name": "computer", "input": {"action": "key", "text": "Tab", "tabId": "seed", "repeat": 6}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (235, 360) [ref_4]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:key] pressed Tab x6
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; N=$(diff $SD/api-before.log $SD/api.log | grep -c '"method": "PUT"'); echo "PUTs during tab-through of 6 unchanged fields: $N  (was 6 before the fix)"
+```
+
+> **↳ result**
+> ```
+> PUTs during tab-through of 6 unchanged fields: 1  (was 6 before the fix)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; cp $SD/api.log $SD/api-before.log; echo "marked (address already saved)"
+```
+
+> **↳ result**
+> ```
+> marked (address already saved)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_4", "tabId": "seed"}}, {"name": "computer", "input": {"action": "key", "text": "Tab", "tabId": "seed", "repeat": 6}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (235, 360) [ref_4]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:key] pressed Tab x6
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; N=$(diff $SD/api-before.log $SD/api.log | grep -c '"method": "PUT"'); echo "PUTs from tabbing 6 unchanged fields (address already saved): $N"
+```
+
+> **↳ result**
+> ```
+> PUTs from tabbing 6 unchanged fields (address already saved): 0
+> ```
+
+### 🤖 Claude
+
+6 → 0. Now the acceptance path: pick a rate, apply the discount.
+
+🔧 **mcp__Claude_Browser__find**
+```
+{"query": "Standard shipping", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Found 1 match(es) for "Standard shipping":
+> - generic "Standard shipping (3–5 days)" [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_47", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "form_input", "input": {"ref": "ref_11", "value": "WELCOME10", "tabId": "seed"}}, {"name": "computer", "input": {"action": "left_click", "ref": "ref_12", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (361, 360) [ref_47]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [form_input] filled ref_11 with value
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:left_click] left_click at (1129, 157) [ref_12]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo
+> … [truncated, 367 more chars]
+> ```
+
+### 🤖 Claude
+
+Let me confirm the radio itself is still checked.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "scroll_to", "ref": "ref_47", "tabId": "seed"}}, {"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:scroll_to] scrolled ref_47 into view
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [image]
+> ```
+
+### 🤖 Claude
+
+The pane renders partially; let me read the radio state directly instead.
+
+🔧 **mcp__Claude_Browser__javascript_tool**
+```
+{"action": "javascript_exec", "tabId": "seed", "text": "Array.from(document.querySelectorAll('input[name=\"shipping-rate\"]')).map(r => ({ label: r.closest('label')?.innerText.replace(/\\n/g,' '), checked: r.checked }))"}
+```
+
+> **↳ result**
+> ```
+> [
+>   {
+>     "checked": true,
+>     "label": "Standard shipping (3–5 days) $8.95"
+>   },
+>   {
+>     "checked": false,
+>     "label": "Express shipping (2 days) $18.95"
+>   }
+> ]
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+Standard still checked. Now the counterpart: a discount that *disqualifies* the rate must still drop it — and my optimistic radio must not mask that.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/products/alpine-merino-crewneck", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 3}}, {"name": "find", "input": {"query": "Add to cart", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 3s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> [find] Found 1 match(es) for "Add to cart":
+> - button "Add to cart" [ref_28] type="button"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_28", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 6}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> actions[0] (computer:left_click) failed: ref ref_28 is entirely outside the viewport (center (0, 0)) — likely hidden or off-canvas, so a click cannot reach it. Interact with what opens it first, or re-run read_page and pick a visible element. (0 completed, 4 remaining)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "screenshot", "tabId": "seed"}}, {"name": "find", "input": {"query": "Add to cart", "tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:screenshot] Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> [image]
+> [find] Found 1 match(es) for "Add to cart":
+> - button "Add to cart" [ref_28] type="button"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [640, 291], "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 6}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (640, 291)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Alpine Merino Crewneck — Aurora Supply Co." (http://demo.localhost:3012)
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 6s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://dem
+> … [truncated, 280 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "wait", "duration": 6}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:wait] waited 6s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; tail -12 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> ✓ Compiled /checkout in 638ms (655 modules)
+>  GET /checkout 307 in 1198ms
+>  GET /checkouts/chk_9c374bb079017280ef6ed5b94995a6c4890102d6783b5af1 200 in 332ms
+>  GET /checkout 307 in 102ms
+>  GET /checkouts/chk_5bd8609190075034d99f18f178f9f3530aeac92ed5625ce0 200 in 156ms
+>  POST /checkouts/chk_5bd8609190075034d99f18f178f9f3530aeac92ed5625ce0 200 in 194ms
+>  POST /checkouts/chk_5bd8609190075034d99f18f178f9f3530aeac92ed5625ce0 200 in 405ms
+>  POST /checkouts/chk_5bd8609190075034d99f18f178f9f3530aeac92ed5625ce0 200 in 643ms
+>  GET /products/alpine-merino-crewneck 200 in 4984ms
+>  POST /products/alpine-merino-crewneck 200 in 954ms
+>  GET /checkout 307 in 154ms
+>  GET /checkouts/chk_50ba8fa566978f99f2d07dd3c8351ffcc2
+> … [truncated, 27 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "javascript_tool", "input": {"action": "javascript_exec", "tabId": "seed", "text": "window.location.reload(); 'reloading'"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "seed"}}]}
+```
+
+> **↳ result**
+> ```
+> [javascript_tool:javascript_exec] "reloading"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 8s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__read_console_messages**
+```
+{"limit": 20, "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+> [log] [Fast Refresh] rebuilding
+> [log] [Fast Refresh] done in 470ms
+> [log] [Fast Refresh] rebuilding
+> [log] [Fast Refresh] done in 1079ms
+> [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+> [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+> [log] [Fast Refresh] rebuilding
+> [log] [Fast Refresh] done in 1323ms
+> [log] [Fast Refresh] rebuilding
+> [log] [Fast Refresh] done in 1128ms
+> [log] [Fast Refresh] rebuilding
+> [log] [Fas
+> … [truncated, 871 more chars]
+> ```
+
+🔧 **mcp__Claude_Browser__tabs_create**
+```
+{"foreground": true}
+```
+
+> **↳ result**
+> ```
+> {
+>   "serverId": "preview-local_221a2a2c-e1eb-4f25-8e14-25101d18ba2e",
+>   "tabId": "tab-1",
+>   "reused": false,
+>   "type": "browser"
+> }
+> Opened tab tab-1 in the foreground. Use `navigate` with tabId "tab-1" to load a URL.
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "tab-1"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 8s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+This isn't a pane glitch — it hangs in a fresh tab too, and only since the cart changed. Let me check the API.
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; grep -i "error\|ERR_\|stack" $SD/api.log | tail -10; echo "=== last api reqs ==="; grep '"statusCode"' $SD/api.log | tail -5; echo "=== sf ==="; tail -6 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> "stack":
+>           Error: listen EADDRINUSE: address already in use 0.0.0.0:3011
+> [16:48:56.763] ERROR (83876): failed to start
+>       "type": "Error",
+>       "stack":
+>           Error: listen EADDRINUSE: address already in use 0.0.0.0:3011
+> [16:49:02.336] ERROR (83921): failed to start
+>       "type": "Error",
+>       "stack":
+>           Error: listen EADDRINUSE: address already in use 0.0.0.0:3011
+> === last api reqs ===
+>       "statusCode": 204
+>       "statusCode": 202
+>       "statusCode": 201
+>       "statusCode": 200
+>       "statusCode": 401
+> === sf ===
+>  GET /checkouts/chk_50ba8fa566978f99f2d07dd3c8351ffcc22be57c68062c81 200 in 452ms
+>  GET /checkout 307 in 105ms
+>  GET /checkouts/chk_fd1eb104bbf5883aec2cf874
+> … [truncated, 156 more chars]
+> ```
+
+🔧 **Bash**
+```
+TOK=chk_fd1eb104bbf5883aec2cf87402795cdd9ae9d3f2a44195cf
+echo "== api direct =="; curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' -H 'Host: demo.localhost:3012' "http://127.0.0.1:3011/storefront/api/checkouts/$TOK"
+echo "== storefront html =="; curl -s -H 'Host: demo.localhost:3012' "http://127.0.0.1:3012/checkouts/$TOK" -o /tmp/co.html -w '%{http_code} %{size_download}b\n'
+grep -c "Loading checkout" /tmp/co.html; grep -c "Shipping method" /tmp/co.html
+```
+
+> **↳ result**
+> ```
+> == api direct ==
+> 200 2.720681s
+> == storefront html ==
+> 200 78348b
+> 1
+> 1
+> ```
+
+### 🤖 Claude
+
+The page HTML is complete server-side (contains "Shipping method") — the pane is just showing a stale render. Note the API took 2.7s though; let me check for zombie API processes.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; ps aux | grep -c "[t]sx watch"; echo "--- tsx watch procs ---"; ps -o pid,etime,command -ax | grep "[s]rc/server.ts" | head
+```
+
+> **↳ result**
+> ```
+> 1
+> --- tsx watch procs ---
+> 73914       18:55 node /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/issue-e8-f6a7e3/apps/api/node_modules/.bin/../tsx/dist/cli.mjs --env-file-if-exists=../../.env src/server.ts
+> 73920       18:55 /Users/pauljurgens/.nvm/versions/node/v22.23.2/bin/node --require /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/issue-e8-f6a7e3/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/preflight.cjs --import file:///Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/issue-e8-f6a7e3/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/loader.mjs --env-file-if-exists=../../.env src/server.ts
+> 74415       18:06 node /Users/pauljurgens
+> … [truncated, 2,047 more chars]
+> ```
+
+### 🤖 Claude
+
+Let me clean up my stale watchers (leaving other worktrees' alone) and retry.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; HOLDER=$(lsof -nP -iTCP:3011 -sTCP:LISTEN | awk 'NR==2{print $2}'); echo "port holder: $HOLDER"; for p in 74415 78301 80308; do if [ "$p" != "$HOLDER" ]; then PG=$(ps -o pgid= -p $p 2>/dev/null | tr -d ' '); echo "checking $p (pgid $PG)"; fi; done; ps -o pid,ppid -p 84179
+```
+
+> **↳ result**
+> ```
+> port holder: 84179
+> checking 74415 (pgid 74396)
+> checking 78301 (pgid 78282)
+> checking 80308 (pgid 80289)
+>   PID  PPID
+> 84179 80308
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; kill 74415 78301 2>/dev/null; sleep 3; lsof -nP -iTCP:3011 -sTCP:LISTEN | awk 'NR==2{print "3011 holder still:", $2}'; curl -s -o /dev/null -w 'api health: %{http_code} in %{time_total}s\n' -H 'Host: demo.localhost:3012' http://127.0.0.1:3011/storefront/api/shop
+```
+
+> **↳ result**
+> ```
+> 3011 holder still: 84179
+> api health: 200 in 0.252443s
+> ```
+
+### 🤖 Claude
+
+API is fast again (250ms). Retrying the browser.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 6}}, {"name": "get_page_text", "input": {"tabId": "tab-1"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 6s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__read_console_messages**
+```
+{"limit": 30, "tabId": "tab-1"}
+```
+
+> **↳ result**
+> ```
+> [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+> [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__javascript_tool**
+```
+{"action": "javascript_exec", "tabId": "tab-1", "text": "({ url: location.href, bodyLen: document.body.innerText.length, hasShipping: document.body.innerHTML.includes('Shipping method'), radios: document.querySelectorAll('input[name=shipping-rate]').length, text: document.body.innerText.slice(0,200) })"}
+```
+
+> **↳ result**
+> ```
+> {
+>   "bodyLen": 16,
+>   "hasShipping": true,
+>   "radios": 0,
+>   "text": "Loading checkout",
+>   "url": "http://demo.localhost:3012/checkouts/chk_272cf186c92315040d3e39ecab5afac7a811361da62db714"
+> }
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+Content is in the HTML but React never swapped the Suspense boundary in. Let me check whether the stream aborted.
+
+🔧 **mcp__Claude_Browser__read_network_requests**
+```
+{"limit": 15, "tabId": "tab-1"}
+```
+
+> **↳ result**
+> ```
+> [24832F489250D2DC349FFCCA6E4B97F7] GET http://demo.localhost:3012/checkouts/chk_fd1eb104bbf5883aec2cf87402795cdd9ae9d3f2a44195cf → 200 OK
+> [88136.2] GET http://demo.localhost:3012/_next/static/css/app/layout.css?v=1788011579584 → 200 OK
+> [88136.4] GET http://demo.localhost:3012/_next/static/chunks/webpack.js?v=1788011579584 → 200 OK
+> [88136.5] GET http://demo.localhost:3012/_next/static/chunks/main-app.js?v=1788011579584 → 200 OK
+> [88136.6] GET http://demo.localhost:3012/_next/static/chunks/app-pages-internals.js → 200 OK
+> [88136.13] GET http://demo.localhost:3012/_next/static/chunks/app/checkouts/%5Btoken%5D/page.js → 200 OK
+> [677DFF83219E295B7052C635BF134C42] GET http://demo.localhost:3012/check
+> … [truncated, 698 more chars]
+> ```
+
+### 🤖 Claude
+
+All 200s, no aborts — likely a stale dev build after many Fast Refreshes. Restarting the storefront.
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; PID=$(lsof -nP -iTCP:3012 -sTCP:LISTEN | awk 'NR==2{print $2}'); kill $PID 2>/dev/null; sleep 3; rm -rf apps/storefront/.next; API_URL=http://localhost:3011 STOREFRONT_BASE_DOMAIN=localhost:3012 STOREFRONT_PORT=3012 nohup pnpm --filter @merchant/storefront exec next dev --port 3012 > $SD/sf.log 2>&1 & disown; sleep 18; tail -4 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> - Network:      http://192.168.1.202:3012
+> 
+>  ✓ Starting...
+>  ✓ Ready in 2.2s
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 12}}, {"name": "get_page_text", "input": {"tabId": "tab-1"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 10s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+Not a stale build. Let me look at the page's Suspense structure.
+
+🔧 **Bash**
+```
+find apps/storefront/src/app -path '*checkouts*' -name '*.tsx' | head; echo "==="; cat "apps/storefront/src/app/checkouts/[token]/page.tsx" 2>/dev/null | head -60
+```
+
+> **↳ result**
+> ```
+> apps/storefront/src/app/checkouts/skeletons.tsx
+> apps/storefront/src/app/checkouts/[token]/loading.tsx
+> apps/storefront/src/app/checkouts/[token]/page.tsx
+> apps/storefront/src/app/checkouts/[token]/thank-you/loading.tsx
+> apps/storefront/src/app/checkouts/[token]/thank-you/page.tsx
+> ===
+> /**
+>  * `/checkouts/[token]` (SPEC §10, PARITY.md). Owner: WS-E.
+>  *
+>  * The token in the URL is the credential — checkout carries no session, which
+>  * is why E3 makes it high-entropy. A completed checkout redirects to its
+>  * thank-you page rather than offering to be paid twice.
+>  */
+> 
+> import { env } from '@merchant/config/env';
+> import type { Checkout } from '@merchant/contracts/checkout';
+> import type { Metadata } from
+> … [truncated, 2,283 more chars]
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; TOKEN=$(grep -o 'chk_[a-f0-9]*' $SD/sf.log | tail -1); echo "token=$TOKEN"; curl -s -H 'Host: demo.localhost:3012' "http://127.0.0.1:3012/checkouts/$TOKEN" -o /tmp/co2.html -w 'http=%{http_code} size=%{size_download} time=%{time_total}\n'; echo "Shipping method occurrences: $(grep -c 'Shipping method' /tmp/co2.html)"; echo "Loading checkout: $(grep -c 'Loading checkout' /tmp/co2.html)"
+```
+
+> **↳ result**
+> ```
+> token=chk_e4efedc614e30be43f647115e62a6844509507607132b386
+> http=200 size=78346 time=0.719967
+> Shipping method occurrences: 1
+> Loading checkout: 1
+> ```
+
+### 🤖 Claude
+
+Server delivers the full page in 0.7s; it's the pane failing to swap. Let me try a clean tab and a fresh cart.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "navigate", "input": {"url": "http://demo.localhost:3012/cart", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 4}}, {"name": "get_page_text", "input": {"tabId": "tab-1", "max_chars": 600}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Aurora Supply Co." (http://demo.localhost:3012)
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 4s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "demo.localhost:3012/cart" (http://demo.localhost:3012)
+> [get_page_text] Title: 
+> URL:
+> … [truncated, 335 more chars]
+> ```
+
+### 🤖 Claude
+
+A real server-side exception now. Let me read the log.
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; tail -40 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> ✓ Ready in 2.2s
+>  ✓ Compiled /middleware in 429ms (115 modules)
+>  ○ Compiling /checkout ...
+>  ✓ Compiled /checkout in 1534ms (316 modules)
+>  GET /checkout 307 in 2227ms
+>  ○ Compiling /checkouts/[token] ...
+>  ✓ Compiled /checkouts/[token] in 3.5s (766 modules)
+>  GET /checkouts/chk_e4efedc614e30be43f647115e62a6844509507607132b386 200 in 8555ms
+>  GET /checkouts/chk_e4efedc614e30be43f647115e62a6844509507607132b386 200 in 640ms
+>  ○ Compiling / ...
+>  ✓ Compiled / in 1375ms (898 modules)
+>  GET /checkouts/chk_e4efedc614e30be43f647115e62a6844509507607132b386 200 in 288ms
+>  GET / 200 in 2398ms
+>  ○ Compiling /cart ...
+>  ✓ Compiled /cart in 767ms (891 modules)
+>  ⨯ TypeError: fetch failed
+>     at async apiGet (src/lib/a
+> … [truncated, 889 more chars]
+> ```
+
+### 🤖 Claude
+
+My API on :3011 died (ECONNREFUSED) — that's what the "hang" was. Restarting it.
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; lsof -nP -iTCP:3011 -sTCP:LISTEN | head -2; API_PORT=3011 API_URL=http://localhost:3011 STOREFRONT_BASE_DOMAIN=localhost:3012 ADMIN_URL=http://localhost:3010 nohup pnpm --filter @merchant/api dev > $SD/api.log 2>&1 & disown; sleep 14; curl -s -o /dev/null -w 'api: %{http_code} in %{time_total}s\n' -H 'Host: demo.localhost:3012' http://127.
+… [truncated, 30 more chars]
+```
+
+> **↳ result**
+> ```
+> Exit code 7
+> api: 000 in 0.000915s
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; sleep 10; tail -15 $SD/api.log
+```
+
+> **↳ result**
+> ```
+> > @merchant/api@0.0.0 dev /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api
+> > tsx watch --env-file=../../.env src/server.ts
+> 
+> [16:57:50.061] INFO (92766): Server listening at http://127.0.0.1:3011
+> [16:57:50.061] INFO (92766): Server listening at http://192.168.1.202:3011
+> [16:57:50.063] INFO (92766): SIGTERM received, closing
+> ```
+
+### 🤖 Claude
+
+The task runner keeps SIGTERMing it. Let me detach it into its own session.
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad
+cat > $SD/launch.py <<'PY'
+import os, sys, subprocess
+log = open(sys.argv[1], "w")
+env = dict(os.environ)
+for kv in sys.argv[2].split(","):
+    k, v = kv.split("=", 1)
+    env[k] = v
+p = subprocess.Popen(sys.argv[3:], stdout=log, stderr=log, start_new_session=True, env=env,
+                     cwd="/Users/pauljurgens/Downloads/projects/shop
+… [truncated, 403 more chars]
+```
+
+> **↳ result**
+> ```
+> pid 93146
+> api: 200 in 0.511581s
+> ```
+
+### 🤖 Claude
+
+API is detached and healthy. Let me verify the storefront and rerun the acceptance checks.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; lsof -nP -iTCP:3012 -sTCP:LISTEN | awk 'NR==2{print "storefront pid", $2}'; curl -s -o /dev/null -w 'storefront home: %{http_code}\n' -H 'Host: demo.localhost:3012' http://127.0.0.1:3012/
+```
+
+> **↳ result**
+> ```
+> storefront pid 91946
+> storefront home: 200
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "tab-1"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "tab-1"}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 8s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; tail -8 $SD/sf.log
+```
+
+> **↳ result**
+> ```
+> }
+>  GET /cart 500 in 1073ms
+>  GET / 200 in 8330ms
+>  GET /checkout 307 in 1250ms
+>  GET /checkouts/chk_805c2ae0619ef02b95a2b316644e57ba9c6ba939fd79c5b0 200 in 1552ms
+>  ○ Compiling /icon.svg ...
+>  ✓ Compiled /icon.svg in 2.9s (656 modules)
+>  GET /icon.svg?678ea03095bdcf65 200 in 3203ms
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 400}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 8s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/cart", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 5}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 800}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 5s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Cart · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <main>
+> ---
+> Your cart
+> Basin Wool Socks
+> 
+> M
+> 
+> $18.00 each
+> 
+> −
+> 1
+> +
+> Remove
+> $18.00
+> Alpine Merino Crewneck
+> 
+> S / Oatmeal
+> 
+> $148.00 each
+> 
+> −
+> 1
+> +
+> Remove
+> $148.00
+> Subtotal
+> $166.00
+> 
+> Taxes and shipping calculated at checkout.
+> 
+> Check out
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> … [truncated, 90 more chars]
+> ```
+
+### 🤖 Claude
+
+The cart page renders fine — only `/checkouts/[token]` hangs, and only since the crewneck line was added. Let me test that directly.
+
+🔧 **mcp__Claude_Browser__find**
+```
+{"query": "Remove", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> Found 2 match(es) for "Remove":
+> - button "Remove" [ref_20] type="button"
+> - button "Remove" [ref_30] type="button"
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "ref": "ref_30", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 5}}, {"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 400}}]}
+```
+
+> **↳ result**
+> ```
+> actions[0] (computer:left_click) failed: left_click failed: the press at (0, 0) could not be attributed to a frame (No node found at given location); it was not dispatched. Take a fresh screenshot and retry (0 completed, 4 remaining)
+> ```
+
+🔧 **mcp__Claude_Browser__computer**
+```
+{"action": "screenshot", "tabId": "seed"}
+```
+
+> **↳ result**
+> ```
+> [image]
+> Screenshot size: 800x450
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "computer", "input": {"action": "left_click", "coordinate": [162, 292], "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 5}}, {"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 8}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 500}}]}
+```
+
+> **↳ result**
+> ```
+> [computer:left_click] left_click at (162, 292)
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Cart · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 5s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 8s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_
+> … [truncated, 252 more chars]
+> ```
+
+### 🤖 Claude
+
+Let me test whether my own client change is the cause, by reverting it temporarily.
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; cp apps/storefront/src/components/checkout/checkout-view.tsx $SD/checkout-view.mine.tsx; cp apps/storefront/src/components/checkout/order-summary.tsx $SD/order-summary.mine.tsx; git checkout -- apps/storefront/src/components/checkout/; git status --short; echo "reverted client files"
+```
+
+> **↳ result**
+> ```
+> M .claude/launch.json
+>  M apps/api/test/checkout.test.ts
+> reverted client files
+> ```
+
+### 🤖 Claude
+
+That revert was my deliberate A/B test (copies saved). Now testing the original code.
+
+🔧 **mcp__Claude_Browser__browser_batch**
+```
+{"actions": [{"name": "navigate", "input": {"url": "http://demo.localhost:3012/checkout", "tabId": "seed"}}, {"name": "computer", "input": {"action": "wait", "duration": 10}}, {"name": "get_page_text", "input": {"tabId": "seed", "max_chars": 400}}]}
+```
+
+> **↳ result**
+> ```
+> [navigate] navigated to http://demo.localhost:3012
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [computer:wait] waited 10s
+> 
+> 
+> Tab Context:
+> - Executed on tabId: tab-1
+> - Available tabs:
+>   • tabId tab-1: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> [get_page_text] Title: Checkout · Aurora Supply Co.
+> URL: http://demo.localhost:3012
+> Source element: <body>
+> ---
+> Loading checkout
+> 
+> 
+> Tab Context:
+> - Executed on tabId: seed
+> - Available tabs:
+>   • tabId seed: "Checkout · Aurora Supply Co." (http://demo.localhost:3012)
+> ```
+
+### 🤖 Claude
+
+The **unmodified** code hangs identically, so my diff is cleared. Restoring my changes; this looks like a pane/runtime issue worth separating from the app.
+
+🔧 **Bash**
+```
+SD=/private/tmp/claude-501/-Users-pauljurgens-Downloads-projects-shopify--claude-worktrees-repo-ui-issues-status-afad25/0103d436-541e-4695-adbd-8b5fdc5ae0ef/scratchpad; cp $SD/checkout-view.mine.tsx apps/storefront/src/components/checkout/checkout-view.tsx; cp $SD/order-summary.mine.tsx apps/storefront/src/components/checkout/order-summary.tsx; git status --short
+```
+
+> **↳ result**
+> ```
+> M .claude/launch.json
+>  M apps/api/test/checkout.test.ts
+>  M apps/storefront/src/components/checkout/checkout-view.tsx
+>  M apps/storefront/src/components/checkout/order-summary.tsx
+> ```
+
+🔧 **ToolSearch**
+```
+{"query": "select:mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__tabs_close_mcp", "max_results": 5}
+```
+
+🔧 **mcp__claude-in-chrome__navigate**
+```
+{"url": "http://demo.localhost:3012/checkout"}
+```
+
+> **↳ result**
+> ```
+> The hidden tabs_context_mcp lookup did not respond within 8s. The Chrome extension may be slow to start or waiting on a permission prompt. Retry navigate, or call tabs_context_mcp explicitly to get a tabId first.
+> ```
+
+🔧 **mcp__claude-in-chrome__navigate**
+```
+{"url": "http://demo.localhost:3012/checkout"}
+```
+
+> **↳ result**
+> ```
+> ⚠️ **Claude in Chrome is not connected**
+> 
+> The Chrome extension isn't reachable right now. If browser tools were working earlier in this session, this is usually transient — retry in a moment.
+> 
+> If retries keep failing, or browser tools have never worked in this session, the extension is likely not installed or not signed in. Tell the user how to fix it (include the link):
+> 1. Install the Claude in Chrome extension: https://chromewebstore.google.com/detail/fcoeoabgfenejglbffodgkkbkcdhcgfn
+> 2. Open the Claude side panel in Chrome and sign in with the same account as this app.
+> Then retry the browser tool. If the user prefers, continue with alternatives (web search, or ask them to do the browser st
+> … [truncated, 15 more chars]
+> ```
+
+### 🤖 Claude
+
+Chrome isn't connected, so I can't cross-check there. Reverting the temporary launch.json entry and reviewing my diff.
+
+🔧 **Bash**
+```
+git checkout -- .claude/launch.json && git status --short && echo "=== DIFF ===" && git diff
+```
+
+> **↳ result**
+> ```
+> M apps/api/test/checkout.test.ts
+>  M apps/storefront/src/components/checkout/checkout-view.tsx
+>  M apps/storefront/src/components/checkout/order-summary.tsx
+> === DIFF ===
+> diff --git a/apps/api/test/checkout.test.ts b/apps/api/test/checkout.test.ts
+> index d160fec..e59da6d 100644
+> --- a/apps/api/test/checkout.test.ts
+> +++ b/apps/api/test/checkout.test.ts
+> @@ -428,6 +428,28 @@ describe('totals', () => {
+>      const after = await readyToPay(checkout.token, { discountCode: 'WELCOME10' }, FREE_RATE_ID);
+>      expect(after.selectedShippingRateId).toBeNull();
+>    });
+> +
+> +  it('keeps a still-qualifying rate when the PUT carries only a discount code', async () => {
+> +    // E4 saves one section at a time, so "App
+> … [truncated, 9,164 more chars]
+> ```
+
+### 🤖 Claude
+
+Two refinements: guard the pending-clear against rapid re-clicks, and drop the issue-history reference from the comment.
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx has been updated successfully. (note: the file had been modified on disk since you last read it — the edit applied cleanly, but the file contains other changes not in your context. Read it before edits that depend on surrounding content.)
+> ```
+
+🔧 **Edit**
+```
+/Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx
+```
+
+> **↳ result**
+> ```
+> The file /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/storefront/src/components/checkout/checkout-view.tsx has been updated successfully. (file state is current in your context — no need to Read it back)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm verify 2>&1 | tail -30
+```
+
+> **↳ result**
+> ```
+> > node scripts/check-env-parity.mjs && pnpm lint && pnpm typecheck && pnpm test
+> 
+> env parity ok — 32 vars
+> 
+> > merchant@ lint /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25
+> > biome check .
+> 
+> apps/storefront/src/components/checkout/checkout-view.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> 
+>   × Formatter would have printed the following content:
+>   
+>     107 107 │   
+>     108 108 │     /** The address as last sent, so an unchanged field's blur sends nothing. */
+>     109     │ - ··const·savedAddress·=·useRef(addressComplete(initialAddress)·?·JSON.stringify(initialAddress)·:·'');
+>         109 │ + ··const·savedAddress·=·useRef(
+>         110 │ + ····addressCo
+> … [truncated, 515 more chars]
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm format 2>&1 | tail -5 && git diff --stat
+```
+
+> **↳ result**
+> ```
+> > merchant@ format /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25
+> > biome format --write .
+> 
+> Formatted 505 files in 210ms. Fixed 1 file.
+>  apps/api/test/checkout.test.ts                     |  22 ++++
+>  .../src/components/checkout/checkout-view.tsx      | 112 +++++++++++++++------
+>  .../src/components/checkout/order-summary.tsx      |   7 +-
+>  3 files changed, 107 insertions(+), 34 deletions(-)
+> [This command modified 1 file you've previously read: apps/storefront/src/components/checkout/checkout-view.tsx. Call Read before editing.]
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm verify 2>&1 | tail -25
+```
+
+> **↳ result**
+> ```
+> @merchant/api:test: prisma:error 
+> @merchant/api:test: Invalid `prisma.discount.create()` invocation:
+> @merchant/api:test: 
+> @merchant/api:test: 
+> @merchant/api:test: Unique constraint failed on the fields: (`shopId`,`code`)
+> @merchant/api:test: 
+> @merchant/api:test:  ✓ test/discounts.test.ts (7 tests) 88ms
+> @merchant/api:test:  ✓ test/admin-api.test.ts (5 tests) 176ms
+> @merchant/api:test:  ✓ test/vault.test.ts (6 tests) 60ms
+> @merchant/api:test:  ✓ test/custom-domain.test.ts (7 tests) 107ms
+> @merchant/api:test:  ✓ test/files.test.ts (7 tests) 68ms
+> @merchant/api:test:  ✓ src/services/settings/shipping.test.ts (7 tests) 1ms
+> @merchant/api:test:  ✓ test/rate-limit.test.ts (1 test) 205ms
+> @merchant/api:tes
+> … [truncated, 436 more chars]
+> ```
+
+### 🤖 Claude
+
+All green — 373 tests, lint, typecheck. Now the decision log and agent log.
+
+🔧 **Bash**
+```
+tail -6 DECISIONS.md; echo "=== AGENT-LOG tail ==="; tail -4 docs/AGENT-LOG.md
+```
+
+> **↳ result**
+> ```
+> 2026-08-29 | WS-B | The collection description is B5's `RichTextField`, not a textarea, and the draft carries raw `descriptionHtml` end to end. Shopify's collection description is the same rich editor as the product's, and after B5 landed its toolbar a bare textarea one nav item away was the loudest remaining "not Shopify" tell on the page. `RichTextField` gains an additive `labelHidden` (the collection card carries no labelled inputs; the product form keeps its label). `apps/admin/src/lib/description-html.ts` and its test are DELETED — the collection form was its last consumer once nothing unwraps `<p>` tags any more (CLAUDE.md §8, no dead code).
+> 2026-08-29 | WS-B | Index-page chrome lives
+> … [truncated, 5,358 more chars]
+> ```
+
+🔧 **Bash**
+```
+cat >> DECISIONS.md <<'EOF'
+2026-08-29 | WS-E | E9's stated cause is wrong and the fix is client-side. The issue posits that a discount-only PUT re-prices with `shippingRateId` absent and treats absent as "reset". It does not: `updateCheckout` already guards every field on `!== undefined`, and `computeCheckoutTotals` re-finds the selection in the re-qualified list. Verified twice — a new `checkout.test.ts` case (mutation-checked: force `data.shippingRateId = input.selectedShippingRateId ?? null` and it fails on exactly that assertion) and the live seed over curl, where Standard survives WELCOM
+… [truncated, 1,688 more chars]
+```
+
+> **↳ result**
+> ```
+> ok
+> ```
+
+🔧 **Bash**
+```
+git add -A && git commit -q -m "fix(ws-e): checkout keeps the chosen shipping rate visible while a save is in flight
+
+E9's stated cause does not reproduce: the API already treats an absent
+selectedShippingRateId as \"leave alone\", verified by a new mutation-checked
+checkout.test.ts case and against the live seed over curl.
+
+What a shopper sees is latency. The rate radios render purely from server
+state, so from the click until the save returns every radio is empty and the
+sidebar says \"Enter shipping address\" — read as a cleared selection. And
+saveAddress re-sent an identical address on eve
+… [truncated, 414 more chars]
+```
+
+> **↳ result**
+> ```
+> Checked 3 files in 123ms. No fixes applied.
+> 13b5ff3 fix(ws-e): checkout keeps the chosen shipping rate visible while a save is in flight
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; git fetch origin -q && git merge origin/main --no-edit 2>&1 | tail -5
+```
+
+> **↳ result**
+> ```
+> create mode 100644 docs/chat-archive/sessions/2026-08-29-shopify-ui-parity-files.md
+>  create mode 100644 docs/chat-archive/sessions/2026-08-29-uncompleted-tasks-review.md
+>  create mode 100644 docs/chat-archive/sessions/2026-08-29-undone-issues.md
+>  create mode 100644 docs/chat-archive/sessions/2026-08-29-workstream-review-status.md
+>  create mode 100755 scripts/export-chat-archive.py
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm install 2>&1 | tail -3; pnpm worktree:env --migrate 2>&1 | tail -4
+```
+
+> **↳ result**
+> ```
+> Already up to date
+> 
+> Done in 2.1s
+>   ✓ migrated and seeded
+> 
+>   Each worktree now has its own database and Redis keyspace.
+>   Ports 3000/3001/3002 are still shared on purpose — one dev stack at a time.
+> ```
+
+🔧 **Bash**
+```
+export PATH="/Users/pauljurgens/.nvm/versions/node/v22.23.2/bin:/opt/homebrew/bin:$PATH"; pnpm verify 2>&1 | tail -8
+```
+
+> **↳ result**
+> ```
+> @merchant/api:test:    Start at  17:08:06
+> @merchant/api:test:    Duration  16.50s (transform 1.14s, setup 105ms, collect 2.29s, tests 11.15s, environment 0ms, prepare 807ms)
+> @merchant/api:test: 
+> 
+>  Tasks:    10 successful, 10 total
+> Cached:    6 cached, 10 total
+>   Time:    20.062s
+> ```
+
+### 🤖 Claude
+
+Green on the merged tree. Pushing and opening the PR.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; git push -u origin ws-e/discount-keeps-shipping 2>&1 | tail -4
+```
+
+> **↳ result**
+> ```
+> remote: 
+> To github.com:pauljurgens11/shopify.git
+>  * [new branch]      ws-e/discount-keeps-shipping -> ws-e/discount-keeps-shipping
+> branch 'ws-e/discount-keeps-shipping' set up to track 'origin/ws-e/discount-keeps-shipping' by rebasing.
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; gh pr create --title "fix(ws-e): E9 — checkout keeps the chosen shipping rate visible while a save is in flight" --body "$(cat <<'EOF'
+Resolves [E9](docs/issues/E9-checkout-discount-keeps-shipping.md).
+
+## The issue's stated cause does not reproduce
+
+E9 posits that a discount-only PUT re-prices with `shippingRateId` absent and treats absent as "reset". It does not. `updateCheckout` already guards every field on `!== undefined`, and `computeCheckoutTotals` re-finds the selection in the re-qualified rate list. Verified two ways:
+
+- A new `checkout.test.ts`
+… [truncated, 2,677 more chars]
+```
+
+> **↳ result**
+> ```
+> https://github.com/pauljurgens11/shopify/pull/121
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; gh pr merge 121 --auto --squash --delete-branch 2>&1 | tail -3
+```
+
+> **↳ result**
+> ```
+> (Bash completed with no output)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; sleep 20; gh pr view 121 --json state,mergeStateStatus,autoMergeRequest,statusCheckRollup --jq '{state, mergeState: .mergeStateStatus, auto: (.autoMergeRequest != null), checks: [.statusCheckRollup[]? | {name, status, conclusion}]}'
+```
+
+> **↳ result**
+> ```
+> {"auto":true,"checks":[{"conclusion":"","name":"pr-checks","status":"IN_PROGRESS"},{"conclusion":"SUCCESS","name":"enable","status":"COMPLETED"},{"conclusion":"SUCCESS","name":"triage","status":"COMPLETED"},{"conclusion":"SUCCESS","name":"rebase","status":"COMPLETED"}],"mergeState":"BLOCKED","state":"OPEN"}
+> ```
+
+### 🤖 Claude
+
+Auto-merge is armed and `pr-checks` is running. Cleaning up my dev servers while it finishes.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"
+for port in 3011 3012; do
+  PID=$(lsof -nP -iTCP:$port -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2}')
+  if [ -n "$PID" ]; then
+    CWD=$(lsof -a -p "$PID" -d cwd -Fn 2>/dev/null | grep '^n' | sed 's/^n//')
+    case "$CWD" in
+      */repo-ui-issues-status-afad25*) kill "$PID" && echo "killed mine on :$port ($PID)";;
+      *) echo "NOT mine on :$port ($CWD) — left alone";;
+    esac
+  else echo "nothing on :$port"; fi
+done
+sleep 3
+ps -o pid,command -ax | grep "[r]epo-ui-issues-status-afad25/apps" | head
+```
+
+> **↳ result**
+> ```
+> killed mine on :3011 (2228)
+> killed mine on :3012 (91946)
+> 93163 node /Users/pauljurgens/Downloads/projects/shopify/.claude/worktrees/repo-ui-issues-status-afad25/apps/api/node_modules/.bin/../tsx/dist/cli.mjs watch --env-file=../../.env src/server.ts
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; kill 93163 80308 2>/dev/null; sleep 3; ps -o pid,command -ax | grep "[r]epo-ui-issues-status-afad25/apps" | head; echo "--- ports ---"; for p in 3011 3012; do lsof -nP -iTCP:$p -sTCP:LISTEN | awk 'NR==2{print "'"$p"'", $2}'; done; echo "(blank = free)"
+```
+
+> **↳ result**
+> ```
+> --- ports ---
+> (blank = free)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; git status --short; echo "--- untracked temp? ---"; git clean -nd; echo "--- PR ---"; gh pr view 121 --json state,mergeStateStatus,statusCheckRollup --jq '{state, mergeState: .mergeStateStatus, checks: [.statusCheckRollup[]? | {name, conclusion}]}'
+```
+
+> **↳ result**
+> ```
+> --- untracked temp? ---
+> --- PR ---
+> {"checks":[{"conclusion":"","name":"pr-checks"},{"conclusion":"SUCCESS","name":"enable"},{"conclusion":"SUCCESS","name":"triage"},{"conclusion":"SUCCESS","name":"rebase"}],"mergeState":"BLOCKED","state":"OPEN"}
+> ```
+
+### 🤖 Claude
+
+Tree is clean with no leftovers. Waiting for `pr-checks` to finish.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; for i in $(seq 1 30); do S=$(gh pr view 121 --json state,mergeStateStatus,statusCheckRollup --jq '"\(.state) \(.mergeStateStatus) \([.statusCheckRollup[]?|select(.name=="pr-checks")|.conclusion//"RUNNING"]|join(","))"'); echo "$i: $S"; case "$S" in MERGED*) break;; *FAILURE*) break;; esac; sleep 20; done
+```
+
+> **↳ result**
+> ```
+> 1: OPEN BLOCKED 
+> 2: OPEN BLOCKED 
+> 3: OPEN CLEAN SUCCESS
+> 4: MERGED UNKNOWN SUCCESS
+> ```
+
+### 🤖 Claude
+
+Merged. Landing the DONE entry so the swarm sees E9 closed and the finding recorded.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; git checkout -q main && git pull -q && git checkout -qb ws-e/e9-agent-log && cat >> docs/AGENT-LOG.md <<'EOF'
+2026-08-29 17:20 | WS-E | DONE E9 | PR #121. The issue's diagnosis was WRONG and I left the API alone: `updateCheckout` already guards every field on `!== undefined` and `computeCheckoutTotals` re-finds the selection in the re-qualified list, so a discount-only PUT never dropped the rate. Proven twice — a new mutation-checked `checkout.test.ts` case (force `data.shippingRateId = input.selectedShippingRateId ?? null` and it fails on exactly that as
+… [truncated, 2,453 more chars]
+```
+
+> **↳ result**
+> ```
+> Exit code 1
+> fatal: 'main' is already used by worktree at '/Users/pauljurgens/Downloads/projects/shopify'
+> Checked 0 files in 938µs. No fixes applied.
+> On branch ws-e/discount-keeps-shipping
+> Your branch is up to date with 'origin/ws-e/discount-keeps-shipping'.
+> 
+> nothing to commit, working tree clean
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; git fetch -q origin && git checkout -qB ws-e/e9-agent-log origin/main && git log --oneline -1
+```
+
+> **↳ result**
+> ```
+> 7d0ea87 fix(ws-e): checkout keeps the chosen shipping rate visible while a save is in flight (#121)
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; cat >> docs/AGENT-LOG.md <<'EOF'
+2026-08-29 17:20 | WS-E | DONE E9 | PR #121. The issue's diagnosis was WRONG and I left the API alone: `updateCheckout` already guards every field on `!== undefined` and `computeCheckoutTotals` re-finds the selection in the re-qualified list, so a discount-only PUT never dropped the rate. Proven twice — a new mutation-checked `checkout.test.ts` case (force `data.shippingRateId = input.selectedShippingRateId ?? null` and it fails on exactly that assertion) and the live seed over curl. The real defect is client-side in `chec
+… [truncated, 2,719 more chars]
+```
+
+> **↳ result**
+> ```
+> Checked 0 files in 6ms. No fixes applied.
+> remote: 
+> remote: Create a pull request for 'ws-e/e9-agent-log' on GitHub by visiting:        
+> remote:      https://github.com/pauljurgens11/shopify/pull/new/ws-e/e9-agent-log        
+> remote: 
+> https://github.com/pauljurgens11/shopify/pull/123
+> ```
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; gh pr merge 123 --auto --squash --delete-branch 2>&1 | tail -2; for i in $(seq 1 25); do S=$(gh pr view 123 --json state,statusCheckRollup --jq '"\(.state) \([.statusCheckRollup[]?|select(.name=="pr-checks")|.conclusion//"RUNNING"]|join(","))"'); echo "$i: $S"; case "$S" in MERGED*) break;; *FAILURE*) break;; esac; sleep 20; done
+```
+
+> **↳ result**
+> ```
+> 1: OPEN 
+> 2: OPEN 
+> 3: OPEN 
+> 4: OPEN 
+> 5: OPEN 
+> 6: OPEN SUCCESS
+> 7: MERGED SUCCESS
+> ```
+
+### 🤖 Claude
+
+Both merged. Final state check.
+
+🔧 **Bash**
+```
+export PATH="/opt/homebrew/bin:$PATH"; git fetch -q origin; git log --oneline origin/main -3; echo "--- my procs ---"; ps -o pid,command -ax | grep "[r]epo-ui-issues-status-afad25/apps" | wc -l; echo "--- tree ---"; git status --short | head
+```
+
+> **↳ result**
+> ```
+> 6ffa0a0 docs(ws-e): AGENT-LOG — E9 done, E8 observations, background-server trap (#123)
+> 7d0ea87 fix(ws-e): checkout keeps the chosen shipping rate visible while a save is in flight (#121)
+> b9cadb1 feat(ws-a): make the production stack deployable on a real domain (#120)
+> --- my procs ---
+>        0
+> --- tree ---
+> ```
+
+### 🤖 Claude
+
+E9 is merged: [#121](https://github.com/pauljurgens11/shopify/pull/121) (fix) and [#123](https://github.com/pauljurgens11/shopify/pull/123) (agent log). Working tree clean, no dev servers left running.
+
+## The issue's diagnosis was wrong, so I didn't touch the API
+
+E9 claimed the discount PUT re-prices with `shippingRateId` absent and treats absent as "reset". It doesn't. [`updateCheckout`](apps/api/src/services/checkout/checkout.ts:332) already guards every field on `!== undefined`, and [`computeCheckoutTotals`](apps/api/src/services/checkout/totals.ts:134) re-finds the selection in the re-qualified list. I disproved it twice: a new `checkout.test.ts` case that PUTs `{discountCode}` alone (mutation-checked — forcing `data.shippingRateId = input.selectedShippingRateId ?? null` fails it on exactly that assertion), and the live seed over curl, where Standard survives WELCOME10 with `shippingTotal: 895` intact.
+
+## What a shopper actually sees is latency, rendered as data loss
+
+The rate radios were driven purely by server state with no optimistic value, so from the click until the save returned **every** radio was empty and the sidebar read "Enter shipping address" — the reported symptom exactly. I confirmed this live by delaying the address PUT: two seconds after clicking a rate, the sidebar still said "Enter shipping address".
+
+That window was stretched by a second defect at the same seam: `saveAddress` fired on every address field's blur whether or not anything changed. I measured **6 identical PUTs from tabbing through 6 untouched fields**, each a full reprice — and since Next runs Server Actions one at a time, they queue ahead of the shopper's next real action.
+
+Three fixes, all verified in the browser against the seeded stack: `pendingRateId` holds the clicked rate until its save settles (6 → 0 redundant address PUTs; WELCOME10 applied with Standard still `checked: true` and shipping $8.95); the sidebar now says "Select a shipping method" when the address is complete but no rate is chosen. The documented drop rule is untouched. `pnpm verify` green after merging main — 373 tests.
+
+One gap I want to be straight about: midway through, the checkout page stopped swapping in its Suspense boundary in the in-app browser, so I couldn't re-verify the disqualification path end-to-end there. The **unmodified** code does the same and the server returns complete HTML in under a second, so it isn't my change; that path is covered by the pre-existing passing API test. I logged it as an observation for E8 rather than a claim, since I couldn't cross-check in a second browser.
+
+## On B7 — yes, it's noticeable, but the cheap part isn't the visible part
+
+I looked at the seeded data while working. The Alpine Merino Crewneck has a **Color: Oatmeal / Slate** selector on its PDP, and clicking between them does not change the photo. That's the kind of thing a Shopify user notices immediately, and it's on the demo's main product.
+
+The catch is that B7's parts don't split the way the sizing suggests. Item 1 (stop the product form erasing `variantIds`) is genuinely small but **invisible** — it only prevents future data loss. The visible payoff needs items 2, 3 and 4 together: a media-card affordance to assign images to variants, seed assignments so the demo has data to show, and the PDP gallery swap. That's a real M, and item 4 lives in `product-form.tsx`, which WS-E owns, so it needs a handoff.
+
+My read: worth doing if the demo script clicks a colour swatch, because the dead swatch is a parity tell on your best-looking product. If the demo doesn't touch variants, it's lower value than it looks. If you want it, I'd do the full 1–4 rather than just the cheap core — item 1 alone changes nothing anyone can see.

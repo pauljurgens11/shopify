@@ -3,7 +3,7 @@
 Every Claude Code session behind this repo, exported to Markdown — the whole two-day build,
 from the first spec conversation to the last parity fix.
 
-**81 sessions** · 2026-08-28 – 2026-08-29 · 6 archived · main checkout + every agent worktree
+**84 sessions** · 2026-08-28 – 2026-08-29 · 6 archived · main checkout + every agent worktree
 
 ## What's in each file
 
@@ -23,7 +23,8 @@ python3 scripts/export-chat-archive.py docs/chat-archive docs/chat-archive/sessi
 ```
 
 `sessions.json` holds the sidebar titles, PR numbers and archived flags, which live in the
-Claude Code app rather than in the transcripts themselves.
+Claude Code app rather than in the transcripts themselves. Refresh it when sessions are added
+or their PRs land, then re-run the export — existing files are rewritten in place.
 
 ## Sessions
 
@@ -107,16 +108,19 @@ Claude Code app rather than in the transcripts themselves.
 | 69 | [Demo flows](sessions/2026-08-29-demo-flows.md) | 4 | — | `main` |
 | 70 | [Collection details UI parity](sessions/2026-08-29-collection-details-ui-parity.md) | 5 | #108 (MERGED) | `ws-b/collection-detail-parity` |
 | 71 | [How domains work locally](sessions/2026-08-29-how-domains-work-locally.md) | 7 | — | `ws-d/stripe-test-mode` |
-| 72 | [Index details UI parity alignment](sessions/2026-08-29-index-details-ui-parity-alignment-2.md) | 5 | #109 (MERGED) | `ws-b/parity-index-detail` |
-| 73 | [Index details UI parity alignment](sessions/2026-08-29-index-details-ui-parity-alignment.md) | 1 | #109 (MERGED) | `ws-b/parity-index-detail` |
-| 74 | [Admin shell UI parity alignment](sessions/2026-08-29-admin-shell-ui-parity-alignment.md) | 4 | #110 (OPEN) | `HEAD` |
-| 75 | [Home parity UI alignment](sessions/2026-08-29-home-parity-ui-alignment.md) | 4 | #116 (OPEN) | `ws-g/home-onboarding-variant` |
-| 76 | [Repo review skill execution](sessions/2026-08-29-repo-review-skill-execution.md) | 7 | #111 (MERGED) | `ws-qa/demo-polish` |
-| 77 | [Undone issues](sessions/2026-08-29-undone-issues.md) | 5 | — | `ws-e/discount-keeps-shipping` |
-| 78 | [Issue e8](sessions/2026-08-29-issue-e8.md) | 2 | — | `ws-e/action-hang-production` |
-| 79 | [Export project chats](sessions/2026-08-29-export-project-chats.md) | 1 | — | `main` |
-| 80 | [Local app testing](sessions/2026-08-29-local-app-testing.md) | 1 | — | `claude/local-app-testing-39495f` |
-| 81 | [Project deployment readiness](sessions/2026-08-29-project-deployment-readiness.md) | 1 | — | `claude/project-deployment-readiness-7dd23d` |
+| 72 | [Index details UI parity alignment](sessions/2026-08-29-index-details-ui-parity-alignment.md) | 1 | #109 (MERGED) | `ws-b/parity-index-detail` |
+| 73 | [Index details UI parity alignment](sessions/2026-08-29-index-details-ui-parity-alignment-2.md) | 5 | #109 (MERGED) | `ws-b/parity-index-detail` |
+| 74 | [Admin shell UI parity alignment](sessions/2026-08-29-admin-shell-ui-parity-alignment.md) | 4 | #110 (CLOSED) | `claude/admin-shell-ui-parity-65b222` |
+| 75 | [Home parity UI alignment](sessions/2026-08-29-home-parity-ui-alignment.md) | 4 | #116 (MERGED) | `ws-g/home-onboarding-variant` |
+| 76 | [Repo review skill execution](sessions/2026-08-29-repo-review-skill-execution.md) | 8 | #111 (MERGED) | `claude/repo-review-skill-d78732` |
+| 77 | [Undone issues](sessions/2026-08-29-undone-issues.md) | 5 | #121 (MERGED) | `ws-e/e9-agent-log` |
+| 78 | [Issue e8](sessions/2026-08-29-issue-e8.md) | 2 | #125 (MERGED) | `ws-e/action-hang-production` |
+| 79 | [Export project chats](sessions/2026-08-29-export-project-chats.md) | 3 | — | `main` |
+| 80 | [Local app testing](sessions/2026-08-29-local-app-testing.md) | 3 | — | `claude/local-app-testing-39495f` |
+| 81 | [Project deployment readiness](sessions/2026-08-29-project-deployment-readiness.md) | 3 | #120 (MERGED) | `ws-a/deploy-runbook` |
+| 82 | [B7 demo impact assessment](sessions/2026-08-29-b7-demo-impact-assessment.md) | 1 | — | `main` |
+| 83 | [Stale worktrees cleanup](sessions/2026-08-29-stale-worktrees-cleanup.md) | 3 | — | `main` |
+| 84 | [Deployment readiness check](sessions/2026-08-29-deployment-readiness-check.md) | 14 | #124 (MERGED) | `ws-qa/e2e-fresh-shop-empty-state` |
 
 🗄️ = archived in the Claude Code sidebar. Archived sessions are included here on purpose —
 they are the earliest planning conversations and the first workstream runs.

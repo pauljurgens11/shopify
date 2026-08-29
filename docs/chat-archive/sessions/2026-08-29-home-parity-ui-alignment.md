@@ -7,7 +7,7 @@
 | **Ended** | 2026-08-29T13:36:03.526Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/home-parity-ui-alignment-fd1ddc` |
 | **Branch** | `ws-g/home-onboarding-variant` |
-| **Pull request** | #116 (OPEN) |
+| **Pull request** | #116 (MERGED) |
 | **Model** | `claude-opus-5` |
 | **Claude Code** | 2.1.247 |
 | **Archived** | no |
