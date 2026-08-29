@@ -12,6 +12,7 @@ import { BlockStack, Card, Layout, SkeletonBodyText, SkeletonPage } from '@shopi
 export function PageSkeleton({
   lines = 6,
   layout = 'single',
+  fullWidth = false,
 }: {
   lines?: number;
   /**
@@ -20,6 +21,12 @@ export function PageSkeleton({
    * lands (PARITY.md §Motion: skeleton → content swaps with zero layout shift).
    */
   layout?: 'single' | 'detail';
+  /**
+   * The seven index pages render `<Page fullWidth>`; their skeleton must match
+   * or the content area visibly snaps from ~950px to full width when data
+   * lands — the exact jump the full-width change was made to remove.
+   */
+  fullWidth?: boolean;
 }) {
   if (layout === 'detail') {
     return (
@@ -51,7 +58,7 @@ export function PageSkeleton({
   }
 
   return (
-    <SkeletonPage primaryAction>
+    <SkeletonPage primaryAction fullWidth={fullWidth}>
       <Card>
         <SkeletonBodyText lines={lines} />
       </Card>

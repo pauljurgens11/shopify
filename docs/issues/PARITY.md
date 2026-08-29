@@ -166,7 +166,9 @@ on keyboard navigation only (`:focus-visible`), never on mouse click.
   with **no full reload**.
 - Variant select → gallery image swap: instant, client-side.
 - Product cards: a subtle hover affordance is allowed (e.g. image
-  opacity/scale ≤150ms, `transform`/`opacity` only); nothing bouncy.
+  opacity/scale ≤300ms, `transform`/`opacity` only); nothing bouncy.
+  (300ms matches what shipped — the H4 sweep logged the card zooms at
+  `duration-300` in DECISIONS.md; the doc and the classes must not disagree.)
 - Images reserve dimensions (width/height or aspect-ratio) — zero layout
   shift as they load.
 

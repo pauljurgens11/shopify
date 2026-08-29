@@ -101,7 +101,7 @@ export default function OrdersPage() {
 
   const resetPaging = () => setCursorStack([]);
 
-  if (orders.isPending) return <PageSkeleton />;
+  if (orders.isPending) return <PageSkeleton fullWidth />;
 
   const unfiltered = selectedTab === 'all' && query.trim() === '' && cursorStack.length === 0;
 

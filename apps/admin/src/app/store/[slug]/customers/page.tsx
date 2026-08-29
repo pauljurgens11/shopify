@@ -22,18 +22,14 @@ import {
   Card,
   IndexFilters,
   IndexTable,
-  Modal,
   Page,
   Text,
-  useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
-import { useToast } from '../../../../components/shell/toast-provider.tsx';
-import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
+import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
 
@@ -84,15 +80,11 @@ function customerName(customer: Customer): string {
 export default function CustomersPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const toast = useToast();
-  const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<string[]>(['createdAt desc']);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [bulkBusy, setBulkBusy] = useState(false);
   const { mode, setMode } = useSetIndexFiltersMode();
 
   const cursor = cursorStack.at(-1);
@@ -114,33 +106,9 @@ export default function CustomersPage() {
   });
   const rows = customers.data?.data ?? [];
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-    useIndexResourceState(rows as unknown as Array<{ [key: string]: unknown; id: string }>);
-
   const resetPaging = () => setCursorStack([]);
 
-  /**
-   * The checkbox column has to lead somewhere — a bulk bar with no actions in
-   * it is a dead control (CLAUDE.md §8).
-   */
-  const deleteSelected = async () => {
-    setBulkBusy(true);
-    try {
-      await Promise.all(
-        selectedResources.map((id) => apiFetch(`/admin/api/customers/${id}`, { method: 'DELETE' })),
-      );
-      await queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast.show('Customers deleted');
-      clearSelection();
-    } catch (cause) {
-      toast.error((cause as ApiError).message);
-    } finally {
-      setBulkBusy(false);
-      setConfirmingDelete(false);
-    }
-  };
-
-  if (customers.isPending) return <PageSkeleton />;
+  if (customers.isPending) return <PageSkeleton fullWidth />;
 
   // A failed load must never read as "no customers yet" — that empty state
   // invites the merchant to re-add customers they already have.
@@ -238,16 +206,15 @@ export default function CustomersPage() {
             <IndexTable
               resourceName={{ singular: 'customer', plural: 'customers' }}
               itemCount={rows.length}
-              selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
-              onSelectionChange={handleSelectionChange}
+              // Orders precedent (DECISIONS.md): no selection checkboxes here —
+              // the API has no bulk customer actions, and deleting a customer
+              // with orders is a 409 by design.
+              selectable={false}
               headings={[
                 { title: 'Customer' },
                 { title: 'Email subscription' },
                 { title: 'Orders' },
                 { title: 'Amount spent' },
-              ]}
-              promotedBulkActions={[
-                { content: 'Delete customers', onAction: () => setConfirmingDelete(true) },
               ]}
               pagination={{
                 hasPrevious: cursorStack.length > 0,
@@ -276,7 +243,6 @@ export default function CustomersPage() {
                   id={customer.id}
                   key={customer.id}
                   position={index}
-                  selected={selectedResources.includes(customer.id)}
                   onClick={() => router.push(`/store/${slug}/customers/${customer.id}`)}
                 >
                   <IndexTable.Cell>
@@ -303,25 +269,6 @@ export default function CustomersPage() {
           </>
         )}
       </Card>
-
-      <Modal
-        open={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        title={`Delete ${selectedResources.length} customer${selectedResources.length === 1 ? '' : 's'}?`}
-        primaryAction={{
-          content: 'Delete',
-          destructive: true,
-          loading: bulkBusy,
-          onAction: deleteSelected,
-        }}
-        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
-      >
-        <Modal.Section>
-          <Text as="p">
-            This can’t be undone. Orders these customers already placed keep their details.
-          </Text>
-        </Modal.Section>
-      </Modal>
     </Page>
   );
 }

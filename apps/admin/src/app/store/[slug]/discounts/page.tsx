@@ -21,19 +21,15 @@ import {
   Card,
   IndexFilters,
   IndexTable,
-  Modal,
   Page,
   Popover,
   Text,
-  useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
-import { useToast } from '../../../../components/shell/toast-provider.tsx';
-import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
+import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
 
@@ -81,15 +77,11 @@ function StatusBadge({ status }: { status: Discount['status'] }) {
 export default function DiscountsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const toast = useToast();
-  const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [bulkBusy, setBulkBusy] = useState(false);
   const { mode, setMode } = useSetIndexFiltersMode();
 
   const cursor = cursorStack.at(-1);
@@ -108,35 +100,10 @@ export default function DiscountsPage() {
   });
   const rows = discounts.data?.data ?? [];
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-    useIndexResourceState(rows as unknown as Array<{ [key: string]: unknown; id: string }>);
-
   const resetPaging = () => setCursorStack([]);
   const createUrl = (type: Discount['type']) => `/store/${slug}/discounts/new?type=${type}`;
 
-  /**
-   * The checkbox column is only honest if the bulk bar it opens can do
-   * something — an empty bulk bar is a dead control (CLAUDE.md §8). Delete is
-   * the one bulk action Shopify offers on this index.
-   */
-  const deleteSelected = async () => {
-    setBulkBusy(true);
-    try {
-      await Promise.all(
-        selectedResources.map((id) => apiFetch(`/admin/api/discounts/${id}`, { method: 'DELETE' })),
-      );
-      await queryClient.invalidateQueries({ queryKey: ['discounts'] });
-      toast.show('Discounts deleted');
-      clearSelection();
-    } catch (cause) {
-      toast.error((cause as ApiError).message);
-    } finally {
-      setBulkBusy(false);
-      setConfirmingDelete(false);
-    }
-  };
-
-  if (discounts.isPending) return <PageSkeleton />;
+  if (discounts.isPending) return <PageSkeleton fullWidth />;
 
   const empty = rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
 
@@ -224,17 +191,15 @@ export default function DiscountsPage() {
             <IndexTable
               resourceName={{ singular: 'discount', plural: 'discounts' }}
               itemCount={rows.length}
-              selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
-              onSelectionChange={handleSelectionChange}
+              // Orders precedent (DECISIONS.md): no selection checkboxes —
+              // the API has no bulk discount actions.
+              selectable={false}
               headings={[
                 { title: 'Title' },
                 { title: 'Status' },
                 { title: 'Method' },
                 { title: 'Type' },
                 { title: 'Used' },
-              ]}
-              promotedBulkActions={[
-                { content: 'Delete discounts', onAction: () => setConfirmingDelete(true) },
               ]}
               pagination={{
                 hasPrevious: cursorStack.length > 0,
@@ -263,7 +228,6 @@ export default function DiscountsPage() {
                   id={discount.id}
                   key={discount.id}
                   position={index}
-                  selected={selectedResources.includes(discount.id)}
                   onClick={() => router.push(`/store/${slug}/discounts/${discount.id}`)}
                 >
                   <IndexTable.Cell>
@@ -302,25 +266,6 @@ export default function DiscountsPage() {
           </>
         )}
       </Card>
-
-      <Modal
-        open={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        title={`Delete ${selectedResources.length} discount${selectedResources.length === 1 ? '' : 's'}?`}
-        primaryAction={{
-          content: 'Delete',
-          destructive: true,
-          loading: bulkBusy,
-          onAction: deleteSelected,
-        }}
-        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
-      >
-        <Modal.Section>
-          <Text as="p">
-            This can’t be undone. Orders that already used these discounts keep their totals.
-          </Text>
-        </Modal.Section>
-      </Modal>
     </Page>
   );
 }

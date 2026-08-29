@@ -7,6 +7,7 @@
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
 import {
+  Banner,
   BlockStack,
   Card,
   Grid,
@@ -61,7 +62,11 @@ export default function HomePage() {
   const { data: session } = useSession();
   const today = useMemo(() => rangeQueryString('today', new Date()), []);
 
-  const { data: dashboard, error } = useApiQuery<AnalyticsDashboard>(
+  const {
+    data: dashboard,
+    error,
+    refetch,
+  } = useApiQuery<AnalyticsDashboard>(
     ['analytics', 'dashboard', 'today'],
     `/admin/api/analytics?${today}`,
     { enabled: Boolean(session) },
@@ -79,6 +84,18 @@ export default function HomePage() {
     <Page title={`${greeting(new Date().getHours())}, ${session.shop.name}`}>
       <BlockStack gap="400">
         <OnboardingCard slug={session.shop.slug} />
+
+        {/* $0.00 with no explanation is a wrong number, not a fallback — the
+            first screen after login must not present a failed report as data. */}
+        {error ? (
+          <Banner
+            tone="critical"
+            title="Today’s numbers could not be loaded"
+            action={{ content: 'Try again', onAction: () => refetch() }}
+          >
+            <p>{error.message}</p>
+          </Banner>
+        ) : null}
 
         <BlockStack gap="200">
           <InlineStack align="space-between" blockAlign="center">

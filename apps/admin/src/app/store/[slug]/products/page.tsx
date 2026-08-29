@@ -142,7 +142,7 @@ export default function ProductsPage() {
       apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
     );
 
-  if (products.isPending) return <PageSkeleton />;
+  if (products.isPending) return <PageSkeleton fullWidth />;
 
   const empty =
     rows.length === 0 &&
