@@ -55,6 +55,7 @@ eight interpretations. Read your page's section before writing JSX.
 | [H4](H4-ux-motion-parity.md) | UX/motion parity audit: animations & interaction polish | H | M | H3 |
 | [C7](C7-orders-index-filters.md) | Orders index: wire payment/fulfillment filters | C | S | C5 |
 | [E6](E6-checkout-save-card.md) | Checkout: implement (or delete) saveCard | E | M | E4, D3, C4 |
+| [E7](E7-theme-publish-revalidation.md) | Theme publish revalidates the storefront cache | E | S | E2, F3 |
 | [H5](H5-demo-seed-gaps.md) | Seed: jane's orders, a demo app, abandoned checkouts | H | S | H1 |
 
 Deferred hardening (explicitly NOT issues — do not build unless promoted via
