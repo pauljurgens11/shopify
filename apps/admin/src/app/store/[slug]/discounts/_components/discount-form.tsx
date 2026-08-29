@@ -119,11 +119,23 @@ function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
   }
   lines.push(
     draft.hasEndDate && draft.endsAt !== ''
-      ? `Active from ${draft.startsAt} to ${draft.endsAt}`
-      : `Active from ${draft.startsAt}`,
+      ? `Active from ${summaryDate(draft.startsAt)} to ${summaryDate(draft.endsAt)}`
+      : `Active from ${summaryDate(draft.startsAt)}`,
   );
 
   return lines;
+}
+
+/**
+ * `2026-08-29` → `Aug 29, 2026` in the summary card — Shopify's bullets never
+ * show an ISO date. The raw value passes through unchanged while it is not a
+ * complete date (mid-edit, or cleared), so the bullet stays honest instead of
+ * reading "Invalid Date".
+ */
+function summaryDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function DiscountForm({

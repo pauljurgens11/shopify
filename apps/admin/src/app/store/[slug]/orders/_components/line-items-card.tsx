@@ -113,7 +113,10 @@ export function LineItemsCards({ order, fulfilHref }: { order: OrderDetail; fulf
                 </Badge>
                 {fulfillment.trackingNumber ? (
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Tracking:{' '}
+                    {/* "UPS · 1Z…" like Shopify; bare "Tracking:" when no carrier. */}
+                    {fulfillment.trackingCompany
+                      ? `${fulfillment.trackingCompany} · `
+                      : 'Tracking: '}
                     {fulfillment.trackingUrl ? (
                       <Link url={fulfillment.trackingUrl} target="_blank">
                         {fulfillment.trackingNumber}
