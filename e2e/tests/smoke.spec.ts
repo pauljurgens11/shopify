@@ -8,6 +8,7 @@ import {
   loginAsOwner,
   payWithApprovedCard,
   STOREFRONT_URL,
+  saveViaSaveBar,
   searchAdminIndex,
   signupFreshShop,
   storefrontUrlFor,
@@ -40,7 +41,11 @@ test.describe('mandatory smoke flows', () => {
 
     await test.step('fill title, price and two options', async () => {
       await page.locator('input[name="title"]').fill(title);
-      await page.locator('textarea[name="description"]').fill('Created by the e2e smoke suite.');
+      // The description is a rich text editor, not a textarea (B5 parity), so
+      // it is addressed by its role rather than by a form control name.
+      await page
+        .getByRole('textbox', { name: 'Description' })
+        .fill('Created by the e2e smoke suite.');
       // Price first, while there is a single variant row — generated variants
       // inherit the first row's price.
       await page.getByLabel('Price').fill('24.00');
@@ -65,7 +70,7 @@ test.describe('mandatory smoke flows', () => {
     });
 
     await test.step('save and land on the product page', async () => {
-      await page.getByRole('button', { name: 'Save' }).click();
+      await saveViaSaveBar(page);
       await expect(page.getByText('Product saved')).toBeVisible();
       await page.waitForURL(/\/products\/prod_/);
       productId = page.url().match(/prod_[0-9A-Za-z]+/)?.[0];
@@ -80,7 +85,7 @@ test.describe('mandatory smoke flows', () => {
       await expect(prices).toHaveCount(4);
       await prices.nth(2).fill('26.50'); // M / Black
       await expect(page.getByText('Unsaved changes')).toBeVisible();
-      await page.getByRole('button', { name: 'Save' }).click();
+      await saveViaSaveBar(page);
       // The save bar clears only after the refetched product re-seeds the form,
       // so these values are the server's, not the local draft's.
       await expect(page.getByText('Unsaved changes')).toBeHidden();

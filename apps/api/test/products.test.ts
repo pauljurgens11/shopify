@@ -459,3 +459,64 @@ describe('list', () => {
     expect(archived.data.map((p: { title: string }) => p.title)).toEqual(['Archived Thing']);
   });
 });
+
+describe('collection membership', () => {
+  const COLLECTIONS = '/admin/api/collections';
+
+  async function createCollection(payload: Record<string, unknown>) {
+    const response = await write('POST', COLLECTIONS, payload);
+    expect(response.statusCode, response.body).toBe(201);
+    return response.json() as { id: string };
+  }
+
+  it('joins and leaves manual collections through the product write', async () => {
+    const winter = await createCollection({ title: 'Winter', type: 'manual' });
+    const sale = await createCollection({ title: 'Sale', type: 'manual' });
+
+    const product = await createProduct({
+      title: 'Membership Tee',
+      collectionIds: [winter.id],
+      variants: [{ price: usd(1000) }],
+    });
+    expect(product.collectionIds).toEqual([winter.id]);
+
+    // Swapping the list moves the product; the PUT is a full replacement, so
+    // the collection it left must not keep a stale join row.
+    const moved = await write('PUT', `${PRODUCTS}/${product.id}`, { collectionIds: [sale.id] });
+    expect(moved.statusCode, moved.body).toBe(200);
+    expect(moved.json().collectionIds).toEqual([sale.id]);
+
+    const winterMembers = (await get(`${PRODUCTS}?collectionId=${winter.id}`)).json();
+    expect(winterMembers.data).toEqual([]);
+  });
+
+  it('leaves membership alone when the payload does not mention it', async () => {
+    const winter = await createCollection({ title: 'Winter Keep', type: 'manual' });
+    const product = await createProduct({ title: 'Keeper Tee', collectionIds: [winter.id] });
+
+    const renamed = await write('PUT', `${PRODUCTS}/${product.id}`, { title: 'Keeper Tee 2' });
+    expect(renamed.statusCode, renamed.body).toBe(200);
+    expect(renamed.json().collectionIds).toEqual([winter.id]);
+  });
+
+  it('refuses a smart collection, whose membership is a rule and not a row', async () => {
+    const smart = await createCollection({
+      title: 'Automated',
+      type: 'smart',
+      ruleSet: {
+        appliedDisjunctively: false,
+        rules: [{ column: 'vendor', relation: 'equals', condition: 'Northwind' }],
+      },
+    });
+
+    const response = await write('POST', PRODUCTS, {
+      title: 'Rule Breaker',
+      collectionIds: [smart.id],
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().errors[0]).toMatchObject({
+      code: 'invalid_request',
+      field: 'collectionIds',
+    });
+  });
+});

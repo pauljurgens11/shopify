@@ -22,6 +22,7 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { PlusCircleIcon } from '@shopify/polaris-icons';
 import { useState } from 'react';
 import {
   addOptionValues,
@@ -148,13 +149,18 @@ export function VariantsCard({
         </Text>
 
         {options.length === 0 ? (
-          <Button
-            variant="plain"
-            onClick={() => setOptions([{ name: '', values: [] }])}
-            accessibilityLabel="Add options like size or color"
-          >
-            + Add options like size or color
-          </Button>
+          // Wrapped: a BlockStack stretches its children, and a stretched
+          // Polaris Button centres its label. Shopify's action is flush left.
+          <InlineStack align="start">
+            <Button
+              variant="plain"
+              icon={PlusCircleIcon}
+              onClick={() => setOptions([{ name: '', values: [] }])}
+              accessibilityLabel="Add options like size or color"
+            >
+              Add options like size or color
+            </Button>
+          </InlineStack>
         ) : (
           <BlockStack gap="400">
             {options.map((option, index) => (
@@ -202,18 +208,24 @@ export function VariantsCard({
             ))}
 
             {options.length < MAX_OPTIONS ? (
-              <Button
-                variant="plain"
-                onClick={() => setOptions([...options, { name: '', values: [] }])}
-              >
-                + Add another option
-              </Button>
+              <InlineStack align="start">
+                <Button
+                  variant="plain"
+                  icon={PlusCircleIcon}
+                  onClick={() => setOptions([...options, { name: '', values: [] }])}
+                >
+                  Add another option
+                </Button>
+              </InlineStack>
             ) : null}
           </BlockStack>
         )}
 
         {error ? <InlineError message={error} fieldID="product-variants" /> : null}
 
+        {/* Only once options exist. Without them the product has a single
+            implicit variant whose price, sku and stock belong to the Price and
+            Inventory cards above — the same split Shopify makes. */}
         <BlockStack gap="200">
           {hasMatrix ? (
             <Text as="h3" variant="headingXs">
@@ -221,7 +233,7 @@ export function VariantsCard({
             </Text>
           ) : null}
 
-          {variants.map((variant, index) => (
+          {(hasMatrix ? variants : []).map((variant, index) => (
             <Box
               key={variant.key}
               borderBlockStartWidth="025"

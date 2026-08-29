@@ -153,6 +153,7 @@ export type ListInventoryOptions = {
   cursor?: string;
   query?: string;
   locationId?: string;
+  productId?: string;
 };
 
 const VARIANT_INCLUDE = {
@@ -194,14 +195,17 @@ export async function listInventory(
 
   const search = options.query?.trim();
   const rows = await db.productVariant.findMany({
-    where: search
-      ? {
-          OR: [
-            { sku: { contains: search, mode: 'insensitive' } },
-            { product: { title: { contains: search, mode: 'insensitive' } } },
-          ],
-        }
-      : {},
+    where: {
+      ...(options.productId ? { productId: options.productId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { sku: { contains: search, mode: 'insensitive' } },
+              { product: { title: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    },
     include: VARIANT_INCLUDE,
     // Grouped by product the way Shopify's inventory table reads, then by the
     // variant's own order within it. The id tiebreak is what keeps the cursor
