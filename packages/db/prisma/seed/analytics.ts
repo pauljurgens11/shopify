@@ -184,11 +184,18 @@ async function createRollups(
     'purchases',
   ];
 
+  // Every metric gets a row for every CLOSED day, zeros included — a chart
+  // that skips empty days draws a misleading line. Iterating the day range,
+  // not the buckets: a day the RNG gave zero traffic still owes its rows.
+  const closedDays: string[] = [];
+  for (let day = HISTORY_DAYS; day >= OLDEST_HISTORY_DAY; day--) {
+    closedDays.push(dayKey(daysAgo(ctx, day)));
+  }
+
   await db.analyticsRollupDaily.createMany({
-    data: [...buckets.entries()].flatMap(([day, bucket]) =>
-      // Every metric gets a row for every day, zeros included — a chart that
-      // skips empty days draws a misleading line.
-      METRICS.map((metric) => {
+    data: closedDays.flatMap((day) => {
+      const bucket = buckets.get(day) ?? new Map<string, number | Set<string>>();
+      return METRICS.map((metric) => {
         const raw = bucket.get(metric);
         const value = raw instanceof Set ? raw.size : (raw ?? 0);
         return {
@@ -198,7 +205,7 @@ async function createRollups(
           metric,
           value,
         };
-      }),
-    ),
+      });
+    }),
   });
 }

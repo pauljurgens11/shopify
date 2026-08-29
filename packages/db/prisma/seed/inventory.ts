@@ -86,7 +86,9 @@ export class InventoryLedger {
   async flush(db: PrismaClient): Promise<void> {
     await db.inventoryAdjustment.createMany({
       data: this.entries.map((e) => ({
-        id: newId('inventory'),
+        // Same prefix the live adjustment service writes (inv_adj_) — mixed
+        // prefixes in one table start the moment real activity lands.
+        id: newId('inventoryAdjustment'),
         shopId: this.shopId,
         variantId: e.variantId,
         locationId: e.locationId,

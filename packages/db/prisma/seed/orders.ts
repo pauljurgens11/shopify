@@ -19,7 +19,7 @@ import { newId } from '@merchant/config/ids';
 import { allocate, format, percentOf } from '@merchant/config/money';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { SeededProduct, SeededVariant } from './catalog.ts';
-import { addHours, addMinutes, daysAgo, type SeedContext } from './context.ts';
+import { addHours, addMinutes, daysAgo, type SeedContext, startOfUtcDay } from './context.ts';
 import type { SeededCustomer } from './customers.ts';
 import { shippingAddressFor } from './customers.ts';
 import type { SeededDiscount } from './discounts.ts';
@@ -68,7 +68,19 @@ const CARRIERS = [
 
 type OrderKind = 'fulfilled' | 'unfulfilled' | 'refunded' | 'cancelled';
 
-const notAfterNow = (ctx: SeedContext, at: Date): Date => (at > ctx.now ? ctx.now : at);
+/**
+ * History ends at the last instant of yesterday, not at the run instant:
+ * clamping against `ctx.now` re-introduced the run-time dependence that
+ * OLDEST_HISTORY_DAY exists to remove (DECISIONS.md, the "whole UTC days"
+ * line) — two seeds a minute apart must stamp identical timestamps.
+ */
+export const endOfHistory = (ctx: SeedContext): Date =>
+  new Date(startOfUtcDay(ctx.now).getTime() - 1);
+
+const notAfterHistoryEnd = (ctx: SeedContext, at: Date): Date => {
+  const cap = endOfHistory(ctx);
+  return at > cap ? cap : at;
+};
 
 export interface SeededOrder {
   id: string;
@@ -210,7 +222,7 @@ export async function createOrders(
 
     // Capped at `now`: a shipment stamped in the future is nonsense, and the
     // offset can run past midnight for the most recent orders.
-    const fulfilledAt = notAfterNow(ctx, addHours(createdAt, ctx.rng.int(6, 40)));
+    const fulfilledAt = notAfterHistoryEnd(ctx, addHours(createdAt, ctx.rng.int(6, 40)));
     const fulfillmentId = location ? newId('fulfillment') : null;
 
     if (location && fulfillmentId) {
@@ -264,15 +276,21 @@ export async function createOrders(
     const refundedQuantityFor = (line: DraftLine) =>
       kind === 'refunded' && line.id === refundedLine.id ? line.quantity : 0;
 
+    let refundedAt: Date | null = null;
     if (kind === 'refunded') {
-      const lineNet =
-        refundedLine.variant.price * refundedLine.quantity - (allocations[0]?.amount ?? 0);
-      refundedTotal =
-        lineNet +
-        percentOf({ amount: lineNet, currencyCode: ctx.currencyCode }, ctx.taxRatePercentage)
-          .amount;
+      // Tax comes back the way the live refund engine hands it out: the stored
+      // taxTotal allocated across lines by net, largest remainder. A fresh
+      // percentOf rounding here can disagree with that allocation by 1¢ on
+      // multi-line orders, and then refunding the remainder through the admin
+      // can never land on exactly `total` (DECISIONS.md, the calculateRefund
+      // tax line).
+      const lineNets = lines.map(
+        (l, i) => l.variant.price * l.quantity - (allocations[i]?.amount ?? 0),
+      );
+      const taxShare = allocate({ amount: taxTotal, currencyCode: ctx.currencyCode }, lineNets)[0];
+      refundedTotal = (lineNets[0] ?? 0) + (taxShare?.amount ?? 0);
 
-      const refundedAt = notAfterNow(ctx, addHours(fulfilledAt, ctx.rng.int(24, 120)));
+      refundedAt = notAfterHistoryEnd(ctx, addHours(fulfilledAt, ctx.rng.int(24, 120)));
       const paymentRefundId = newId('refund');
 
       // Restock only what actually left a shelf.
@@ -315,7 +333,7 @@ export async function createOrders(
     /* --- payment ---------------------------------------------------------- */
     const capturedAt = addMinutes(createdAt, 1);
     const cancelledAtRaw = kind === 'cancelled' ? addHours(createdAt, ctx.rng.int(2, 20)) : null;
-    const cancelledAt = cancelledAtRaw && cancelledAtRaw > ctx.now ? ctx.now : cancelledAtRaw;
+    const cancelledAt = cancelledAtRaw && notAfterHistoryEnd(ctx, cancelledAtRaw);
 
     paymentRows.push({
       id: paymentId,
@@ -336,7 +354,9 @@ export async function createOrders(
       routingTrail: [{ processor: 'mock', outcome: 'succeeded', at: capturedAt.toISOString() }],
       idempotencyKey: `seed_${orderNumber}`,
       createdAt: capturedAt,
-      updatedAt: capturedAt,
+      // A refunded or voided payment was touched after capture; its updatedAt
+      // saying otherwise reads as a data bug on the order page.
+      updatedAt: refundedAt ?? cancelledAt ?? capturedAt,
     });
 
     /* --- order ------------------------------------------------------------ */
@@ -476,12 +496,13 @@ export async function createOrders(
         { locationId: location.id },
       );
     }
-    if (refundedTotal > 0) {
-      const refundEventAt = notAfterNow(ctx, addHours(fulfilledAt, 24));
+    if (refundedTotal > 0 && refundedAt) {
+      // Stamped at the Refund row's own instant — the timeline and the refund
+      // record render on the same order page and must not disagree by days.
       event(
         'refund_created',
         `Refund of ${asMoney(refundedTotal)} issued to the original payment method.`,
-        refundEventAt,
+        refundedAt,
         'Aurora Owner',
       );
     }

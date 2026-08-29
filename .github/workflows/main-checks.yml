@@ -39,6 +39,19 @@ jobs:
       # `pnpm exec playwright` finds no binary.
       - run: pnpm --filter @merchant/e2e exec playwright install --with-deps chromium
       - run: pnpm build
+      # The browser maps *.lvh.me → 127.0.0.1 via --host-resolver-rules, but
+      # the storefront's SSR fetches {slug}.lvh.me:3001 through the RUNNER's
+      # resolver — and "public name that answers 127.0.0.1" is exactly what
+      # DNS-rebind filters drop. Serve the wildcard locally instead of trusting
+      # the network; dnsmasq forwards everything else to systemd-resolved.
+      - name: resolve *.lvh.me locally
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq dnsmasq
+          printf 'listen-address=127.0.0.2\nbind-interfaces\naddress=/lvh.me/127.0.0.1\nserver=127.0.0.53\n' | sudo tee /etc/dnsmasq.d/lvh.conf
+          sudo systemctl restart dnsmasq
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 127.0.0.2\n' | sudo tee /etc/resolv.conf
+          getent hosts smoke-test-wildcard.lvh.me
       - run: pnpm e2e
 
       - uses: actions/upload-artifact@v4

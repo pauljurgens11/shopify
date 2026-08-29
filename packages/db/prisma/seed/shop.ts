@@ -12,8 +12,9 @@ import { daysAgo, type SeedContext } from './context.ts';
 
 /**
  * SPEC §5 fixes the ID prefix set. A few seeded rows — DiscountRedemption,
- * AnalyticsRollupDaily, BuilderConversation, shipping rates — still have no
- * prefix of their own and are never shown in a URL; they use the generic `evt_`.
+ * AnalyticsRollupDaily, shipping rates — still have no prefix of their own and
+ * are never shown in a URL; they use the generic `evt_`. BuilderConversation
+ * has one (`conv_`, same as the live service) and uses it.
  */
 export const DEMO_SHOP_SLUG = 'demo';
 export const DEMO_OWNER_EMAIL = 'owner@demo.dev';
@@ -289,7 +290,7 @@ export async function createProcessor(db: PrismaClient, ctx: SeedContext): Promi
 export async function createTheme(db: PrismaClient, ctx: SeedContext): Promise<void> {
   const published = presetThemeDoc(DEFAULT_PRESET);
   const draft = presetThemeDoc('monochrome');
-  const conversationId = newId('event');
+  const conversationId = newId('conversation');
   const publishedId = newId('theme');
   const draftId = newId('theme');
 

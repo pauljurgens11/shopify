@@ -62,9 +62,17 @@ function unitValues(line: LineRow, currencyCode: string): number[] {
  * `partially_refunded` one tax-total short.
  */
 function unitTaxValues(order: OrderWithLines, currencyCode: string): Map<string, number[]> {
-  const weights = order.lineItems.map((line) =>
+  let weights = order.lineItems.map((line) =>
     line.taxable ? Math.max(0, line.price * line.quantity - line.totalDiscount) : 0,
   );
+  // A zero weight-sum makes `allocate` return all zeros, and tax that no
+  // refund can ever return leaves the order stuck short of `refunded` — the
+  // exact failure the by-net allocation exists to prevent. An order CAN carry
+  // taxTotal > 0 with no positive taxable net (createOrder validates only the
+  // totals equation), so fall back to spreading the tax across units evenly.
+  if (order.taxTotal > 0 && weights.every((w) => w === 0)) {
+    weights = order.lineItems.map((line) => line.quantity);
+  }
   const perLine = allocate(money(order.taxTotal, currencyCode), weights);
   return new Map(
     order.lineItems.map((line, i) => [

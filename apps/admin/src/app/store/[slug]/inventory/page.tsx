@@ -100,7 +100,7 @@ export default function InventoryPage() {
   };
 
   if (locations.isPending || (inventory.isPending && Boolean(activeLocation))) {
-    return <PageSkeleton />;
+    return <PageSkeleton fullWidth />;
   }
 
   const availableAt = (row: InventoryRow) =>

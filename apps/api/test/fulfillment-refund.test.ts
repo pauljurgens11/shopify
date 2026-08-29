@@ -58,7 +58,13 @@ async function stockedVariant(available: number, price: number): Promise<Variant
 const availableAt = async (variantId: string) =>
   (await dbAdmin.inventoryLevel.findFirstOrThrow({ where: { variantId, locationId } })).available;
 
-type LineSpec = { variant: Variant; quantity: number; price: number; discount?: number };
+type LineSpec = {
+  variant: Variant;
+  quantity: number;
+  price: number;
+  discount?: number;
+  taxable?: boolean;
+};
 
 /** An order whose totals balance, so createOrder accepts it (C2's guard). */
 async function placeOrder(lines: LineSpec[], shipping = 0, tax = 0) {
@@ -78,7 +84,7 @@ async function placeOrder(lines: LineSpec[], shipping = 0, tax = 0) {
       price: usd(l.price),
       totalDiscount: usd(l.discount ?? 0),
       requiresShipping: true,
-      taxable: true,
+      taxable: l.taxable ?? true,
     })),
     totals: {
       subtotal: usd(subtotal),
@@ -364,6 +370,26 @@ describe('refund proration', () => {
     expect(second.refunds.at(-1).amount).toEqual(usd(1585));
     expect(second.refundedTotal).toEqual(usd(2671));
     expect(second.financialStatus).toBe('refunded');
+  });
+
+  it('returns the tax even when no line is taxable, so the order can still reach refunded', async () => {
+    // createOrder validates only the totals equation, so taxTotal > 0 with
+    // zero taxable net is a legal order (Admin API). By-net weights are all
+    // zero there — without the unit-count fallback, no refund ever returns
+    // the tax and the order sticks one tax-total short of `refunded`.
+    const jacket = await stockedVariant(10, 1000);
+    const order = await placeOrder(
+      [{ variant: jacket, quantity: 1, price: 1000, taxable: false }],
+      0,
+      85,
+    );
+    const lineId = order.lineItems[0]?.id;
+    await payFor(order);
+
+    const done = await refund(order.id, { lineItems: [{ lineItemId: lineId, quantity: 1 }] });
+    expect(done.refunds.at(-1).amount).toEqual(usd(1085));
+    expect(done.refundedTotal).toEqual(usd(1085));
+    expect(done.financialStatus).toBe('refunded');
   });
 
   it('refunds shipping on top of lines, and only once', async () => {

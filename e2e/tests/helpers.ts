@@ -4,11 +4,39 @@
  * Not a test file — the five flows + health check in smoke.spec.ts are the
  * whole e2e budget.
  */
-import { expect, type Page } from '@playwright/test';
+import { type APIResponse, expect, type Page } from '@playwright/test';
 
 export const ADMIN_URL = process.env.ADMIN_URL ?? 'http://admin.lvh.me:3000';
 export const STOREFRONT_URL = process.env.STOREFRONT_URL ?? 'http://demo.lvh.me:3002';
 export const API_URL = process.env.API_URL ?? 'http://localhost:3001';
+
+/**
+ * The API origin the ADMIN app authenticates against. Cleanup calls must hit
+ * this exact origin — the session cookie is host-scoped, so a request to the
+ * probe URL above (`localhost`) would go out unauthenticated.
+ */
+export const ADMIN_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://api.lvh.me:3001';
+
+/**
+ * Cookie-authenticated admin API call from a logged-in page's context.
+ * `page.request` shares the browser's cookie jar; the `x-requested-with`
+ * header is the API's CSRF presence check for session-proved mutations.
+ *
+ * Exists so flows can clean up after themselves: seed data IS the demo
+ * (CLAUDE.md §8), and a smoke run must not leave products or stock movements
+ * behind in the seeded store.
+ */
+export async function adminApi(
+  page: Page,
+  method: 'get' | 'post' | 'delete',
+  path: string,
+  body?: unknown,
+): Promise<APIResponse> {
+  return page.request[method](`${ADMIN_API_URL}${path}`, {
+    headers: { 'x-requested-with': 'e2e-smoke' },
+    ...(body === undefined ? {} : { data: body }),
+  });
+}
 
 /** Per-flow unique data so a retry never collides with an earlier run's rows. */
 export function uniqueSuffix(): string {
