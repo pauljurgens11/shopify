@@ -11,6 +11,7 @@ import type { Location } from '@merchant/contracts/locations';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import {
   BlockStack,
+  Box,
   Button,
   Card,
   InlineStack,
@@ -21,10 +22,11 @@ import {
   TextField,
   Thumbnail,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, OrderIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../../lib/api.ts';
@@ -80,7 +82,16 @@ export default function FulfillPage() {
   // crash rather than a missing order.
   if (!detail) {
     return (
-      <Page title="Fulfill items" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
+      <Page>
+        <Box paddingBlockEnd="400">
+          <PageBreadcrumb
+            icon={OrderIcon}
+            title="Fulfill items"
+            backUrl={`/store/${slug}/orders`}
+            backLabel="Orders"
+          />
+        </Box>
+
         <Card>
           <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
         </Card>
@@ -123,10 +134,16 @@ export default function FulfillPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: `#${detail.orderNumber}`, url: `/store/${slug}/orders/${id}` }}
-      title={`Fulfill items · #${detail.orderNumber}`}
-    >
+    <Page>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={OrderIcon}
+          backUrl={`/store/${slug}/orders/${id}`}
+          backLabel={`#${detail.orderNumber}`}
+          title={`Fulfill items · #${detail.orderNumber}`}
+        />
+      </Box>
+
       <Layout>
         <Layout.Section>
           <Card>

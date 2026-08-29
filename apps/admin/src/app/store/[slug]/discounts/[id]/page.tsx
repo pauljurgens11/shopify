@@ -4,8 +4,10 @@
  * Edit discount (C6). Same form as create; the draft is seeded from the row.
  */
 import type { Discount } from '@merchant/contracts/discounts';
-import { Banner, Page } from '@shopify/polaris';
+import { Banner, BlockStack, Page } from '@shopify/polaris';
+import { DiscountIcon } from '@shopify/polaris-icons';
 import { useParams } from 'next/navigation';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../../lib/api.ts';
 import { useSession } from '../../../../../lib/session.ts';
@@ -22,10 +24,18 @@ export default function EditDiscountPage() {
   // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
   if (discount.error || !discount.data || !session.data) {
     return (
-      <Page backAction={{ content: 'Discounts', url: `/store/${slug}/discounts` }} title="Discount">
-        <Banner tone="critical" title="This discount could not be loaded">
-          <p>{discount.error?.message ?? 'It may have been deleted.'}</p>
-        </Banner>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={DiscountIcon}
+            title="Discount"
+            backUrl={`/store/${slug}/discounts`}
+            backLabel={'Discounts'}
+          />
+          <Banner tone="critical" title="This discount could not be loaded">
+            <p>{discount.error?.message ?? 'It may have been deleted.'}</p>
+          </Banner>
+        </BlockStack>
       </Page>
     );
   }

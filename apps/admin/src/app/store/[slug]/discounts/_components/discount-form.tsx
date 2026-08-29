@@ -15,6 +15,7 @@ import { format, fromDecimal } from '@merchant/config/money';
 import type { Discount } from '@merchant/contracts/discounts';
 import {
   BlockStack,
+  Box,
   Button,
   ButtonGroup,
   Card,
@@ -30,9 +31,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { DiscountIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
@@ -229,22 +232,7 @@ export function DiscountForm({
   };
 
   return (
-    <Page
-      backAction={{ content: 'Discounts', url: `/store/${slug}/discounts` }}
-      title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
-      subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
-      secondaryActions={
-        discountId
-          ? [
-              {
-                content: 'Delete',
-                destructive: true,
-                onAction: () => setConfirmingDelete(true),
-              },
-            ]
-          : undefined
-      }
-    >
+    <Page>
       <SaveBar
         dirty={dirty}
         saving={saving}
@@ -254,6 +242,23 @@ export function DiscountForm({
           setSubmitted(false);
         }}
       />
+
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={DiscountIcon}
+          backUrl={`/store/${slug}/discounts`}
+          backLabel="Discounts"
+          title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
+          subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
+          actions={
+            discountId ? (
+              <Button tone="critical" variant="tertiary" onClick={() => setConfirmingDelete(true)}>
+                Delete
+              </Button>
+            ) : undefined
+          }
+        />
+      </Box>
 
       <Form onSubmit={save}>
         <Layout>

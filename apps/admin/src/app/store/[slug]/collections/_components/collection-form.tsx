@@ -23,10 +23,25 @@ import type {
 } from '@merchant/contracts/collections';
 import type { Paginated } from '@merchant/contracts/common';
 import type { Product } from '@merchant/contracts/products';
-import { BlockStack, Card, Layout, Modal, Page, Text, TextField } from '@shopify/polaris';
+import {
+  ActionList,
+  BlockStack,
+  Box,
+  Button,
+  Card,
+  InlineStack,
+  Layout,
+  Modal,
+  Page,
+  Popover,
+  Text,
+  TextField,
+} from '@shopify/polaris';
+import { CollectionIcon, MenuHorizontalIcon } from '@shopify/polaris-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -126,6 +141,7 @@ export function CollectionForm({
   const [picking, setPicking] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
   const [duplicateTitle, setDuplicateTitle] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const patch = (changes: Partial<Draft>) => setDraft((current) => ({ ...current, ...changes }));
 
@@ -350,54 +366,7 @@ export function CollectionForm({
   };
 
   return (
-    <Page
-      backAction={{ content: 'Collections', url: `/store/${slug}/collections` }}
-      title={collection ? collection.title : 'Create collection'}
-      secondaryActions={
-        collection
-          ? [
-              {
-                content: 'Duplicate',
-                // The copy carries `baseline.products`, which is empty until
-                // the members land — duplicating before then would silently
-                // produce an empty collection.
-                disabled: collection.type === 'manual' && members.isPending,
-                onAction: () => setDuplicateTitle(`${collection.title} copy`),
-              },
-              {
-                content: 'View',
-                url: previewUrl({
-                  shopSlug: slug,
-                  page: 'collection',
-                  collectionHandle: collection.handle,
-                }),
-                external: true,
-                // `external` alone is not enough: the shell's `PolarisLink`
-                // spreads Polaris's props AFTER its own `target="_blank"`, so
-                // an undefined `target` erases it and the storefront would
-                // replace the admin in the same tab.
-                target: '_blank',
-              },
-            ]
-          : undefined
-      }
-      actionGroups={
-        collection
-          ? [
-              {
-                title: 'More actions',
-                actions: [
-                  {
-                    content: 'Delete',
-                    destructive: true,
-                    onAction: () => setConfirmingDelete(true),
-                  },
-                ],
-              },
-            ]
-          : undefined
-      }
-    >
+    <Page>
       <SaveBar
         dirty={dirty}
         saving={saving}
@@ -408,6 +377,73 @@ export function CollectionForm({
           setServerError(null);
         }}
       />
+
+      {/* docs/parity/collection-detail.md: `Duplicate` `View` `More actions ⌄`,
+          all secondary — the page saves through the contextual save bar. */}
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={CollectionIcon}
+          backUrl={`/store/${slug}/collections`}
+          backLabel="Collections"
+          title={collection ? collection.title : 'Create collection'}
+          actions={
+            collection ? (
+              <InlineStack gap="200" blockAlign="center">
+                <Button
+                  // The copy carries `baseline.products`, which is empty until
+                  // the members land — duplicating before then would silently
+                  // produce an empty collection.
+                  disabled={collection.type === 'manual' && members.isPending}
+                  onClick={() => setDuplicateTitle(`${collection.title} copy`)}
+                >
+                  Duplicate
+                </Button>
+                <Button
+                  url={previewUrl({
+                    shopSlug: slug,
+                    page: 'collection',
+                    collectionHandle: collection.handle,
+                  })}
+                  external
+                  // `external` alone is not enough: the shell's `PolarisLink`
+                  // spreads Polaris's props AFTER its own `target="_blank"`, so
+                  // an undefined `target` erases it and the storefront would
+                  // replace the admin in the same tab.
+                  target="_blank"
+                >
+                  View
+                </Button>
+                <Popover
+                  active={menuOpen}
+                  onClose={() => setMenuOpen(false)}
+                  activator={
+                    <Button
+                      variant="tertiary"
+                      icon={MenuHorizontalIcon}
+                      accessibilityLabel="More actions"
+                      onClick={() => setMenuOpen((open) => !open)}
+                    />
+                  }
+                >
+                  <ActionList
+                    actionRole="menuitem"
+                    items={[
+                      {
+                        content: 'Delete',
+                        destructive: true,
+                        onAction: () => {
+                          setMenuOpen(false);
+                          setConfirmingDelete(true);
+                        },
+                      },
+                    ]}
+                  />
+                </Popover>
+              </InlineStack>
+            ) : undefined
+          }
+        />
+      </Box>
 
       <Layout>
         <Layout.Section>
