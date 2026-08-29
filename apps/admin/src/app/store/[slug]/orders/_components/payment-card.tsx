@@ -14,6 +14,20 @@ import type { OrderDetail } from '@merchant/contracts/orders';
 import { BlockStack, Box, Card, Divider, InlineStack, Text } from '@shopify/polaris';
 import { capturedTotal, financialBadge, itemCountLabel } from './status.ts';
 
+/**
+ * The processor ids Pay routes through, shown with the same display names
+ * Settings → Payments uses — the row read "Paid with mock" (the raw enum) at
+ * the exact spot DEMO.md's beat 6 points at. Unknown ids fall through
+ * verbatim rather than hiding which processor took the money.
+ */
+const PROCESSOR_NAMES: Record<string, string> = {
+  mock: 'Mock Gateway',
+  stripe: 'Stripe',
+  maverick: 'Maverick',
+};
+
+const processorName = (processor: string) => PROCESSOR_NAMES[processor] ?? processor;
+
 function Row({
   label,
   value,
@@ -110,7 +124,7 @@ export function PaymentCard({ order }: { order: OrderDetail }) {
           <Box>
             <Text as="p" variant="bodySm" tone="subdued">
               {order.payments.length === 1
-                ? `Paid with ${order.payments[0]?.processor ?? 'card'}`
+                ? `Paid with ${processorName(order.payments[0]?.processor ?? 'card')}`
                 : `${order.payments.length} payments`}
             </Text>
           </Box>

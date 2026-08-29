@@ -108,7 +108,12 @@ export function OrderSummary({
                 ? totals.shippingTotal.amount === 0
                   ? 'Free'
                   : money(totals.shippingTotal.amount, currencyCode)
-                : 'Enter shipping address'
+                : // Two different states, and telling a shopper who has already
+                  // typed their address to enter it reads as the checkout
+                  // having lost it.
+                  checkout.shippingAddress
+                  ? 'Select a shipping method'
+                  : 'Enter shipping address'
             }
           />
           <Row label="Taxes" value={money(totals.taxTotal.amount, currencyCode)} />

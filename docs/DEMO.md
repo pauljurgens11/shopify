@@ -56,11 +56,11 @@ dashboard under it: the date-range and comparison pills, four metric tiles
 Last 30 days), the two-series sales chart against the previous period, and the
 Total sales breakdown beside it.
 
-There is **no setup guide on this Home**, and that is the thing to say if anyone
-asks. Its four tasks are checked from real state rather than a stored flag, and
-Aurora has products, a theme, a processor and orders — so the card hides itself,
-the way Shopify's does once a store is set up. Beat 9 shows the other half of
-that: a brand-new store where the same card appears at 1 of 4.
+There is **no onboarding on this Home**, and that is the thing to say if anyone
+asks. Shopify serves Home in two forms — a setup page for a new store, this
+dashboard for an established one — and we switch on the same signal it does:
+Aurora has taken 40 orders, so it gets the dashboard. Beat 9 shows the other
+half of that, on a store created live.
 
 ---
 
@@ -252,9 +252,13 @@ This is the beat that proves the platform, and nothing about it is prepared.
 **Say.** "New store, new tenant, same deployment. Signing up logs me in."
 
 **Point at.** The URL — `/store/northwind-goods` — "the store URL was derived
-from the name and de-duplicated server-side" — and the Home setup guide, which
-Aurora's Home did not show, here at **1 of 4 tasks complete**: the store already has a published theme,
-because signup installs one so a new shop never opens on a blank page.
+from the name and de-duplicated server-side" — and then the Home itself, which is
+a **different page** from Aurora's: *"Welcome to Shopify! Where do you want to
+start?"*, an assistant prompt, and a grid of setup cards, each independently
+dismissible. `Choose your store design` is already marked **Done**, because signup
+installs a published theme so a new shop never opens on a blank page. This store
+has taken no orders, so it gets the onboarding Home; the moment it takes one it
+gets Aurora's dashboard.
 
 **Do.** Click **Products**.
 

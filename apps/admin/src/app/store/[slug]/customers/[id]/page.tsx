@@ -35,9 +35,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { PersonIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
@@ -228,7 +230,16 @@ export default function CustomerDetailPage() {
   if (customer.isError || !loaded) {
     const missing = customer.error?.code === 'not_found';
     return (
-      <Page backAction={{ content: 'Customers', url: `/store/${slug}/customers` }} title="Customer">
+      <Page>
+        <Box paddingBlockEnd="400">
+          <PageBreadcrumb
+            icon={PersonIcon}
+            title="Customer"
+            backUrl={`/store/${slug}/customers`}
+            backLabel="Customers"
+          />
+        </Box>
+
         {missing ? (
           <Card>
             {/* Hand-built rather than Polaris `EmptyState`, which requires an
@@ -291,12 +302,18 @@ export default function CustomerDetailPage() {
     setAddresses((current) => current.map((a, i) => ({ ...a, isDefault: i === index })));
 
   return (
-    <Page
-      backAction={{ content: 'Customers', url: `/store/${slug}/customers` }}
-      title={fullName(loaded)}
-      subtitle={customerFor(loaded.createdAt)}
-    >
+    <Page>
       <SaveBar dirty={dirty} saving={saving} onSave={save} onDiscard={discard} />
+
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={PersonIcon}
+          backUrl={`/store/${slug}/customers`}
+          backLabel="Customers"
+          title={fullName(loaded)}
+          subtitle={customerFor(loaded.createdAt)}
+        />
+      </Box>
 
       <Layout>
         <Layout.Section>

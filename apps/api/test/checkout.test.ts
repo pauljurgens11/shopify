@@ -428,6 +428,28 @@ describe('totals', () => {
     const after = await readyToPay(checkout.token, { discountCode: 'WELCOME10' }, FREE_RATE_ID);
     expect(after.selectedShippingRateId).toBeNull();
   });
+
+  it('keeps a still-qualifying rate when the PUT carries only a discount code', async () => {
+    // E4 saves one section at a time, so "Apply" sends `discountCode` alone.
+    // An absent `selectedShippingRateId` means "leave it alone", never "reset":
+    // dropping it here makes the shopper re-pick a rate they never changed.
+    const { checkout } = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    await readyToPay(checkout.token, {}, STANDARD_RATE_ID);
+
+    const response = await req('PUT', `/storefront/api/checkouts/${checkout.token}`, {
+      payload: { discountCode: 'WELCOME10' },
+    });
+    expect(response.statusCode).toBe(200);
+    const after = response.json();
+
+    expect(after.selectedShippingRateId).toBe(STANDARD_RATE_ID);
+    expect(after.totals.shippingTotal).toEqual(usd(895));
+    expect(after.appliedDiscounts).toHaveLength(1);
+
+    // And it survives the next read, not just the response to the PUT.
+    const reread = await req('GET', `/storefront/api/checkouts/${checkout.token}`);
+    expect(reread.json().selectedShippingRateId).toBe(STANDARD_RATE_ID);
+  });
 });
 
 describe('complete', () => {

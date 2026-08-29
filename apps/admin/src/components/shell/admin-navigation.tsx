@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Left navigation (SPEC §9, PARITY.md). Owner: WS-A.
+ * Left navigation (SPEC §9, docs/parity/admin-shell.md). Owner: WS-A.
  *
  * Renders whatever `src/navigation/` holds, in that order — this file never
  * names an item. Adding or reordering nav happens in `navigation/items/`.
@@ -16,7 +16,7 @@ import * as PolarisIcons from '@shopify/polaris-icons';
 import { usePathname } from 'next/navigation';
 import { isItemSelected, isSubItemSelected, storeHref, visibleNav } from '../../lib/nav.ts';
 import { viewerOf } from '../../lib/session.ts';
-import { BOTTOM_NAV, MAIN_NAV, type NavItem } from '../../navigation/index.ts';
+import { BOTTOM_NAV, NAV_SECTIONS, type NavItem } from '../../navigation/index.ts';
 
 type IconComponent = (typeof PolarisIcons)['HomeIcon'];
 
@@ -64,11 +64,26 @@ export function AdminNavigation({
     };
   };
 
+  // A section a staff user cannot see any of is dropped entirely rather than
+  // left as a header with nothing under it.
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: visibleNav(section.items, viewer),
+  })).filter((section) => section.items.length > 0);
+
   return (
     <Navigation location={pathname}>
-      {/* `fill` makes this section take the slack, which pins Settings to the
-          bottom of the sidebar the way Shopify does (PARITY.md). */}
-      <Navigation.Section fill items={visibleNav(MAIN_NAV, viewer).map(toPolaris)} />
+      {/* `Sales channels` and `Apps` carry a header; the main list does not.
+          `fill` goes on the LAST visible section so the groups stack from the
+          top and the slack below them is what pins Settings to the bottom. */}
+      {sections.map((section, index) => (
+        <Navigation.Section
+          key={section.key}
+          title={section.title}
+          fill={index === sections.length - 1}
+          items={section.items.map(toPolaris)}
+        />
+      ))}
       <Navigation.Section items={visibleNav(BOTTOM_NAV, viewer).map(toPolaris)} />
     </Navigation>
   );

@@ -13,8 +13,10 @@
 import type { AddressDto } from '@merchant/contracts/common';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import {
+  ActionList,
   Badge,
   BlockStack,
+  Box,
   Button,
   Card,
   InlineStack,
@@ -22,13 +24,16 @@ import {
   Link,
   Modal,
   Page,
+  Popover,
   Select,
   Text,
   TextField,
 } from '@shopify/polaris';
+import { OrderIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -82,6 +87,7 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient();
 
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('customer');
   const [cancelling, setCancelling] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -103,10 +109,18 @@ export default function OrderDetailPage() {
   if (query.isPending) return <PageSkeleton layout="detail" primaryAction />;
   if (!order) {
     return (
-      <Page title="Order" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
-        <Card>
-          <Text as="p">{query.error?.message ?? 'This order could not be found.'}</Text>
-        </Card>
+      <Page>
+        <BlockStack gap="400">
+          <PageBreadcrumb
+            icon={OrderIcon}
+            title="Order"
+            backUrl={`/store/${slug}/orders`}
+            backLabel={'Orders'}
+          />
+          <Card>
+            <Text as="p">{query.error?.message ?? 'This order could not be found.'}</Text>
+          </Card>
+        </BlockStack>
       </Page>
     );
   }
@@ -183,156 +197,179 @@ export default function OrderDetailPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}
-      title={`#${order.orderNumber}`}
-      titleMetadata={
-        <InlineStack gap="200">
-          {alreadyCancelled ? <CancelledBadge /> : null}
-          <FinancialBadge order={order} />
-          <FulfillmentBadge order={order} />
-        </InlineStack>
-      }
-      subtitle={placed}
-      // PARITY.md → Order detail: `Refund` then `More actions ▾`, top-right.
-      secondaryActions={
-        refundable ? [{ content: 'Refund', url: `/store/${slug}/orders/${id}/refund` }] : []
-      }
-      actionGroups={
-        alreadyCancelled
-          ? []
-          : [
-              {
-                title: 'More actions',
-                actions: [
-                  {
-                    content: 'Cancel order',
-                    destructive: true,
-                    disabled: paid,
-                    onAction: () => setCancelOpen(true),
-                    // Shopify explains the disabled state rather than hiding it.
-                    helpText: paid ? 'Refund the payment before cancelling this order.' : undefined,
-                  },
-                ],
-              },
-            ]
-      }
-    >
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="400">
-            <LineItemsCards order={order} fulfilHref={`/store/${slug}/orders/${id}/fulfill`} />
-            <PaymentCard order={order} />
-            <Card>
-              <Timeline events={order.events} onComment={postComment} posting={posting} />
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Notes
-                </Text>
-                <TextField
-                  label="Order note"
-                  labelHidden
-                  multiline={3}
-                  autoComplete="off"
-                  placeholder="No notes from customer"
-                  value={note ?? order.note ?? ''}
-                  onChange={setNote}
+    <Page>
+      <PageBreadcrumb
+        icon={OrderIcon}
+        backUrl={`/store/${slug}/orders`}
+        backLabel={'Orders'}
+        title={`#${order.orderNumber}`}
+        titleMetadata={
+          <InlineStack gap="200">
+            {alreadyCancelled ? <CancelledBadge /> : null}
+            <FinancialBadge order={order} />
+            <FulfillmentBadge order={order} />
+          </InlineStack>
+        }
+        subtitle={placed}
+        // PARITY.md → Order detail: `Refund` then `More actions ▾`, top-right.
+        actions={
+          <InlineStack gap="200" blockAlign="center">
+            {refundable ? <Button url={`/store/${slug}/orders/${id}/refund`}>Refund</Button> : null}
+            {alreadyCancelled ? null : (
+              <Popover
+                active={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                activator={
+                  <Button disclosure onClick={() => setMenuOpen((open) => !open)}>
+                    More actions
+                  </Button>
+                }
+              >
+                <ActionList
+                  actionRole="menuitem"
+                  items={[
+                    {
+                      content: 'Cancel order',
+                      destructive: true,
+                      disabled: paid,
+                      onAction: () => {
+                        setMenuOpen(false);
+                        setCancelOpen(true);
+                      },
+                      // Shopify explains the disabled state rather than hiding it.
+                      helpText: paid
+                        ? 'Refund the payment before cancelling this order.'
+                        : undefined,
+                    },
+                  ]}
                 />
-                {note !== null && note !== (order.note ?? '') ? (
-                  // Buttons, not text links: Shopify's inline note editor ends
-                  // in a Cancel/Save button pair, and `loading` on the primary
-                  // is the in-button spinner PARITY.md asks for.
-                  <InlineStack align="end" gap="200">
-                    <Button disabled={savingNote} onClick={() => setNote(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="primary" loading={savingNote} onClick={() => void saveNote()}>
-                      Save
-                    </Button>
-                  </InlineStack>
-                ) : null}
-              </BlockStack>
-            </Card>
+              </Popover>
+            )}
+          </InlineStack>
+        }
+      />
 
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">
-                  Customer
-                </Text>
-                {order.customer ? (
-                  <BlockStack gap="100">
-                    <Link url={`/store/${slug}/customers/${order.customer.id}`}>
-                      {[order.customer.firstName, order.customer.lastName]
-                        .filter(Boolean)
-                        .join(' ') || order.customer.email}
-                    </Link>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {order.customer.ordersCount} order
-                      {order.customer.ordersCount === 1 ? '' : 's'}
-                    </Text>
-                  </BlockStack>
-                ) : (
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Guest checkout
-                  </Text>
-                )}
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <LineItemsCards order={order} fulfilHref={`/store/${slug}/orders/${id}/fulfill`} />
+              <PaymentCard order={order} />
+              <Card>
+                <Timeline events={order.events} onComment={postComment} posting={posting} />
+              </Card>
+            </BlockStack>
+          </Layout.Section>
 
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">
-                    Contact information
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {order.email}
-                  </Text>
-                  {order.phone ? (
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {order.phone}
-                    </Text>
-                  ) : null}
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">
-                    Shipping address
-                  </Text>
-                  <AddressBlock address={order.shippingAddress} />
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">
-                    Billing address
-                  </Text>
-                  <AddressBlock address={order.billingAddress} />
-                </BlockStack>
-              </BlockStack>
-            </Card>
-
-            <ChargeSavedCard order={order} onCharged={refresh} />
-
-            {order.tags.length > 0 ? (
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
-                    Tags
+                    Notes
                   </Text>
-                  <InlineStack gap="150">
-                    {order.tags.map((tag) => (
-                      <Badge key={tag}>{tag}</Badge>
-                    ))}
-                  </InlineStack>
+                  <TextField
+                    label="Order note"
+                    labelHidden
+                    multiline={3}
+                    autoComplete="off"
+                    placeholder="No notes from customer"
+                    value={note ?? order.note ?? ''}
+                    onChange={setNote}
+                  />
+                  {note !== null && note !== (order.note ?? '') ? (
+                    // Buttons, not text links: Shopify's inline note editor ends
+                    // in a Cancel/Save button pair, and `loading` on the primary
+                    // is the in-button spinner PARITY.md asks for.
+                    <InlineStack align="end" gap="200">
+                      <Button disabled={savingNote} onClick={() => setNote(null)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        loading={savingNote}
+                        onClick={() => void saveNote()}
+                      >
+                        Save
+                      </Button>
+                    </InlineStack>
+                  ) : null}
                 </BlockStack>
               </Card>
-            ) : null}
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">
+                    Customer
+                  </Text>
+                  {order.customer ? (
+                    <BlockStack gap="100">
+                      <Link url={`/store/${slug}/customers/${order.customer.id}`}>
+                        {[order.customer.firstName, order.customer.lastName]
+                          .filter(Boolean)
+                          .join(' ') || order.customer.email}
+                      </Link>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {order.customer.ordersCount} order
+                        {order.customer.ordersCount === 1 ? '' : 's'}
+                      </Text>
+                    </BlockStack>
+                  ) : (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Guest checkout
+                    </Text>
+                  )}
+
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingSm">
+                      Contact information
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {order.email}
+                    </Text>
+                    {order.phone ? (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {order.phone}
+                      </Text>
+                    ) : null}
+                  </BlockStack>
+
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingSm">
+                      Shipping address
+                    </Text>
+                    <AddressBlock address={order.shippingAddress} />
+                  </BlockStack>
+
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingSm">
+                      Billing address
+                    </Text>
+                    <AddressBlock address={order.billingAddress} />
+                  </BlockStack>
+                </BlockStack>
+              </Card>
+
+              <ChargeSavedCard order={order} onCharged={refresh} />
+
+              {order.tags.length > 0 ? (
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Tags
+                    </Text>
+                    <InlineStack gap="150">
+                      {order.tags.map((tag) => (
+                        <Badge key={tag}>{tag}</Badge>
+                      ))}
+                    </InlineStack>
+                  </BlockStack>
+                </Card>
+              ) : null}
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </Box>
 
       <Modal
         open={cancelOpen}

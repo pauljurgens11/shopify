@@ -236,7 +236,7 @@ test.describe('mandatory smoke flows', () => {
     });
 
     await test.step('apply the Monochrome preset', async () => {
-      await page.getByRole('link', { name: 'Storefront', exact: true }).click();
+      await page.getByRole('link', { name: 'Online Store', exact: true }).click();
       await page.waitForURL(/\/storefront$/);
       // Scope to Monochrome's own row rather than THEME_PRESETS order — a
       // preset reorder must not silently apply the wrong theme (`.last()` is
@@ -294,7 +294,7 @@ test.describe('mandatory smoke flows', () => {
 
     await test.step('its admin shows empty states', async () => {
       await page.goto(`${ADMIN_URL}/store/${slug}/products`);
-      await expect(page.getByRole('heading', { name: 'Add your first product' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Add your products' })).toBeVisible();
     });
 
     await test.step('its storefront renders with none of demo’s products', async () => {

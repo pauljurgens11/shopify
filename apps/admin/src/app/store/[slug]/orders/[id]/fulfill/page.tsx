@@ -11,6 +11,7 @@ import type { Location } from '@merchant/contracts/locations';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import {
   BlockStack,
+  Box,
   Button,
   Card,
   InlineStack,
@@ -21,14 +22,26 @@ import {
   TextField,
   Thumbnail,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, OrderIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageBreadcrumb } from '../../../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../../lib/api.ts';
 import { remainingToFulfil } from '../../_components/status.ts';
+
+/**
+ * Shopify's carrier SELECT, cut to the carriers a US demo store plausibly
+ * ships with — the contract's `trackingCompany` is a free string, so the API
+ * accepts anything, but a curated select is the simplest Polaris-idiomatic
+ * version of Shopify's long carrier list (CLAUDE.md §7). Value = label:
+ * whatever is picked here renders verbatim on the fulfillment card.
+ */
+const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL Express', 'Canada Post', 'Royal Mail'].map(
+  (carrier) => ({ label: carrier, value: carrier }),
+);
 
 export default function FulfillPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -42,6 +55,7 @@ export default function FulfillPage() {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [locationId, setLocationId] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingCompany, setTrackingCompany] = useState('');
   const [trackingUrl, setTrackingUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -68,7 +82,16 @@ export default function FulfillPage() {
   // crash rather than a missing order.
   if (!detail) {
     return (
-      <Page title="Fulfill items" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
+      <Page>
+        <Box paddingBlockEnd="400">
+          <PageBreadcrumb
+            icon={OrderIcon}
+            title="Fulfill items"
+            backUrl={`/store/${slug}/orders`}
+            backLabel="Orders"
+          />
+        </Box>
+
         <Card>
           <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
         </Card>
@@ -94,6 +117,7 @@ export default function FulfillPage() {
           locationId,
           lineItems,
           ...(trackingNumber.trim() ? { trackingNumber: trackingNumber.trim() } : {}),
+          ...(trackingCompany ? { trackingCompany } : {}),
           ...(trackingUrl.trim() ? { trackingUrl: trackingUrl.trim() } : {}),
         },
       });
@@ -110,10 +134,16 @@ export default function FulfillPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: `#${detail.orderNumber}`, url: `/store/${slug}/orders/${id}` }}
-      title={`Fulfill items · #${detail.orderNumber}`}
-    >
+    <Page>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={OrderIcon}
+          backUrl={`/store/${slug}/orders/${id}`}
+          backLabel={`#${detail.orderNumber}`}
+          title={`Fulfill items · #${detail.orderNumber}`}
+        />
+      </Box>
+
       <Layout>
         <Layout.Section>
           <Card>
@@ -204,6 +234,13 @@ export default function FulfillPage() {
                   autoComplete="off"
                   value={trackingNumber}
                   onChange={setTrackingNumber}
+                />
+                <Select
+                  label="Shipping carrier"
+                  placeholder="Select carrier"
+                  options={CARRIERS}
+                  value={trackingCompany}
+                  onChange={setTrackingCompany}
                 />
                 <TextField
                   label="Tracking URL"

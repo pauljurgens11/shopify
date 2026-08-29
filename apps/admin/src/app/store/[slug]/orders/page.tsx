@@ -14,6 +14,7 @@ import { format } from '@merchant/config/money';
 import type { Paginated } from '@merchant/contracts/common';
 import type { OrderSummary } from '@merchant/contracts/orders';
 import {
+  Box,
   Card,
   ChoiceList,
   IndexFilters,
@@ -23,6 +24,7 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { OrderIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
@@ -31,6 +33,7 @@ import {
   IndexNoMatchState,
   IndexTableSkeleton,
 } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from './_components/order-badges.tsx';
 import { itemCountLabel } from './_components/status.ts';
@@ -206,7 +209,13 @@ export default function OrdersPage() {
     cursorStack.length === 0;
 
   return (
-    <Page title="Orders" fullWidth>
+    <Page fullWidth>
+      {/* No header action: the real Orders index offers only `More actions`,
+          and every entry in it is out of scope (docs/parity/admin-shell.md). */}
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb icon={OrderIcon} title="Orders" />
+      </Box>
+
       <Card padding="0">
         {rows.length === 0 && unfiltered ? (
           // Kind A, with Shopify's own heading. Its captured BODY is

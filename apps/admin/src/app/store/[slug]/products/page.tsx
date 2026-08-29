@@ -15,6 +15,8 @@ import type { Paginated } from '@merchant/contracts/common';
 import type { Product } from '@merchant/contracts/products';
 import {
   Badge,
+  Box,
+  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -27,7 +29,7 @@ import {
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, ProductIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -37,6 +39,7 @@ import {
   IndexPromoEmptyState,
   IndexTableSkeleton,
 } from '../../../../components/shell/index-chrome.tsx';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
@@ -165,11 +168,19 @@ export default function ProductsPage() {
     cursorStack.length === 0;
 
   return (
-    <Page
-      fullWidth
-      title="Products"
-      primaryAction={{ content: 'Add product', url: `/store/${slug}/products/new` }}
-    >
+    <Page fullWidth>
+      <Box paddingBlockEnd="400">
+        <PageBreadcrumb
+          icon={ProductIcon}
+          title="Products"
+          actions={
+            <Button variant="primary" url={`/store/${slug}/products/new`}>
+              Add product
+            </Button>
+          }
+        />
+      </Box>
+
       <Card padding="0">
         {empty ? (
           // Kind B — Products is the one index with the LEFT-aligned promo

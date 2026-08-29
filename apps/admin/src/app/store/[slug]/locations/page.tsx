@@ -25,9 +25,11 @@ import {
   TextField,
   Tooltip,
 } from '@shopify/polaris';
+import { SettingsIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageBreadcrumb } from '../../../../components/shell/page-breadcrumb.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
@@ -288,88 +290,98 @@ export default function LocationsSettingsPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: 'Settings', url: `/store/${slug}/settings` }}
-      title="Locations"
-      primaryAction={{
-        content: 'Add location',
-        onAction: () => setDialog({ open: true, location: null }),
-      }}
-    >
-      <Card padding="0">
-        {rows.length === 0 ? (
-          // Signup creates no location, so a fresh shop lands here on an empty
-          // card unless it says something (PARITY.md → Index pages).
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Add a location to hold stock
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Locations are the places you store inventory and fulfill orders from.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" onClick={() => setDialog({ open: true, location: null })}>
-                  Add location
+    <Page>
+      <BlockStack gap="400">
+        <PageBreadcrumb
+          icon={SettingsIcon}
+          backUrl={`/store/${slug}/settings`}
+          backLabel={'Settings'}
+          title="Locations"
+          actions={
+            <Button variant="primary" onClick={() => setDialog({ open: true, location: null })}>
+              Add location
+            </Button>
+          }
+        />
+
+        <Card padding="0">
+          {rows.length === 0 ? (
+            // Signup creates no location, so a fresh shop lands here on an empty
+            // card unless it says something (PARITY.md → Index pages).
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Add a location to hold stock
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  Locations are the places you store inventory and fulfill orders from.
+                </Text>
+                <Box paddingBlockStart="300">
+                  <Button
+                    variant="primary"
+                    onClick={() => setDialog({ open: true, location: null })}
+                  >
+                    Add location
+                  </Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          ) : null}
+
+          <BlockStack gap="0">
+            {rows.map((location, index) => {
+              const blocked = blockedReason(location);
+              const deleteButton = (
+                <Button
+                  variant="tertiary"
+                  tone="critical"
+                  disabled={blocked !== null}
+                  onClick={() => setDeleting(location)}
+                >
+                  Delete
                 </Button>
-              </Box>
-            </BlockStack>
-          </Box>
-        ) : null}
+              );
 
-        <BlockStack gap="0">
-          {rows.map((location, index) => {
-            const blocked = blockedReason(location);
-            const deleteButton = (
-              <Button
-                variant="tertiary"
-                tone="critical"
-                disabled={blocked !== null}
-                onClick={() => setDeleting(location)}
-              >
-                Delete
-              </Button>
-            );
-
-            return (
-              <Box
-                key={location.id}
-                padding="400"
-                borderBlockStartWidth={index === 0 ? '0' : '025'}
-                borderColor="border"
-              >
-                <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                  <BlockStack gap="100">
-                    <InlineStack gap="200" blockAlign="center">
-                      <Text as="h2" variant="headingSm">
-                        {location.name}
+              return (
+                <Box
+                  key={location.id}
+                  padding="400"
+                  borderBlockStartWidth={index === 0 ? '0' : '025'}
+                  borderColor="border"
+                >
+                  <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                    <BlockStack gap="100">
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="h2" variant="headingSm">
+                          {location.name}
+                        </Text>
+                        {location.isActive ? null : <Badge>Inactive</Badge>}
+                        {location.fulfillsOnlineOrders ? (
+                          <Badge tone="success">Fulfills online orders</Badge>
+                        ) : null}
+                      </InlineStack>
+                      <Text as="p" tone="subdued" variant="bodySm">
+                        {location.stockedVariantCount === 0
+                          ? 'No stock here'
+                          : `${location.stockedVariantCount} ${
+                              location.stockedVariantCount === 1 ? 'variant' : 'variants'
+                            } stocked`}
                       </Text>
-                      {location.isActive ? null : <Badge>Inactive</Badge>}
-                      {location.fulfillsOnlineOrders ? (
-                        <Badge tone="success">Fulfills online orders</Badge>
-                      ) : null}
-                    </InlineStack>
-                    <Text as="p" tone="subdued" variant="bodySm">
-                      {location.stockedVariantCount === 0
-                        ? 'No stock here'
-                        : `${location.stockedVariantCount} ${
-                            location.stockedVariantCount === 1 ? 'variant' : 'variants'
-                          } stocked`}
-                    </Text>
-                  </BlockStack>
+                    </BlockStack>
 
-                  <InlineStack gap="200">
-                    <Button onClick={() => setDialog({ open: true, location })}>Edit</Button>
-                    {/* Polaris tooltips do not fire on a disabled control, so
+                    <InlineStack gap="200">
+                      <Button onClick={() => setDialog({ open: true, location })}>Edit</Button>
+                      {/* Polaris tooltips do not fire on a disabled control, so
                         the reason is wrapped around it rather than on it. */}
-                    {blocked ? <Tooltip content={blocked}>{deleteButton}</Tooltip> : deleteButton}
+                      {blocked ? <Tooltip content={blocked}>{deleteButton}</Tooltip> : deleteButton}
+                    </InlineStack>
                   </InlineStack>
-                </InlineStack>
-              </Box>
-            );
-          })}
-        </BlockStack>
-      </Card>
+                </Box>
+              );
+            })}
+          </BlockStack>
+        </Card>
+      </BlockStack>
 
       <LocationDialog
         open={dialog.open}
