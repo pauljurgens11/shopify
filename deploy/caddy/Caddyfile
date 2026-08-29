@@ -1,6 +1,7 @@
 # Caddy — the production stack's front door (A5, SPEC §17).
 #
 # Wildcard tenant routing, exactly the SPEC's shape:
+#   {BASE_DOMAIN}         → redirect to the admin (so the bare URL works)
 #   admin.{BASE_DOMAIN}   → admin:3000
 #   api.{BASE_DOMAIN}     → api:3001
 #   assets.{BASE_DOMAIN}  → minio:9000   (public bucket reads + presigned PUTs)
@@ -10,29 +11,38 @@
 # Tenancy keys off the Host header (SPEC §6); reverse_proxy passes Host
 # through untouched by default, which is the property everything relies on.
 #
-# TLS: `local_certs` issues from Caddy's internal CA so the whole stack can be
-# verified on BASE_DOMAIN=localhost with no real DNS. For a real domain:
-#   1. Remove `local_certs` and set `email` below — explicit hosts get
-#      Let's Encrypt automatically.
-#   2. Shop hostnames (subdomains and custom domains alike) go through the
-#      catch-all's `on_demand`, one exact cert per hostname as it is first
-#      visited (add an `on_demand_tls ask` endpoint to stop strangers minting
-#      certs against your rate limits). Deliberately NOT a `*.{BASE_DOMAIN}`
-#      wildcard cert: with a real domain that needs a DNS-challenge plugin,
-#      and on a single-label base like `localhost` a `*.tld` wildcard is
-#      rejected by Node and most clients outright.
-
+# TLS is one variable. `CADDY_TLS` defaults to `internal`, which issues from
+# Caddy's internal CA so the whole stack can be verified on BASE_DOMAIN=localhost
+# with no real DNS. For a real domain, set it to a contact email address and
+# every hostname here gets a Let's Encrypt certificate instead:
+#
+#   BASE_DOMAIN=example.com CADDY_TLS=you@example.com docker compose …
+#
+# Shop hostnames (subdomains and custom domains alike) go through the
+# catch-all's `on_demand`, one exact certificate per hostname as it is first
+# visited. Deliberately NOT a `*.{BASE_DOMAIN}` wildcard certificate: with a
+# real domain that needs a DNS-challenge plugin, and on a single-label base
+# like `localhost` a `*.tld` wildcard is rejected by Node and most clients.
 {
-	local_certs
-	# email admin@example.com
-	# on_demand_tls {
-	#	ask http://api:3001/health
-	# }
+	# On-demand issuance is gated — see /health/tls-ask. Without this, every
+	# hostname anyone points at this box makes Caddy ask a public CA for a
+	# certificate, and a few hundred of those exhaust the account's issuance
+	# rate limit, after which the real hostnames stop renewing too.
+	on_demand_tls {
+		ask http://api:3001/health/tls-ask
+	}
+}
+
+# This is a study clone that renders a real company's name and mark, so nothing
+# it serves belongs in a search index.
+(noindex) {
+	header X-Robots-Tag "noindex, nofollow, noarchive"
 }
 
 # One set of shopper-facing routes, shared by the wildcard-subdomain site and
 # the custom-domain catch-all: same shop, two hostnames.
 (storefront_routes) {
+	import noindex
 	# The browser talks to the platform on the shop's own origin: the
 	# analytics beacon and cart/checkout calls post to /storefront/api/*,
 	# and the hosted card fields post the PAN to /vault/tokenize (SPEC §11)
@@ -46,24 +56,38 @@
 	}
 }
 
+# The bare domain is what gets pasted into a chat window, so it has to land
+# somewhere. The admin is the product (CLAUDE.md §0), so it lands there.
+{$BASE_DOMAIN}, www.{$BASE_DOMAIN} {
+	tls {$CADDY_TLS:internal}
+	import noindex
+	redir https://admin.{$BASE_DOMAIN}{uri} permanent
+}
+
 admin.{$BASE_DOMAIN} {
+	tls {$CADDY_TLS:internal}
+	import noindex
 	reverse_proxy admin:3000
 }
 
 api.{$BASE_DOMAIN} {
+	tls {$CADDY_TLS:internal}
+	import noindex
 	reverse_proxy api:3001
 }
 
 assets.{$BASE_DOMAIN} {
+	tls {$CADDY_TLS:internal}
 	reverse_proxy minio:9000
 }
 
 # Every host the sites above did not claim is a storefront: wildcard shop
 # subdomains and registered custom domains alike, resolved by the API from the
-# Host header. Certs are minted on demand per hostname — internal CA locally,
-# ACME when configured above.
+# Host header. Certificates are minted on demand per hostname — internal CA
+# locally, ACME when CADDY_TLS is an email — but only for hostnames the API
+# confirms are a real shop (the `ask` endpoint in the global block above).
 https:// {
-	tls internal {
+	tls {$CADDY_TLS:internal} {
 		on_demand
 	}
 	import storefront_routes

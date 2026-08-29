@@ -27,9 +27,10 @@ the nav/shell, the contextual save bar, the one populated `IndexTable` we had
 - Order detail — the single most complex page in the admin
 - The real Home dashboard *with data*. What we captured is the *new-store onboarding*
   Home ("Welcome to Shopify! Where do you want to start?"), a different page from the
-  dashboard an established store sees. **`home.md` is a trap — build Home from
-  `dashboard.md` instead**, which has the real dashboard chrome (date range, metric
-  tiles, charts, per-card empty states) captured from Analytics.
+  dashboard an established store sees. We build **both**, switched on whether the shop
+  has ever taken an order: `home.md` for a shop created at signup, and `dashboard.md`
+  — the real dashboard chrome (date range, metric tiles, charts, per-card empty states),
+  captured from Analytics — for the seeded demo.
 - Anything below the fold on Settings, Analytics, Content, Markets, Finance
 
 Filling those gaps needs a store with data. See "Extending this folder" below.
@@ -42,9 +43,9 @@ Filling those gaps needs a store with data. See "Extending this folder" below.
 | [product-form.md](product-form.md) | Add/edit product — full card order, both columns | High |
 | [customer-form.md](customer-form.md) | New customer | High |
 | [collection-detail.md](collection-detail.md) | Collection editor, skeleton state | High |
-| [dashboard.md](dashboard.md) | Date-range popover, metric tiles, charts — **build Home from this** | High for structure |
+| [dashboard.md](dashboard.md) | Date-range popover, metric tiles, charts — **the seeded Home** | High for structure |
 | [index-tables.md](index-tables.md) | Index page chrome, bulk actions, empty states | Medium — one populated table only |
-| [home.md](home.md) | Onboarding Home — complete, but the wrong variant | High for the variant; **not the page to clone** |
+| [home.md](home.md) | Onboarding Home — the variant an empty shop gets | High; built |
 | [capture.md](capture.md) | How to capture more, and the priority queue | — |
 
 ## How to use this

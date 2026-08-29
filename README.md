@@ -65,8 +65,9 @@ last 60 days, with analytics events and daily rollups behind them.
 1. **Log in** at http://admin.lvh.me:3000 as `owner@demo.dev` / `password123`.
    You land on Home: a dashboard over the last 30 days — four metric tiles, a
    two-series sales chart against the previous period, and a sales breakdown.
-   (No setup guide: its four checks all pass on the seeded store, so the card
-   hides itself. A fresh store shows it — see "A brand-new store" below.)
+   (No onboarding: Shopify serves a setup page to a store that has never taken
+   an order and this dashboard to one that has, and we switch on the same
+   signal. A fresh store gets the other page — see "A brand-new store" below.)
 2. **Tour the admin.** Products (index with tabs, search and bulk actions; open
    one for the two-column form), Orders (#1001–#1040, mixed fulfillment and
    financial states), Customers, Discounts (`WELCOME10` is Active), Inventory
@@ -105,12 +106,13 @@ nothing about it is prepared.
    password. The slug is derived from the store name and de-duplicated
    server-side, exactly the way a real store URL is assigned. Signing up logs
    you in; the next screen is your admin.
-2. **Onboard.** The Home setup guide has four real checks — add a product,
-   customize the storefront, connect a payment processor, place a test order —
-   each of which reads actual state rather than a stored flag, and the card
-   disappears once all four pass (which is why the seeded store's Home has
-   none). The store already has a published theme: signup installs the default
-   preset so a new shop opens on a real storefront instead of a blank page.
+2. **Onboard.** A store with no orders gets Shopify's onboarding Home instead of
+   the dashboard — "Welcome to Shopify! Where do you want to start?", an
+   assistant prompt that hands your words to the storefront builder, and a grid
+   of setup cards you can dismiss one at a time. Each card's state is read from
+   real data rather than a stored flag, so `Choose your store design` already
+   says **Done**: signup installs the default preset, and a new shop opens on a
+   real storefront instead of a blank page.
 3. **Make it sellable.** Settings → Payments → connect **Mock Gateway** (one
    click, no credentials). Settings → Shipping and delivery → **Add rate** — a
    new shop starts with no rates, and checkout needs one to complete.
@@ -235,17 +237,16 @@ a shared cache.
 
 **Packaging.** Each app has a production Dockerfile (`apps/*/Dockerfile`,
 multi-stage on `node:22-slim`), and CI builds all four on every commit to `main`
-— one job per app in `.github/workflows/main-checks.yml`. Publishing those
-images to a registry is the one thing that job does not do yet.
+— one job per app in `.github/workflows/main-checks.yml` — and pushes them to
+`ghcr.io/pauljurgens11/shopify/{api,admin,storefront,worker}`.
 
-The documented deployment target is a `docker-compose.prod.yml` that runs the
-four images behind **Caddy**, which terminates TLS automatically and routes by
-subdomain: `admin.*` → admin, `api.*` → api, everything else → storefront, which
-is what makes `{shop}.example.com` resolve a tenant in production the same way
-`{shop}.lvh.me:3002` does locally. That compose file and its Caddyfile land with
-the deploy issue; when they are present in the repo root, deploying is
-`docker compose -f docker-compose.prod.yml up -d` on a VM, or the same four
-images on Fly or Kubernetes.
+The deployment target is [docker-compose.prod.yml](docker-compose.prod.yml),
+which runs the four images behind **Caddy**. Caddy terminates TLS automatically
+and routes by subdomain: `admin.*` → admin, `api.*` → api, everything else →
+storefront, which is what makes `{shop}.example.com` resolve a tenant in
+production the same way `{shop}.lvh.me:3002` does locally. Deploying is
+`docker compose -f docker-compose.prod.yml up -d --build` on a VM, or the same
+four images on Fly or Kubernetes. **[DEPLOY.md](DEPLOY.md)** is the runbook.
 
 ## Working here
 
@@ -268,12 +269,14 @@ Decision log: [DECISIONS.md](DECISIONS.md) — append-only.
 
 ## Notes
 
-This is a private study clone of the Shopify admin, built to be visually
+This is a study clone of the Shopify admin, built to be visually
 indistinguishable from it. As of 2026-08-29 the running app therefore renders
 the Shopify name and bag mark (DECISIONS; the earlier "never render the name or
 logo" rule was reversed by the repo owner). It is **not affiliated with or
-endorsed by Shopify**, is never deployed publicly and is not distributed; the
-codebase itself keeps the neutral `@merchant/*` package scope. Built with
+endorsed by Shopify**; the codebase itself keeps the neutral `@merchant/*`
+package scope. A deployment of it is a demo to be looked at, not a product —
+[DEPLOY.md](DEPLOY.md) — and Caddy serves every page `X-Robots-Tag: noindex`
+so it stays out of search results. Built with
 Shopify's open-source [Polaris](https://polaris.shopify.com/) design system.
 
 The card vault demonstrates PAN isolation — the card number goes from the
