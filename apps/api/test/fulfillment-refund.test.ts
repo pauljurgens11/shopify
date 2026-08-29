@@ -30,7 +30,7 @@ let locationId: string;
 const shopIds: string[] = [];
 
 const usd = (amount: number) => ({ amount, currencyCode: 'USD' });
-const CSRF = { 'x-requested-with': 'merchant-admin' };
+const CSRF = { 'x-requested-with': 'shopify-admin' };
 
 type Variant = { productId: string; variantId: string };
 

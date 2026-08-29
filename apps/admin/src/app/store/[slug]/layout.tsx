@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@merchant/config/constants';
 import type { Metadata } from 'next';
 import { AdminFrame } from '../../../components/shell/admin-frame.tsx';
 
@@ -12,11 +13,11 @@ import { AdminFrame } from '../../../components/shell/admin-frame.tsx';
  */
 // `template` is repeated here on purpose. A segment whose `title` is a plain
 // string clears the inherited template for everything below it, so without this
-// the section layouts render a bare "Products" instead of "Products · Merchant".
+// the section layouts render a bare "Products" instead of "Products · Shopify".
 // `default` names Home itself and is still run through the ROOT template, so it
-// is "Home" here rather than "Home · Merchant" — otherwise the suffix lands twice.
+// is "Home" here rather than "Home · Shopify" — otherwise the suffix lands twice.
 export const metadata: Metadata = {
-  title: { default: 'Home', template: '%s · Merchant' },
+  title: { default: 'Home', template: `%s · ${BRAND_NAME}` },
 };
 
 export default async function StoreLayout({

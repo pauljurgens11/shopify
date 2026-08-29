@@ -54,7 +54,7 @@ export const deliveryListResponse = paginated(webhookDeliverySchema);
 
 /**
  * Envelope every delivery POSTs. Signature is HMAC-SHA256 of the RAW body with
- * the subscription secret, in `x-merchant-hmac-sha256` — verify against the raw
+ * the subscription secret, in `x-shopify-hmac-sha256` — verify against the raw
  * bytes, not a re-serialized object, or whitespace will break it.
  */
 export const webhookEnvelopeSchema = z.object({

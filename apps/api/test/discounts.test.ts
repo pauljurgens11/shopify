@@ -17,7 +17,7 @@ let shop: Awaited<ReturnType<typeof createTestShop>>;
 let cookie: string;
 const shopIds: string[] = [];
 
-const CSRF = { 'x-requested-with': 'merchant-admin' };
+const CSRF = { 'x-requested-with': 'shopify-admin' };
 const iso = (offsetDays: number) =>
   new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toISOString();
 

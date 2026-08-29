@@ -8,6 +8,7 @@
  * session anywhere lands on /login with a `next` param and comes back to the
  * page it was aimed at.
  */
+import { BRAND_NAME } from '@merchant/config/constants';
 import { Banner, Button, Frame, Loading, Page } from '@shopify/polaris';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,6 +18,24 @@ import { AdminNavigation } from './admin-navigation.tsx';
 import { AdminTopBar } from './admin-top-bar.tsx';
 import { PageSkeleton } from './page-skeleton.tsx';
 import { ToastProvider } from './toast-provider.tsx';
+
+/**
+ * The bag mark at the left of the top bar. `Frame` hands this to `TopBar`,
+ * which is where the real admin puts it — rendering it inside `AdminTopBar`
+ * ourselves would land it after the nav toggle instead of before it.
+ *
+ * BOTH sources are required even though the asset is the same file. `Frame`
+ * also feeds this logo to the contextual save bar, which renders
+ * `<img src={contextualSaveBarSource || ''}>` unconditionally — omitting it
+ * puts an `src=""` on every page, which React warns about and the browser
+ * answers by re-downloading the page itself (PARITY.md: no console warnings).
+ */
+const BRAND_LOGO = {
+  topBarSource: '/shopify-bag.svg',
+  contextualSaveBarSource: '/shopify-bag.svg',
+  accessibilityLabel: BRAND_NAME,
+  width: 32,
+} as const;
 
 export function loginHref(next?: string): string {
   return next && next !== '/' ? `/login?next=${encodeURIComponent(next)}` : '/login';
@@ -79,7 +98,7 @@ export function AdminFrame({
   if (error && error.status !== 401) {
     return (
       <Frame>
-        {/* No page title: "Merchant" as an H1 reads like a page someone forgot
+        {/* No page title: the brand as an H1 reads like a page someone forgot
             to name. The banner is the whole screen here. */}
         <Page>
           <Banner tone="critical" title="Can’t reach your store">
@@ -104,6 +123,7 @@ export function AdminFrame({
 
   return (
     <Frame
+      logo={{ ...BRAND_LOGO, url: `/store/${shopSlug}` }}
       topBar={
         <AdminTopBar session={session} onNavigationToggle={() => setMobileNavOpen((o) => !o)} />
       }
