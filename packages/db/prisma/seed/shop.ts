@@ -119,21 +119,21 @@ export async function applyShopSettings(db: PrismaClient, ctx: SeedContext): Pro
       },
       shippingRates: [
         {
-          id: newId('event'),
+          id: newId('shippingRate'),
           name: SHIPPING_STANDARD.name,
           price: { amount: SHIPPING_STANDARD.price, currencyCode: ctx.currencyCode },
           minOrderSubtotal: null,
           maxOrderSubtotal: null,
         },
         {
-          id: newId('event'),
+          id: newId('shippingRate'),
           name: SHIPPING_EXPRESS.name,
           price: { amount: SHIPPING_EXPRESS.price, currencyCode: ctx.currencyCode },
           minOrderSubtotal: null,
           maxOrderSubtotal: null,
         },
         {
-          id: newId('event'),
+          id: newId('shippingRate'),
           name: 'Free shipping',
           price: { amount: 0, currencyCode: ctx.currencyCode },
           minOrderSubtotal: { amount: FREE_SHIPPING_THRESHOLD, currencyCode: ctx.currencyCode },
