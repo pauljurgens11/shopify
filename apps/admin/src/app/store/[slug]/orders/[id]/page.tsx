@@ -111,13 +111,20 @@ export default function OrderDetailPage() {
     );
   }
 
-  const placed = new Date(order.createdAt).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  // en-US pinned like the Apps pages — `undefined` rendered the host locale
+  // ("18 Aug 2026, 17:26"), which read as a different product from one page
+  // to the next. Shopify writes "Aug 18, 2026 at 5:26 pm".
+  const placed = new Date(order.createdAt)
+    .toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    .replace(/, (\d+:)/, ' at $1')
+    .replace(' AM', ' am')
+    .replace(' PM', ' pm');
 
   /**
    * Shopify disables Cancel while the merchant still holds the customer's

@@ -12,7 +12,7 @@ import { format } from '@merchant/config/money';
 import type { MoneyDto } from '@merchant/contracts/common';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import { BlockStack, Box, Card, Divider, InlineStack, Text } from '@shopify/polaris';
-import { capturedTotal, financialBadge } from './status.ts';
+import { capturedTotal, financialBadge, itemCountLabel } from './status.ts';
 
 function Row({
   label,
@@ -76,7 +76,7 @@ export function PaymentCard({ order }: { order: OrderDetail }) {
           <Row
             label="Subtotal"
             value={order.subtotal}
-            detail={`${order.lineItems.reduce((n, l) => n + l.quantity, 0)} items`}
+            detail={itemCountLabel(order.lineItems.reduce((n, l) => n + l.quantity, 0))}
           />
           {order.discountTotal.amount > 0 ? (
             <Row

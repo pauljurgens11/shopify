@@ -21,7 +21,7 @@ import {
   Thumbnail,
 } from '@shopify/polaris';
 import { ImageIcon } from '@shopify/polaris-icons';
-import { fulfillmentRowBadge, remainingToFulfil } from './status.ts';
+import { fulfillmentRowBadge, itemCountLabel, remainingToFulfil } from './status.ts';
 
 function LineRow({ line, quantity }: { line: OrderLineItem; quantity: number }) {
   return (
@@ -81,7 +81,7 @@ export function LineItemsCards({ order, fulfilHref }: { order: OrderDetail; fulf
                   Unfulfilled
                 </Badge>
                 <Text as="span" variant="bodySm" tone="subdued">
-                  {unfulfilled.reduce((sum, e) => sum + e.quantity, 0)} items
+                  {itemCountLabel(unfulfilled.reduce((sum, e) => sum + e.quantity, 0))}
                 </Text>
               </InlineStack>
               {order.cancelledAt ? null : (
