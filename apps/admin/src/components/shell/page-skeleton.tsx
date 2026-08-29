@@ -13,6 +13,7 @@ export function PageSkeleton({
   lines = 6,
   layout = 'single',
   fullWidth = false,
+  primaryAction = false,
 }: {
   lines?: number;
   /**
@@ -27,10 +28,17 @@ export function PageSkeleton({
    * lands — the exact jump the full-width change was made to remove.
    */
   fullWidth?: boolean;
+  /**
+   * Only for a page whose real header has a top-right button. Polaris renders
+   * this as a 100x36 grey block, so passing it where the loaded page has no
+   * such button promises a button that never arrives and shifts the header
+   * when the block disappears — Orders, Home and every save-bar form page.
+   */
+  primaryAction?: boolean;
 }) {
   if (layout === 'detail') {
     return (
-      <SkeletonPage primaryAction backAction>
+      <SkeletonPage primaryAction={primaryAction} backAction>
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">
@@ -58,7 +66,7 @@ export function PageSkeleton({
   }
 
   return (
-    <SkeletonPage primaryAction fullWidth={fullWidth}>
+    <SkeletonPage primaryAction={primaryAction} fullWidth={fullWidth}>
       <Card>
         <SkeletonBodyText lines={lines} />
       </Card>

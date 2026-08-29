@@ -103,7 +103,7 @@ export default function DiscountsPage() {
   const resetPaging = () => setCursorStack([]);
   const createUrl = (type: Discount['type']) => `/store/${slug}/discounts/new?type=${type}`;
 
-  if (discounts.isPending) return <PageSkeleton fullWidth />;
+  if (discounts.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   const empty = rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
 
