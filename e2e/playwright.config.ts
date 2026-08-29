@@ -39,6 +39,10 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
+  // These are PRODUCTION `start` scripts: without a running `pnpm dev` to
+  // reuse (or a prior `pnpm build` in CI), `next start` exits immediately with
+  // "Could not find a production build". stdout is piped so that error reaches
+  // the terminal instead of a bare 120s port-probe timeout.
   webServer: [
     {
       command: 'pnpm --filter @merchant/api start',
@@ -46,6 +50,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: '..',
+      stdout: 'pipe',
     },
     {
       command: 'pnpm --filter @merchant/admin start',
@@ -53,6 +58,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: '..',
+      stdout: 'pipe',
     },
     {
       command: 'pnpm --filter @merchant/storefront start',
@@ -60,6 +66,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: '..',
+      stdout: 'pipe',
     },
   ],
 });

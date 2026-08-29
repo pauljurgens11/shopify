@@ -3,6 +3,7 @@ import {
   ADMIN_URL,
   API_URL,
   addSocksToCartAndOpenCheckout,
+  adminApi,
   fillCheckoutAddressAndPickStandard,
   loginAsOwner,
   payWithApprovedCard,
@@ -27,6 +28,7 @@ import {
 test.describe('mandatory smoke flows', () => {
   test('a) staff login → create product with 2 variants → appears in list', async ({ page }) => {
     const title = `Smoke Tee ${uniqueSuffix()}`;
+    let productId: string | undefined;
 
     await test.step('log in and open the product form', async () => {
       await loginAsOwner(page);
@@ -66,6 +68,7 @@ test.describe('mandatory smoke flows', () => {
       await page.getByRole('button', { name: 'Save' }).click();
       await expect(page.getByText('Product saved')).toBeVisible();
       await page.waitForURL(/\/products\/prod_/);
+      productId = page.url().match(/prod_[0-9A-Za-z]+/)?.[0];
     });
 
     await test.step('edit one variant price, re-save — the other rows survive', async () => {
@@ -93,6 +96,15 @@ test.describe('mandatory smoke flows', () => {
       await expect(page.getByText(title)).toBeVisible();
       // The price column repeats the edited range — the PUT persisted.
       await expect(page.getByText('$24.00 – $26.50')).toBeVisible();
+    });
+
+    await test.step('clean up — the demo store must not accrue smoke products (§8)', async () => {
+      // Left behind, every run adds an ACTIVE "Smoke Tee …" to Aurora Supply
+      // Co.'s storefront — the same defacement DECISIONS.md moved flow (d) to
+      // a scratch shop for.
+      expect(productId, 'product id captured after save').toBeTruthy();
+      const res = await adminApi(page, 'delete', `/admin/api/products/${productId}`);
+      expect(res.ok(), `DELETE ${productId} → ${res.status()}`).toBe(true);
     });
   });
 
@@ -169,6 +181,36 @@ test.describe('mandatory smoke flows', () => {
       await expect(page.getByText(/Confirmation #\d+/)).toBeVisible();
       await expect(page.getByText('$26.53')).toBeVisible();
     });
+
+    await test.step('clean up — refund with restock so runs do not drain seeded stock (§8)', async () => {
+      // Left behind, every run sells a Basin Wool Socks (M) unit for good;
+      // enough runs sell it out and flows (b)/(c) start failing at add-to-cart.
+      // A restocking full refund is the same end state flow (b) leaves.
+      const confirmation = await page.getByText(/Confirmation #\d+/).textContent();
+      const orderNumber = confirmation?.match(/#(\d+)/)?.[1];
+      expect(orderNumber, 'order number on the thank-you page').toBeTruthy();
+
+      await loginAsOwner(page);
+      const listed = await adminApi(page, 'get', `/admin/api/orders?query=${orderNumber}`);
+      const { data } = (await listed.json()) as { data: Array<{ id: string }> };
+      expect(data.length, `order #${orderNumber} findable in admin`).toBe(1);
+      const orderId = data[0]?.id as string;
+
+      const order = (await (
+        await adminApi(page, 'get', `/admin/api/orders/${orderId}`)
+      ).json()) as {
+        lineItems: Array<{ id: string; quantity: number }>;
+        shippingTotal: { amount: number; currencyCode: string };
+      };
+      const res = await adminApi(page, 'post', `/admin/api/orders/${orderId}/refunds`, {
+        lineItems: order.lineItems.map((li) => ({ lineItemId: li.id, quantity: li.quantity })),
+        shippingAmount: order.shippingTotal,
+        restock: true,
+        note: 'e2e smoke cleanup — flow (c)',
+        idempotencyKey: `smoke-c-cleanup-${uniqueSuffix()}`,
+      });
+      expect(res.ok(), `refund → ${res.status()}`).toBe(true);
+    });
   });
 
   test('d) AI builder: apply preset → publish → storefront reflects it', async ({ page }) => {
@@ -191,8 +233,16 @@ test.describe('mandatory smoke flows', () => {
     await test.step('apply the Monochrome preset', async () => {
       await page.getByRole('link', { name: 'Storefront', exact: true }).click();
       await page.waitForURL(/\/storefront$/);
-      // Preset rows render in THEME_PRESETS order: Aurora, Monochrome, Bloom.
-      await page.getByRole('button', { name: 'Apply' }).nth(1).click();
+      // Scope to Monochrome's own row rather than THEME_PRESETS order — a
+      // preset reorder must not silently apply the wrong theme (`.last()` is
+      // the innermost container holding both the label and an Apply button).
+      await page
+        .locator('div')
+        .filter({ has: page.getByText('Monochrome', { exact: true }) })
+        .filter({ has: page.getByRole('button', { name: 'Apply' }) })
+        .last()
+        .getByRole('button', { name: 'Apply' })
+        .click();
       await expect(page.getByText('Monochrome applied')).toBeVisible();
     });
 
