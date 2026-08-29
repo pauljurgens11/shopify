@@ -28,6 +28,47 @@ Small rounded pill buttons, light fill, each with a leading icon and a trailing 
 The comparison pill is the detail people recognise: Shopify dashboards always show
 current-vs-previous, and every metric carries a delta because of it.
 
+### The date-range popover
+
+Captured open. This is a substantial component and worth building carefully — it is the
+first thing a merchant touches on a dashboard.
+
+The pill toggles to a `⌃` chevron when open. The popover is wide (~870px), anchored
+under the pill, and split into a **left preset rail** and a **right calendar panel**:
+
+**Left rail** — a vertical list of presets, grouped by thin separators. The active
+preset is a filled light-grey rounded pill:
+
+```
+Today
+Yesterday
+───────────────
+Last              ⟩   (submenu: last 7/30/90 days etc.)
+Period to date    ⟩
+───────────────
+Black Friday
+Cyber Monday
+Quarters          ⟩
+───────────────
+Custom range
+```
+
+**Right panel**:
+
+- A row of **two date inputs** with a `→` arrow between them (`August 29, 2026` →
+  `August 29, 2026`), and a clock/recent icon button at the far right.
+- **Two months side by side**, July and August, each headed `Month YYYY` centred, with
+  `‹` at the far left of the first month and `›` at the far right of the second.
+- Weekday header row `Sun Mon Tue Wed Thu Fri Sat`.
+- The selected day is a **dark filled rounded square** with white text. Days spilling in
+  from the adjacent month are greyed and non-interactive.
+- Footer, right-aligned: `Cancel` (secondary) and `Apply` (primary, **disabled until the
+  selection changes**).
+
+Polaris ships `DatePicker` and `Popover`; the preset rail is ours to assemble. If it
+fights for more than 20 minutes, CLAUDE.md §7's escape hatch applies — but a preset rail
+plus a two-month `DatePicker` is close to out-of-the-box.
+
 ## Metric tiles
 
 A single row of four equal tiles, each its own card, no heading above the row:
@@ -85,9 +126,11 @@ the one a dashboard uses — do not put an illustrated empty state inside a metr
 
 Compare against `apps/admin/src/app/store/[slug]/` Home and `analytics/`.
 
-1. **Date-range + comparison pills above the cards.** Ours needs at minimum a date-range
-   control in the header. The *comparison* pill is what drives every delta indicator —
-   if we show deltas, we need a comparison period to justify them. — *worth fixing*
+1. **Date-range + comparison pills above the cards**, with the full popover documented
+   above (preset rail + two-month calendar + Cancel/Apply). Ours needs at minimum a
+   date-range control in the header. The *comparison* pill is what drives every delta
+   indicator — if we show deltas, we need a comparison period to justify them.
+   — *worth fixing*
 2. **Metric tiles: label above, large value below, delta inline.** Dotted-underline the
    label. Four across. — *cheap win*
 3. **Two-series chart with a dotted comparison line and a dot legend below.** A single

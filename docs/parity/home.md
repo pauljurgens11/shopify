@@ -1,67 +1,93 @@
-# Home — onboarding variant only ⚠️
+# Home — onboarding variant, fully captured
 
 Source: `admin.shopify.com/store/…` (store root), 1054×719 and 1316×898.
-Confidence: **complete for what it is, but it is not the page we need.**
+Confidence: **high for this variant** — complete accessibility-tree capture, every card,
+every button label and href transcribed. Re-verified after a hard refresh.
 
-**Building our Home? Read [dashboard.md](dashboard.md) instead.** That file has the real
-dashboard chrome — date range, metric tiles, charts, per-card empty states — captured
-from Analytics, which renders it even on an empty store.
+**Confidence that this is the Home we should clone: still low.** See below.
 
-## Why this is the wrong page
+## Two variants, and which one we need
 
-The captured store is brand new, empty and on a trial, so Shopify serves an
-**onboarding Home**. An established store gets a dashboard instead. Our demo store is
-Aurora Supply Co., seeded with products, orders and customers (CLAUDE.md §8), so
-onboarding cards would look broken on it.
+Shopify serves Home in (at least) two forms:
 
-Captured in full anyway, because it is a real page and we may want its *pattern* for a
-genuinely empty tenant.
+- **Onboarding Home** — what this file documents. Setup cards, no dashboard, no page
+  header. Served to new/empty stores.
+- **Dashboard Home** — metric tiles, charts, date range. Served to established stores.
 
-## What the onboarding Home looks like
+Our demo store is Aurora Supply Co., seeded with products, orders and customers
+(CLAUDE.md §8), so **we need the dashboard variant**.
 
-**No page header at all** — no icon, no title, no action row. Content starts directly
-below the top bar.
+The account available for capture has exactly one store, it is empty, and it is on a
+trial without a plan — and the Orders page states plainly that the store cannot take
+orders until a plan is selected. So this store can never reach the state that flips Home
+to the dashboard. **A populated Dashboard Home is not obtainable from this account.**
+Re-checked with a hard refresh: the onboarding variant is deterministic here, not a
+loading artifact.
 
-1. Top-right, floating over the content, a dark rounded pill split into two halves:
-   `● Get 3 months for €1/month` | `Select a plan`.
-2. Centred, two lines, large (~32px) and semibold:
-   `"Welcome to Shopify!"` / `"Where do you want to start?"`
-3. A centred AI prompt input, ~640px wide, heavily rounded, white with a light border:
-   a Sidekick avatar on the left, then a **rotating placeholder** — observed cycling
-   through `"Create a product listing"` and `"Generate product images"` — then a `+`
-   and a circular submit arrow on the right.
-4. A **two-column grid of large setup cards**. Each card: heading, one or two sentences,
-   a big illustration, and a single light button pinned bottom-left. Some cards carry a
-   progress row *above* the heading — a circle glyph plus `0 tasks completed` or
-   `0 of 5 tasks completed`.
+→ **Build our Home from [dashboard.md](dashboard.md)**, which captures the real dashboard
+chrome — date-range picker, comparison period, metric tiles, two-series charts, per-card
+empty states — from Analytics, which renders it even with zero data.
 
-Cards in order:
+This file is complete and accurate for the onboarding case. Use it if we ever render a
+genuinely empty tenant; do not use it for the seeded demo.
 
-| Heading | Body | Button |
-|---|---|---|
-| `Add your first product` | "Start with a title, price, and a photo. You can always add more detail later." | `Add product` |
-| `Choose your store design` | "Pick a theme that fits your brand, then customize from there." | `Choose theme` |
-| `You're ready to accept payments` | *(below fold, not transcribed)* | — |
-| `Name your store` | *(below fold, not transcribed)* | — |
-| `Get a custom domain` | "Give your store a branded URL that's easy to find, trust, and remember." | `Set up domain` |
-| *(shipping card)* | "Look over the defaults set up for you based on your location." | `Review rates` |
-| `Optimize your store in Estonia` | "A personalized setup for your country, markets, payments, and shipping." — `0 tasks completed` | `Get started` |
-| `Prepare your store for EU right of withdrawal` | "Set up return and cancellation options for EU orders. Learn more about EU right of withdrawal requirements." — `0 of 5 tasks completed` | `Get started` |
+## Layout
 
-The country-specific cards confirm this whole surface is personalised setup guidance,
-not a dashboard.
+**No page header** — no icon, no title, no action row. Content begins directly under the
+top bar. The whole page is centred in a single column, not the usual two-column card grid.
+
+1. **Trial promo pill**, top-right, floating over the content: a dark rounded pill split
+   in two — `● Get 3 months for €1/month` and a `Select a plan` link
+   (→ `/subscribe/checkout`).
+2. **Welcome heading**, centred, two lines, ~32px semibold — a single heading element
+   containing `"Welcome to Shopify!"` and `"Where do you want to start?"`.
+   The block carries `Close` and `Dismiss` buttons.
+3. **AI prompt input**, centred, ~640px, heavily rounded, white with a light border.
+   Sidekick avatar left; `Add files and more` (`+`) and `Send` (`↑`) buttons right.
+   The placeholder **rotates** — observed values: `"Create a product listing"`,
+   `"Generate product images"`, `"Help me get started"`, `"Help me find a business idea"`.
+4. **Setup cards** — a `<ul>` rendered as a two-column grid. Each card is itself a
+   button (the whole card is clickable), containing: an optional badge or progress line,
+   a heading, one or two sentences, an illustration, and a single light action button
+   pinned bottom-left. **Every card has its own `Dismiss card` button.**
+
+## Setup cards — complete, in order
+
+| # | Heading | Body | Action | Extra |
+|---|---|---|---|---|
+| 1 | `Add your first product` | "Start with a title, price, and a photo. You can always add more detail later." | `Add product` → `/products` | |
+| 2 | `Choose your store design` | "Pick a theme that fits your brand, then customize from there." | `Choose theme` → `/themes` | |
+| 3 | `You're ready to accept payments` | "Review settings to accept more payment methods and add a payout account." | `Review payments` → `/settings/payments` | |
+| 4 | `Name your store` | "Customers will see this across your storefront, emails, and checkout." | `Add name` (opens a modal, not a link) | |
+| 5 | `Get a custom domain` | "Give your store a branded URL that's easy to find, trust, and remember." | `Set up domain` → `/settings/domains` | badge `Get €15 back` |
+| 6 | `Review shipping rates` | "Look over the defaults set up for you based on your location." | `Review rates` → shipping profile | |
+| 7 | `Optimize your store in Estonia` | "A personalized setup for your country, markets, payments, and shipping." | `Get started` | progress `0 tasks completed` |
+| 8 | `Prepare your store for EU right of withdrawal` | "Set up return and cancellation options for EU orders. `Learn more` about EU right of withdrawal requirements." | `Get started` | progress `0 of 5 tasks completed` |
+
+Cards 7–8 are country-specific (this store is registered in Estonia), which confirms the
+whole surface is personalised setup guidance rather than a dashboard.
+
+Progress lines render **above** the heading as a circle glyph plus text. Cards 1–6 have
+no progress line.
+
+## Patterns worth stealing, even though we skip this page
+
+- **Every card independently dismissible**, and the welcome block too. Onboarding is
+  treated as disposable chrome, not permanent furniture.
+- **The whole card is the click target**, with the button as a visual affordance rather
+  than the only hit area.
+- **Progress as `N tasks completed` / `N of M tasks completed`** above the heading —
+  a cheap, legible pattern if we ever build a setup guide.
 
 ## Delta vs our build
 
-**Not assessed, deliberately.** Diffing our Home against an onboarding page would
-produce misleading findings. Our Home is **unverified** against real Shopify until
-someone captures a populated dashboard.
+**None, deliberately.** Diffing our seeded Home against an onboarding page would produce
+confident, wrong findings. Our Home is **unverified** against real Shopify.
 
-Closest available substitute: [dashboard.md](dashboard.md). Build against that, and
-treat this file as reference only for the "brand new tenant" case, if we ever render one.
+Nearest verified substitute: [dashboard.md](dashboard.md).
 
-## To close this gap
+## To close this gap for real
 
-Recapture Home from a store that has orders — a Shopify development store with sample
-data, or any store past onboarding. Then replace this file and drop the warning. See
-[README.md](README.md#extending-this-folder).
+Needs a Shopify store that is past onboarding — a development store with sample data
+installed, or any store with order history. Then capture Home and replace this file.
+Priority queue in [capture.md](capture.md).
