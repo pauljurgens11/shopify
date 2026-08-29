@@ -55,6 +55,8 @@ const PRODUCT_INCLUDE = {
     include: { inventoryLevels: { select: { available: true } } },
   },
   images: { orderBy: BY_POSITION },
+  // Manual membership only — a smart collection stores no join rows.
+  collections: { select: { collectionId: true } },
 } satisfies Prisma.ProductInclude;
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
@@ -127,6 +129,7 @@ function toProductDto(row: ProductRow, currencyCode: string): Product {
       position: image.position,
       variantIds: image.variantIds,
     })),
+    collectionIds: row.collections.map((membership) => membership.collectionId),
     metadata: row.metadata,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -267,6 +270,78 @@ const imageColumns = (
 });
 
 /* -------------------------------------------------------------------------- */
+/* Collection membership                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The collections a product write may join, de-duplicated.
+ *
+ * Only MANUAL collections have membership to write: a smart collection is
+ * resolved from its rule set on every read and stores no join rows, so a row
+ * written here would be dead data that disagrees with what the storefront
+ * shows (DECISIONS, WS-E). An unknown or smart id is refused rather than
+ * silently dropped — the admin's picker only offers manual collections, so a
+ * caller sending one is a bug, not a merchant mistake.
+ */
+async function resolveMemberships(
+  db: TenantClient,
+  collectionIds: readonly string[],
+): Promise<string[]> {
+  const wanted = [...new Set(collectionIds)];
+  if (wanted.length === 0) return [];
+
+  const rows = await db.collection.findMany({
+    where: { id: { in: wanted } },
+    select: { id: true, type: true },
+  });
+  const byId = new Map(rows.map((row) => [row.id, row.type]));
+
+  for (const id of wanted) {
+    const type = byId.get(id);
+    if (type === undefined) throw notFound('Collection');
+    if (type !== 'manual') {
+      throw badRequest('A smart collection selects its products by condition.', 'collectionIds');
+    }
+  }
+  return wanted;
+}
+
+/**
+ * Where each new membership lands in its collection's manual order: after the
+ * current last product, the way Shopify appends to a hand-sorted collection.
+ */
+async function appendPositions(
+  // Structural, so the same helper serves `db` and a `$transaction` client.
+  tx: { collectionProduct: TenantClient['collectionProduct'] },
+  collectionIds: readonly string[],
+): Promise<Map<string, number>> {
+  const entries = await Promise.all(
+    collectionIds.map(async (collectionId) => {
+      const last = await tx.collectionProduct.findFirst({
+        where: { collectionId },
+        orderBy: { position: 'desc' },
+        select: { position: true },
+      });
+      return [collectionId, (last?.position ?? -1) + 1] as const;
+    }),
+  );
+  return new Map(entries);
+}
+
+const membershipRows = (
+  shopId: string,
+  productId: string,
+  collectionIds: readonly string[],
+  positions: Map<string, number>,
+) =>
+  collectionIds.map((collectionId) => ({
+    shopId,
+    collectionId,
+    productId,
+    position: positions.get(collectionId) ?? 0,
+  }));
+
+/* -------------------------------------------------------------------------- */
 /* Read                                                                         */
 /* -------------------------------------------------------------------------- */
 
@@ -385,6 +460,8 @@ export async function createProduct(
   const template = input.variants[0];
   assertVariantCurrencies(input.variants, currencyCode);
   const handle = await assignHandle(db, input.handle, input.title);
+  const memberships = await resolveMemberships(db, input.collectionIds);
+  const positions = await appendPositions(db, memberships);
 
   try {
     const row = await db.product.create({
@@ -410,6 +487,15 @@ export async function createProduct(
           })),
         },
         images: { create: input.images.map((image, i) => imageColumns(image, i, shopId)) },
+        // No `productId`: Prisma refuses it inside a nested create, because the
+        // parent supplies it (same shape collections.ts uses for its own side).
+        collections: {
+          create: memberships.map((collectionId) => ({
+            shopId,
+            collectionId,
+            position: positions.get(collectionId) ?? 0,
+          })),
+        },
       },
       include: PRODUCT_INCLUDE,
     });
@@ -548,6 +634,8 @@ export async function updateProduct(
   // Validated before the transaction opens, so a payload with one bad price
   // cannot leave the variant table half-written.
   assertVariantCurrencies(input.variants, currencyCode);
+  const memberships =
+    input.collectionIds === undefined ? null : await resolveMemberships(db, input.collectionIds);
 
   // Derived only when the payload touches the matrix — a status-only edit must
   // not be able to trip the variant ceiling on a product that already exists.
@@ -625,6 +713,27 @@ export async function updateProduct(
               ...imageColumns(image, i, shopId),
               productId: id,
             })),
+          });
+        }
+      }
+
+      if (memberships !== null) {
+        // Leave first, so the read below sees only the memberships that stay.
+        await tx.collectionProduct.deleteMany({
+          where: {
+            productId: id,
+            ...(memberships.length > 0 ? { collectionId: { notIn: memberships } } : {}),
+          },
+        });
+        const kept = await tx.collectionProduct.findMany({
+          where: { productId: id },
+          select: { collectionId: true },
+        });
+        const have = new Set(kept.map((row) => row.collectionId));
+        const fresh = memberships.filter((collectionId) => !have.has(collectionId));
+        if (fresh.length > 0) {
+          await tx.collectionProduct.createMany({
+            data: membershipRows(shopId, id, fresh, await appendPositions(tx, fresh)),
           });
         }
       }

@@ -16,13 +16,11 @@ import {
   draftFromProduct,
   draftToInput,
   emptyDraft,
-  htmlToText,
-  isSimpleHtml,
   matrixOf,
+  normalizeHandle,
   reconcileVariants,
   renameOptionKeys,
   stockChanges,
-  textToHtml,
   validate,
   variantTitleOf,
 } from './product-draft.ts';
@@ -152,42 +150,38 @@ describe('reconcileVariants', () => {
 });
 
 describe('description', () => {
-  it('unwraps simple paragraphs for editing and puts them back on save', () => {
-    const product = { ...baseProduct, descriptionHtml: '<p>First line.</p><p>Second line.</p>' };
-    const draft = draftFromProduct(product);
-
-    expect(draft.description).toBe('First line.\n\nSecond line.');
-    expect(draft.descriptionIsRich).toBe(false);
-    expect(draftToInput(draft, 'USD').descriptionHtml).toBe(
-      '<p>First line.</p><p>Second line.</p>',
-    );
-  });
-
-  it('leaves richer markup alone rather than flattening a merchant’s formatting', () => {
+  it('carries html straight through, in and out — the editor IS the markup', () => {
     const rich = '<p>Made with <strong>wool</strong>.</p><ul><li>Warm</li></ul>';
     const draft = draftFromProduct({ ...baseProduct, descriptionHtml: rich });
 
-    expect(draft.descriptionIsRich).toBe(true);
-    expect(draft.description).toBe(rich);
-    // Saving must return it untouched — an unrelated edit cannot destroy it.
+    expect(draft.descriptionHtml).toBe(rich);
+    // Byte-identical: an unrelated edit cannot flatten a merchant's formatting.
     expect(draftToInput(draft, 'USD').descriptionHtml).toBe(rich);
   });
 
-  it('round-trips entities instead of double-escaping them', () => {
-    expect(htmlToText('<p>Salt &amp; Pepper</p>')).toBe('Salt & Pepper');
-    expect(textToHtml('Salt & Pepper')).toBe('<p>Salt &amp; Pepper</p>');
-    expect(htmlToText(textToHtml('Salt & Pepper'))).toBe('Salt & Pepper');
+  it('keeps an empty description empty rather than emitting a stray tag', () => {
+    expect(draftToInput({ ...emptyDraft(), title: 'Tee' }, 'USD').descriptionHtml).toBe('');
+  });
+});
+
+describe('the url handle', () => {
+  it('is omitted while untouched, so the API derives it and a rename cannot move it', () => {
+    const draft = { ...emptyDraft(), title: 'Alpine Merino Crewneck' };
+    expect(draftToInput(draft, 'USD')).not.toHaveProperty('handle');
+
+    const renamed = { ...draftFromProduct(baseProduct), title: 'Renamed' };
+    expect(draftToInput(renamed, 'USD').handle).toBe('tee');
   });
 
-  it('knows which markup it can safely unwrap', () => {
-    expect(isSimpleHtml('<p>Hi</p><p>There<br>Again</p>')).toBe(true);
-    expect(isSimpleHtml('plain text')).toBe(true);
-    expect(isSimpleHtml('<p>Hi <em>there</em></p>')).toBe(false);
-  });
-
-  it('keeps an empty description empty rather than emitting an empty tag', () => {
-    expect(textToHtml('')).toBe('');
-    expect(textToHtml('   \n  ')).toBe('');
+  it('normalises what the field allows while typing into what handleSchema accepts', () => {
+    // The field keeps a trailing dash so "tee-shirt" is typeable at all; the
+    // save is what has to satisfy `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
+    expect(normalizeHandle('tee-')).toBe('tee');
+    expect(normalizeHandle('Tee  Shirt!!')).toBe('tee-shirt');
+    expect(normalizeHandle('--')).toBe('');
+    expect(draftToInput({ ...emptyDraft(), title: 'Tee', handle: 'tee-' }, 'USD').handle).toBe(
+      'tee',
+    );
   });
 });
 
@@ -239,6 +233,7 @@ const baseProduct: Product = {
   options: [],
   variants: [variant()],
   images: [],
+  collectionIds: [],
   metadata: {},
   createdAt: '2026-08-28T00:00:00.000Z',
   updatedAt: '2026-08-28T00:00:00.000Z',
@@ -250,10 +245,28 @@ describe('validate', () => {
 
     const typing = { ...emptyDraft(), title: 'Tee' };
     at(typing.variants, 0).price = '19.';
-    expect(validate(typing).variants).toBe('Enter a valid price for every variant.');
+    // No options, so the price lives on the Price card and the message has to
+    // land there — on the variants table it would point at nothing on screen.
+    expect(validate(typing).price).toBe('Enter a valid price.');
+    expect(validate(typing).variants).toBeUndefined();
 
     at(typing.variants, 0).price = '19.9';
     expect(validate(typing)).toEqual({});
+  });
+
+  it('moves the same complaint to the variants table once options exist', () => {
+    const draft = { ...emptyDraft(), title: 'Tee', options: [option('Size', ['S', 'M'])] };
+    draft.variants = reconcileVariants(draft.options, draft.variants);
+    at(draft.variants, 1).price = '19.';
+
+    expect(validate(draft).variants).toBe('Enter a valid price for every variant.');
+    expect(validate(draft).price).toBeUndefined();
+  });
+
+  it('refuses a half-typed compare-at price too', () => {
+    const draft = { ...emptyDraft(), title: 'Tee' };
+    at(draft.variants, 0).compareAtPrice = '29.';
+    expect(validate(draft).price).toBe('Enter a valid price.');
   });
 
   it('refuses an option set past the variant ceiling before the API has to', () => {

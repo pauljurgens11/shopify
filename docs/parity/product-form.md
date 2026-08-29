@@ -101,37 +101,33 @@ small heading size, not the page-title size.
 
 ## Delta vs our build
 
-Diffed against `apps/admin/src/app/store/[slug]/products/_components/product-form.tsx`
-at capture time. Ranked by how much each costs us on the KPI.
+Closed 2026-08-29 (WS-B). `apps/admin/src/app/store/[slug]/products/_components/` now
+follows this file top to bottom: breadcrumb header, rich-text Description, Price /
+Inventory / Shipping as left-column cards above Variants with the collapsed-pill
+pattern, Search engine listing, Collections in Product organization (a real
+`collectionIds` on the product API), the `Unsaved product` save bar, and the Save
+pinned bottom-right of the column.
 
-1. **Price and Inventory belong in the LEFT column as their own cards.** We currently
-   fold pricing and stock into `VariantsCard`. Real Shopify shows Price and Inventory as
-   top-level left-column cards *above* Variants, and only moves per-variant pricing into
-   the variants table once options exist. This is the biggest structural difference on
-   the page. — *worth fixing*
-2. **Card order.** Ours is Title/Description → Media → Variants. Shopify's is
-   Title/Description → Media → Category → Price → Inventory → Shipping → Variants → …
-   Even dropping the out-of-scope cards, Price/Inventory/Shipping sit between Media and
-   Variants. — *worth fixing*
-3. **`Collections` is missing from Product organization.** We render Product type,
-   Vendor, Tags. Shopify has Type, Vendor, **Collections**, Tags. We do have collections
-   in the product model, so this is a real gap. — *worth fixing*
-4. **Page header.** We use `Page backAction={{content:'Products'}}` + `title`. Shopify
-   renders an icon + `›` breadcrumb. Polaris `Page` `breadcrumbs`/`backAction` renders an
-   arrow button, which is the older look. Low cost, decide in DECISIONS.md. — *cosmetic*
-5. **Description is a rich text editor**, ours is `TextField multiline={6}`. We already
-   track `descriptionIsRich`, so the data side exists. A full editor is a big lift; a
-   cheap 80% is a small formatting toolbar. — *judgement call, log it*
-6. **`Search engine listing` card is absent** from our form. Cheap to add and it makes
-   the page look complete. — *cheap win*
-7. **Publishing card.** Ours prints static subdued text `Online Store`. Shopify shows a
-   bold, clickable `All channels` row with a channels icon and a settings glyph in the
-   card header. We only have one channel (SPEC.md §2), so keep it non-interactive — but
-   match the visual weight rather than using subdued body text. — *cheap win*
-8. **Missing: Category, Shipping, Product metafields, Theme template.** Category and
-   metafields are explicitly out of scope. Shipping (weight) and Theme template are
-   judgement calls — Theme template is near-free given the theme engine exists.
-9. **The collapsed-pill pattern** (`Compare-at`, `SKU`, `Barcode`, `Sell when out of
-   stock` as pill-buttons that expand) is distinctive current-Shopify and we use nothing
-   like it. If we add the Price/Inventory cards, use this pattern — it is what makes
-   those cards look right rather than like generic forms.
+What is deliberately still missing, and why — each is a control that could not save
+anything (CLAUDE.md §8). Do not "fix" these without adding the column first:
+
+| On the real page | Why not here |
+|---|---|
+| `Category` | SPEC §2 cuts metafields and tax providers, which is all it drives |
+| `Product metafields` | SPEC §2 |
+| `Theme template` | one product template exists, so the select has one option |
+| Price pills `Unit price`, `Cost per item` | no columns on `ProductVariant` |
+| Inventory `Track quantity` switch | needs a per-variant tracking flag honoured by cart, checkout and storefront availability — WS-E code, not a form change |
+| Shipping `Package`, `Country of origin`, `HS code` | no columns; customs is out of scope |
+| Media `Select existing` | there is no media library to select from |
+| `Generate text` in the description toolbar | the AI budget is the theme builder (SPEC §12) |
+
+Two more places we knowingly say something different from the capture, because the
+capture's copy would be untrue here: Media's caption is `"Accepts images"` rather than
+`"Accepts images, videos, or 3D models"`, and Publishing shows a bold `Online Store`
+rather than `All channels`, since one channel exists.
+
+The breadcrumb header is now on this page and NOT on the other detail pages
+(orders, customers, collections), which still use Polaris `backAction`. Current
+Shopify uses the breadcrumb everywhere, so those pages are the drift — rolling it
+out is a follow-up, tracked in DECISIONS.md.
