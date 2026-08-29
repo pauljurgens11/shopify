@@ -24,13 +24,16 @@ TEXT_MAX = 12000
 # Transcripts capture whatever scrolled past in a terminal, including secrets that leaked
 # into test output. Everything written out goes through this first.
 SECRETS = [
-    (re.compile(r"sk-ant-[A-Za-z0-9_\-]{16,}"), "[REDACTED anthropic-api-key]"),
+    (re.compile(r"sk-ant-[A-Za-z0-9_\-]{6,}"), "[REDACTED anthropic-api-key]"),
     (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), "[REDACTED github-token]"),
     (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "[REDACTED github-token]"),
     (re.compile(r"\b(sk|rk)_live_[A-Za-z0-9]{10,}"), "[REDACTED stripe-key]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED aws-key-id]"),
     (re.compile(r"xox[baprs]-[A-Za-z0-9\-]{10,}"), "[REDACTED slack-token]"),
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S), "[REDACTED private-key]"),
+    # Fragments of the ANTHROPIC_API_KEY that leaked into one session's test output. They
+    # survive without their `sk-ant-` prefix wherever a later session grepped for them.
+    (re.compile(r"i92zMbhL\w*|X77QEl8\w*|kuxJ874S\w*|vpv1lAAA"), "[REDACTED key-fragment]"),
     (re.compile(r"(postgres(?:ql)?|redis|amqp|mongodb)://([^:@\s/]+):([^@\s/]+)@"), r"\1://\2:[REDACTED]@"),
     (re.compile(r"\b(ANTHROPIC_API_KEY|SESSION_SECRET|JWT_SECRET|AWS_SECRET_ACCESS_KEY|STRIPE_SECRET_KEY|WEBHOOK_SECRET)\s*[=:]\s*[\"']?([^\s\"'&]{12,})"), r"\1=[REDACTED]"),
 ]
@@ -197,25 +200,47 @@ for i, e in enumerate(entries, 1):
     with open(os.path.join(OUT, "sessions", e["file"]), "w") as fh:
         fh.write(redact(e["md"]))
 
-# index
-idx = []
-idx.append("# Chat archive\n")
-idx.append("Every Claude Code session that built this repo, exported to Markdown.\n")
-idx.append(f"**{len(entries)} sessions** · {entries[0]['start'][:10]} – {entries[-1]['end'][:10]} · "
-           f"{sum(1 for e in entries if e['meta'].get('archived'))} archived\n")
-idx.append("Each file carries the full conversation: prompts, replies, and a one-line summary of every "
-           "tool call with truncated output. Sub-agent (sidechain) traffic is counted but not inlined.\n")
-idx.append("| # | Date | Session | Prompts | PR | Branch / worktree |")
-idx.append("|---:|---|---|---:|---|---|")
-for i, e in enumerate(entries, 1):
-    m = e["meta"]
-    pr = f"[#{m['pr']}](../../../../pull/{m['pr']})" if m.get("pr") else "—"
-    pr = f"#{m['pr']}" if m.get("pr") else "—"
-    star = " 🗄️" if m.get("archived") else ""
-    br = f"`{e['branch']}`" if e.get("branch") else "`main`"
-    idx.append(f"| {i} | {e['start'][:10]} | [{e['title']}{star}](sessions/{e['file']}) | {e['prompts']} | {pr} | {br} |")
-idx.append("\n🗄️ = archived in the Claude Code sidebar.\n")
+# index — grouped by day, so a two-day build reads as two days
+days = {}
+for e in entries:
+    days.setdefault(e["start"][:10], []).append(e)
+
+n_arch = sum(1 for e in entries if e["meta"].get("archived"))
+idx = ["# Chat archive", "",
+    "Every Claude Code session behind this repo, exported to Markdown — the whole two-day build,",
+    "from the first spec conversation to the last parity fix.", "",
+    f"**{len(entries)} sessions** · {entries[0]['start'][:10]} – {entries[-1]['start'][:10]} · "
+    f"{n_arch} archived · main checkout + every agent worktree", "",
+    "## What's in each file", "",
+    "One Markdown file per session, chronological, with a metadata header (session id, times,",
+    "worktree, branch, PR, model). The body is the conversation as it happened:", "",
+    "- every prompt and every reply, in full;",
+    "- one compact line per tool call (`🔧 **Bash**` + the command, `🔧 **Edit**` + the file), with",
+    "  its output quoted and truncated — enough to follow the work without pasting whole file dumps;",
+    "- sub-agent (sidechain) traffic counted in the header, not inlined, so the main thread stays readable.", "",
+    "Secrets are stripped on export (API keys, tokens, connection-string passwords) and appear as",
+    "`[REDACTED …]`. Regenerate with:", "", "```bash",
+    "python3 scripts/export-chat-archive.py docs/chat-archive docs/chat-archive/sessions.json",
+    "```", "",
+    "`sessions.json` holds the sidebar titles, PR numbers and archived flags, which live in the",
+    "Claude Code app rather than in the transcripts themselves. Refresh it when sessions are added",
+    "or their PRs land, then re-run the export — existing files are rewritten in place.", "",
+    "## Sessions", ""]
+
+n = 0
+for day, es in days.items():
+    idx += [f"### {day}", "", "| # | Session | Prompts | PR | Branch / worktree |", "|---:|---|---:|---|---|"]
+    for e in es:
+        n += 1
+        m = e["meta"]
+        pr = f"#{m['pr']} ({m['prState']})" if m.get("pr") else "—"
+        star = " 🗄️" if m.get("archived") else ""
+        br = f"`{e['branch']}`" if e.get("branch") else "`main`"
+        idx.append(f"| {n} | [{e['title']}{star}](sessions/{e['file']}) | {e['prompts']} | {pr} | {br} |")
+    idx.append("")
+idx += ["🗄️ = archived in the Claude Code sidebar. Archived sessions are included here on purpose —",
+        "they are the earliest planning conversations and the first workstream runs.", ""]
 with open(os.path.join(OUT, "README.md"), "w") as fh:
-    fh.write("\n".join(idx) + "\n")
+    fh.write("\n".join(idx))
 
 print(f"{len(entries)} sessions exported")

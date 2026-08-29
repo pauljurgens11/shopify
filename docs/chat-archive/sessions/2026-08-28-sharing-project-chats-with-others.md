@@ -132,14 +132,14 @@ cd ~/.claude/projects && grep -ohE '(sk-ant-[A-Za-z0-9_-]{8}|ghp_[A-Za-z0-9]{8}|
 
 > **↳ result**
 > ```
-> 2 sk-ant-invalid-
+> 2 [REDACTED anthropic-api-key]
 > --- exit: 0 (no output above = no obvious live keys) ---
 > Shell cwd was reset to /Users/pauljurgens/Downloads/projects/shopify
 > ```
 
 ### 🤖 Claude
 
-Clean — only an `sk-ant-invalid-` placeholder. Now let me look at the transcript format so I can render it readably.
+Clean — only an `[REDACTED anthropic-api-key]` placeholder. Now let me look at the transcript format so I can render it readably.
 
 🔧 **Bash**
 ```
@@ -511,7 +511,7 @@ Sessions aren't hosted anywhere shareable; they live as JSONL transcripts on you
 
 The whole project arc is in there, oldest first: `01-shopify-clone-specification` through the parallel workstream chats (A1A3, B1B4B2, C1C2, D1, D2D3, F1F2, G1, H1E1) to `18-repository-architecture-review`.
 
-**On secrets:** I grepped every transcript for Anthropic/GitHub/AWS/Stripe/Slack key patterns before bundling. Only hit was a literal `sk-ant-invalid-` placeholder. Worth knowing anyway: the transcripts contain full file contents, command output, and your `.env.example` — fine for a colleague, not for a public link.
+**On secrets:** I grepped every transcript for Anthropic/GitHub/AWS/Stripe/Slack key patterns before bundling. Only hit was a literal `[REDACTED anthropic-api-key]` placeholder. Worth knowing anyway: the transcripts contain full file contents, command output, and your `.env.example` — fine for a colleague, not for a public link.
 
 To regenerate later (after more chats), the script is at `scratchpad/export_chats.py` — though the scratchpad gets cleared between sessions, so copy it into the repo if you want it to stick around.
 
