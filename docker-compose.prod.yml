@@ -4,8 +4,9 @@
 #
 # then https://admin.localhost (owner@demo.dev / password123) and
 # https://demo.localhost. Certs come from Caddy's internal CA, so curl needs
-# -k and a browser shows a one-time warning — swap to Let's Encrypt in
-# deploy/caddy/Caddyfile for a real domain.
+# -k and a browser shows a one-time warning. For a real domain set CADDY_TLS to
+# a contact email and Caddy uses Let's Encrypt instead — DEPLOY.md is the
+# step-by-step, including the secrets that MUST be regenerated first.
 #
 # Configuration comes from the same single root `.env` as dev (env_file).
 # Everything network-shaped is overridden below to the compose-internal
@@ -131,6 +132,11 @@ services:
       - "443:443/udp"
     environment:
       BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+      # `internal` (the default) issues from Caddy's own CA, which is what makes
+      # BASE_DOMAIN=localhost verifiable with no DNS. Set it to a contact email
+      # address for a real domain and every hostname gets Let's Encrypt instead.
+      # See DEPLOY.md.
+      CADDY_TLS: ${CADDY_TLS:-internal}
     volumes:
       # The directory, not the file: a single-file bind mount pins the inode,
       # so an edited Caddyfile silently keeps serving its pre-edit content.

@@ -77,6 +77,37 @@ const schema = z.object({
 
 export type Env = z.infer<typeof schema>;
 
+/**
+ * The two secrets that must not survive a copy of `.env.example` into a public
+ * deployment. `SESSION_SECRET` signs staff session cookies and
+ * `VAULT_MASTER_KEY` encrypts stored cards, and both shipped values are in the
+ * repo — keeping them means anyone who has read it can forge a session for any
+ * shop on the box.
+ *
+ * A warning rather than a hard failure on purpose: the production compose is
+ * documented as verifiable end-to-end on BASE_DOMAIN=localhost with the
+ * unedited dev `.env` (DEPLOY.md), and refusing to boot would take that away.
+ */
+const SHIPPED_SECRETS = {
+  SESSION_SECRET: 'dev_session_secret_change_me_0000000000000000',
+  VAULT_MASTER_KEY: '0'.repeat(64),
+} as const;
+
+function warnOnShippedSecrets(parsed: Env): void {
+  if (parsed.NODE_ENV !== 'production') return;
+
+  const kept = (Object.keys(SHIPPED_SECRETS) as (keyof typeof SHIPPED_SECRETS)[]).filter(
+    (key) => parsed[key] === SHIPPED_SECRETS[key],
+  );
+  if (kept.length === 0) return;
+
+  console.warn(
+    `\n  WARNING: ${kept.join(' and ')} still hold the value shipped in .env.example.\n` +
+      '  Anyone with a copy of this repo can forge staff sessions and read stored cards.\n' +
+      '  Generate real ones (openssl rand -hex 32) before this is reachable from the internet.\n',
+  );
+}
+
 let cached: Env | undefined;
 
 export function env(): Env {
@@ -93,6 +124,7 @@ export function env(): Env {
   }
 
   cached = parsed.data;
+  warnOnShippedSecrets(cached);
   return cached;
 }
 

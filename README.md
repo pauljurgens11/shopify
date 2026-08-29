@@ -237,17 +237,16 @@ a shared cache.
 
 **Packaging.** Each app has a production Dockerfile (`apps/*/Dockerfile`,
 multi-stage on `node:22-slim`), and CI builds all four on every commit to `main`
-— one job per app in `.github/workflows/main-checks.yml`. Publishing those
-images to a registry is the one thing that job does not do yet.
+— one job per app in `.github/workflows/main-checks.yml` — and pushes them to
+`ghcr.io/pauljurgens11/shopify/{api,admin,storefront,worker}`.
 
-The documented deployment target is a `docker-compose.prod.yml` that runs the
-four images behind **Caddy**, which terminates TLS automatically and routes by
-subdomain: `admin.*` → admin, `api.*` → api, everything else → storefront, which
-is what makes `{shop}.example.com` resolve a tenant in production the same way
-`{shop}.lvh.me:3002` does locally. That compose file and its Caddyfile land with
-the deploy issue; when they are present in the repo root, deploying is
-`docker compose -f docker-compose.prod.yml up -d` on a VM, or the same four
-images on Fly or Kubernetes.
+The deployment target is [docker-compose.prod.yml](docker-compose.prod.yml),
+which runs the four images behind **Caddy**. Caddy terminates TLS automatically
+and routes by subdomain: `admin.*` → admin, `api.*` → api, everything else →
+storefront, which is what makes `{shop}.example.com` resolve a tenant in
+production the same way `{shop}.lvh.me:3002` does locally. Deploying is
+`docker compose -f docker-compose.prod.yml up -d --build` on a VM, or the same
+four images on Fly or Kubernetes. **[DEPLOY.md](DEPLOY.md)** is the runbook.
 
 ## Working here
 
@@ -270,12 +269,14 @@ Decision log: [DECISIONS.md](DECISIONS.md) — append-only.
 
 ## Notes
 
-This is a private study clone of the Shopify admin, built to be visually
+This is a study clone of the Shopify admin, built to be visually
 indistinguishable from it. As of 2026-08-29 the running app therefore renders
 the Shopify name and bag mark (DECISIONS; the earlier "never render the name or
 logo" rule was reversed by the repo owner). It is **not affiliated with or
-endorsed by Shopify**, is never deployed publicly and is not distributed; the
-codebase itself keeps the neutral `@merchant/*` package scope. Built with
+endorsed by Shopify**; the codebase itself keeps the neutral `@merchant/*`
+package scope. A deployment of it is a demo to be looked at, not a product —
+[DEPLOY.md](DEPLOY.md) — and Caddy serves every page `X-Robots-Tag: noindex`
+so it stays out of search results. Built with
 Shopify's open-source [Polaris](https://polaris.shopify.com/) design system.
 
 The card vault demonstrates PAN isolation — the card number goes from the

@@ -7,6 +7,7 @@
  * resolving *some* shop, and (b) shop A's domain resolving shop B — both are
  * cross-tenant renders, the unforgivable bug.
  */
+import { env } from '@merchant/config/env';
 import { newId } from '@merchant/config/ids';
 import { dbAdmin } from '@merchant/db/client';
 import type { FastifyInstance } from 'fastify';
@@ -122,5 +123,44 @@ describe('storefront custom-domain fallback', () => {
     });
 
     expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  /**
+   * Caddy's on-demand TLS gate (A5, SPEC §17). Same question as tenancy asks,
+   * one request earlier: a hostname only earns a certificate if it is really a
+   * shop. Tested through `inject` rather than against the helper directly
+   * because the failure that matters is the route not being registered at all —
+   * Caddy reads a 404 as "refuse", so a missing route silently stops EVERY
+   * storefront certificate from being issued.
+   */
+  describe('on-demand TLS gate', () => {
+    const base = env().STOREFRONT_BASE_DOMAIN.split(':')[0];
+
+    const ask = (query: string) => app.inject({ method: 'GET', url: `/health/tls-ask${query}` });
+
+    it('allows a shop’s own subdomain', async () => {
+      const response = await ask(`?domain=${shopA.slug}.${base}`);
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('allows a registered custom domain', async () => {
+      const response = await ask(`?domain=${domainA}`);
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('refuses a subdomain that is not a shop, so strangers cannot mint certs', async () => {
+      const response = await ask(`?domain=definitely-not-a-shop.${base}`);
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('refuses an unregistered domain', async () => {
+      const response = await ask('?domain=evil.attacker.test');
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('refuses a request with no domain at all', async () => {
+      const response = await ask('');
+      expect(response.statusCode).toBe(400);
+    });
   });
 });
