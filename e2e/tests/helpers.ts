@@ -104,13 +104,43 @@ export async function loginAsOwner(page: Page): Promise<void> {
  * $18.00, well under the $150 free-shipping threshold so Standard ($8.95)
  * always applies.
  */
-export async function addSocksToCartAndOpenCheckout(page: Page): Promise<void> {
+export async function addSocksToCartAndOpenCheckout(
+  page: Page,
+  options: { exerciseQuantityStepper?: boolean } = {},
+): Promise<void> {
   await page.goto(`${STOREFRONT_URL}/products/basin-wool-socks`);
   await page.getByRole('button', { name: 'M', exact: true }).click();
-  await page.getByRole('button', { name: 'Add to cart' }).click();
+  const addToCart = page.getByRole('button', { name: 'Add to cart' });
+  await addToCart.click();
   await expect(page.getByText('Added to your cart.')).toBeVisible();
+  // E8: the write landing is not the same as the control coming back. On a
+  // production build the button used to stay on "Adding…", disabled forever,
+  // and the header badge kept its server-rendered count — while every
+  // assertion above still passed, because the flows navigate straight to
+  // /cart and only ever checked server state.
+  await expect(addToCart).toBeEnabled();
+  await expect(page.getByRole('link', { name: /^Cart\s*\d+$/ })).toBeVisible();
   await page.getByRole('link', { name: 'View cart' }).click();
   await expect(page.getByRole('heading', { name: 'Your cart' })).toBeVisible();
+
+  if (options.exerciseQuantityStepper) {
+    // E8 again, on the other surface: the stepper wrote the new quantity and
+    // then froze, so the line still read 1 until the shopper reloaded.
+    const increase = page.getByRole('button', { name: /^Increase quantity/ });
+    const decrease = page.getByRole('button', { name: /^Decrease quantity/ });
+    const quantity = page.locator('[data-cart-line] span').filter({ hasText: /^\d+$/ }).first();
+    // The line total is server-rendered outside the stepper island, so asserting
+    // it is what proves the whole page caught up — not just the local control.
+    await increase.click();
+    await expect(quantity).toHaveText('2');
+    await expect(page.getByText('$36.00').first()).toBeVisible();
+    await expect(increase).toBeEnabled();
+    await decrease.click();
+    await expect(quantity).toHaveText('1');
+    await expect(page.getByText('$18.00').first()).toBeVisible();
+    await expect(decrease).toBeEnabled();
+  }
+
   await page.getByRole('link', { name: 'Check out' }).click();
   // /checkout creates the checkout server-side and 302s to its token URL.
   await page.waitForURL(/\/checkouts\/[^/]+$/);

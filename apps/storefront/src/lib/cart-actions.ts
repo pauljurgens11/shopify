@@ -9,12 +9,19 @@
  * the browser to `api.lvh.me` would also be cross-origin, and the cookie would
  * never be sent.
  *
- * Every action revalidates `/cart` so the page and the header badge agree.
+ * No action calls `revalidatePath`. It looks like the obvious way to keep the
+ * page and the header badge in step, and on a production build it is not: a
+ * revalidating action makes Next re-render the whole route and stream it back
+ * on the action's own response, and that update frequently never commits — the
+ * control that fired it stays disabled forever and the badge keeps its old
+ * count (E8; measurements in DECISIONS.md). Nothing here needs it either. The
+ * cart is fetched `no-store`, every storefront page is dynamic, and the chrome
+ * navigates with plain `<a href>` — so a real navigation always re-reads the
+ * cart from the server. What has to move WITHOUT a navigation is returned
+ * instead: `itemCount` drives the header badge through `cart-count.ts`.
  */
 import { CART_COOKIE } from '@merchant/config/constants';
-import { revalidatePath } from 'next/cache';
-import { cookies, headers } from 'next/headers';
-import { PATHNAME_HEADER } from '../middleware.ts';
+import { cookies } from 'next/headers';
 import { storefrontApiUrl } from './api.ts';
 import { cartTokenFromSetCookie } from './set-cookie.ts';
 import { resolveShopSlug } from './tenant.ts';
@@ -69,13 +76,6 @@ async function cartRequest(
   }
 
   const cart = (await response.json()) as { itemCount: number };
-  revalidatePath('/cart');
-  // …and the page the shopper is actually on, or the header's cart badge keeps
-  // the count it was server-rendered with until they navigate — adding from a
-  // product page would look like nothing happened. The middleware puts the
-  // path on a header, which is also set for the Server Action's own POST.
-  const pathname = (await headers()).get(PATHNAME_HEADER);
-  if (pathname && pathname !== '/cart') revalidatePath(pathname);
   return { ok: true, itemCount: cart.itemCount };
 }
 

@@ -12,8 +12,9 @@
  * Shopify product page behaves.
  */
 import type { StorefrontProduct } from '@merchant/contracts/storefront';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { addToCart } from '../lib/cart-actions.ts';
+import { publishCartCount } from '../lib/cart-count.ts';
 
 type Variant = StorefrontProduct['variants'][number];
 
@@ -31,7 +32,12 @@ export function ProductForm({ product }: { product: StorefrontProduct }) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
-  const [pending, startTransition] = useTransition();
+  // Deliberately not `useTransition`: a Server Action dispatched inside one
+  // stays pending until the router applies the tree the action streams back,
+  // and on a production build that update often never commits — leaving the
+  // button on "Adding…" forever even though the line is in the cart (E8).
+  // Plain state settles on the promise this component actually awaits.
+  const [pending, setPending] = useState(false);
 
   const selected: Variant | undefined = useMemo(
     () =>
@@ -41,14 +47,23 @@ export function ProductForm({ product }: { product: StorefrontProduct }) {
   );
 
   const submit = () => {
-    if (!selected) return;
+    if (!selected || pending) return;
     setError(null);
     setAdded(false);
-    startTransition(async () => {
-      const result = await addToCart(selected.id, quantity);
-      if (result.ok) setAdded(true);
-      else setError(result.message ?? 'We could not add that to your cart.');
-    });
+    setPending(true);
+    addToCart(selected.id, quantity)
+      .then((result) => {
+        if (!result.ok) {
+          setError(result.message ?? 'We could not add that to your cart.');
+          return;
+        }
+        setAdded(true);
+        // The header is server-rendered, so the badge only moves if the count
+        // the action just returned is handed to it.
+        if (result.itemCount !== undefined) publishCartCount(result.itemCount);
+      })
+      .catch(() => setError('We could not add that to your cart.'))
+      .finally(() => setPending(false));
   };
 
   const soldOut = selected ? !selected.available : true;
