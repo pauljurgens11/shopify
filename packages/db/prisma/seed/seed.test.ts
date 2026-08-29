@@ -361,6 +361,71 @@ describe('customers', () => {
       await dbAdmin.customer.count({ where: { ...where(), passwordHash: { not: null } } }),
     ).toBeGreaterThan(1);
   });
+
+  it('gives jane an order history so the E5 account demo is not an empty state', async () => {
+    const jane = await dbAdmin.customer.findUniqueOrThrow({
+      where: { shopId_email: { shopId, email: 'jane@example.com' } },
+    });
+    const orders = await dbAdmin.order.findMany({ where: { ...where(), customerId: jane.id } });
+    expect(orders.length).toBeGreaterThanOrEqual(2);
+    // At least one delivered order (a real history) and none of hers cancelled —
+    // a cancelled order is a strange first impression for the demo login.
+    expect(orders.some((o) => o.fulfillmentStatus === 'fulfilled')).toBe(true);
+    expect(orders.every((o) => o.cancelledAt === null)).toBe(true);
+  });
+
+  it('seeds two abandoned checkouts C4’s segment can actually list', async () => {
+    const open = await dbAdmin.checkout.findMany({
+      where: { ...where(), status: 'open', completedOrderId: null },
+    });
+    expect(open).toHaveLength(2);
+    const emails = await dbAdmin.customer.findMany({ where: where(), select: { email: true } });
+    const known = new Set(emails.map((c) => c.email));
+    for (const checkout of open) {
+      // Younger than the 72h segment window regardless of when the seed ran.
+      expect(Date.now() - checkout.createdAt.getTime()).toBeLessThan(48 * 60 * 60 * 1000);
+      expect(checkout.email).not.toBeNull();
+      expect(known.has(checkout.email as string)).toBe(true);
+      expect(Array.isArray(checkout.cartSnapshot)).toBe(true);
+      expect((checkout.cartSnapshot as unknown[]).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('demo app', () => {
+  it('installs one app whose token is stored hashed only', async () => {
+    const apps = await dbAdmin.app.findMany({ where: where() });
+    expect(apps).toHaveLength(1);
+    const app = apps[0];
+    expect(app?.name).toBe('Warehouse Sync');
+    // SHA-256 hex, never a plaintext `shpat_` token.
+    expect(app?.apiTokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(app?.uninstalledAt).toBeNull();
+    expect(app?.scopes).toContain('read_orders');
+  });
+
+  it('subscribes a webhook and fills its delivery log with real orders', async () => {
+    const subscription = await dbAdmin.webhookSubscription.findFirstOrThrow({
+      where: { ...where(), deletedAt: null },
+    });
+    expect(subscription.topic).toBe('orders/create');
+    expect(subscription.secret).toMatch(/^whsec_/);
+
+    const deliveries = await dbAdmin.webhookDelivery.findMany({ where: where() });
+    expect(deliveries.length).toBeGreaterThanOrEqual(2);
+    for (const delivery of deliveries) {
+      expect(delivery.subscriptionId).toBe(subscription.id);
+      expect(delivery.status).toBe('success');
+      // Each payload names a real seeded order, so the log opens onto real pages.
+      const payload = delivery.payload as { id?: string };
+      const order = await dbAdmin.order.findFirst({
+        where: { ...where(), id: payload.id ?? '' },
+      });
+      expect(order, `delivery ${delivery.id} references a real order`).not.toBeNull();
+      // The log cannot predate the app it belongs to.
+      expect(delivery.createdAt.getTime()).toBeGreaterThan(subscription.createdAt.getTime());
+    }
+  });
 });
 
 describe('theme and processor', () => {
