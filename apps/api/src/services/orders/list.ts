@@ -108,19 +108,23 @@ export async function listOrders(
       ? [{ orderNumber: direction }]
       : [{ [sortKey]: direction }, { orderNumber: direction }];
 
+  // limit + 1, like every other list service: "a full page means more behind
+  // it" hands out a cursor to an EMPTY page whenever the order count is an
+  // exact multiple of the page size — a live Next button that lands on
+  // "No orders found".
   const rows = await db.order.findMany({
     where,
     orderBy,
-    take: query.limit,
+    take: query.limit + 1,
     // The name renders the index's Customer column; the count and spend that
     // `orderDetailSchema` carries would be a per-row join the index never shows.
     include: { lineItems: true, customer: { select: { firstName: true, lastName: true } } },
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
   });
 
+  const page = rows.slice(0, query.limit);
   return {
-    data: rows.map(toOrderSummary),
-    // A short page is the last page; only a full one can have more behind it.
-    nextCursor: rows.length === query.limit ? (rows.at(-1)?.id ?? null) : null,
+    data: page.map(toOrderSummary),
+    nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
   };
 }
