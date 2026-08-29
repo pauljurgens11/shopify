@@ -100,10 +100,13 @@ const EDITOR_CSS = `
 
 export function RichTextField({
   label,
+  labelHidden,
   value,
   onChange,
 }: {
   label: string;
+  /** The collection card (B6) carries no labelled inputs; the label stays for a11y. */
+  labelHidden?: boolean;
   value: string;
   onChange: (html: string) => void;
 }) {
@@ -219,7 +222,7 @@ export function RichTextField({
   );
 
   return (
-    <Labelled id={id} label={label}>
+    <Labelled id={id} label={label} labelHidden={labelHidden}>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: a <style> element's own rules, no user input */}
       <style dangerouslySetInnerHTML={{ __html: EDITOR_CSS }} />
       <Box
