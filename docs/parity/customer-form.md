@@ -43,17 +43,24 @@ editable field — the card shows a read-only summary and the pencil switches it
 
 ## Delta vs our build
 
-Compare against `apps/admin/src/app/store/[slug]/customers/`.
+Closed 2026-08-29 (WS-C). `apps/admin/src/app/store/[slug]/customers/new/page.tsx` now
+follows this file: breadcrumb header, two columns, first/last name side by side, the
+marketing-consent checkbox over the grey caution strip, Default address as one bordered
+`⊕ Add address ›` row, and Notes/Tags as pencil-in-header right-rail cards. The
+`Unsaved customer` save bar came with the same pass. The pencil pattern was applied to
+the customer *detail* page's Notes and Tags too, so the two pages agree.
 
-1. **First name / Last name must be side by side.** Stacking them is an instant tell.
-   Polaris `FormLayout.Group` does exactly this. — *cheap win*
-2. **The marketing-consent checkbox + grey footer strip** is most of what makes this
-   card look like Shopify's. We support email marketing consent in the model; render at
-   least the email checkbox and the footer caution text. SMS/WhatsApp are out of scope —
-   omit them rather than disabling them (CLAUDE.md §8). — *worth fixing*
-3. **Default address as a bordered `⊕ Add address` row with a trailing chevron**, not a
-   set of always-visible address fields. — *worth fixing*
-4. **Notes and Tags as separate right-rail cards** with the pencil-edit affordance.
-   — *cheap win*
-5. `Language` and `Tax details` are out of scope (SPEC.md §2 cuts i18n and tax
-   providers). Omit both cards; do not render them disabled.
+Deliberately still missing, each because the control could not save anything
+(CLAUDE.md §8 — a cut feature is not rendered at all):
+
+| On the real page | Why not here |
+|---|---|
+| `Language` select | SPEC §2 cuts i18n; there is one locale |
+| SMS and WhatsApp consent checkboxes | no SMS/WhatsApp channel, and no columns for the consent |
+| `Tax details` card (`VAT number`, `Tax settings`) | SPEC §2 cuts tax providers |
+
+Two knowing differences from the capture. The phone prefix select shows `🇺🇸 +1` rather
+than the flag alone — US and CA both dial `+1`, so flag-only gives no way to see what
+the field will save. And the `⊕ Add address ›` row is hand-built from Polaris tokens:
+`Button` has `fullWidth`/`textAlign` but cannot put a chevron on the trailing edge, and
+that chevron is the pattern.
