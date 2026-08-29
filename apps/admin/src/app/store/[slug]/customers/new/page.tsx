@@ -15,7 +15,6 @@
 import {
   BlockStack,
   Box,
-  Button,
   Card,
   Checkbox,
   Form,
@@ -33,6 +32,7 @@ import { ChevronRightIcon, PersonIcon, PlusCircleIcon } from '@shopify/polaris-i
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
@@ -43,36 +43,6 @@ import { EditableCard } from '../_components/editable-card.tsx';
 /** Verbatim from the capture — this strip is most of what makes the card read as Shopify. */
 const MARKETING_CAUTION =
   'You should ask your customers for permission before you subscribe them to your marketing emails, SMS, or WhatsApp messages.';
-
-/**
- * The page header is a breadcrumb, not a back-button + title: a person icon, a
- * chevron, then `New customer` (docs/parity/customer-form.md). Polaris `Page`'s
- * `backAction` renders the older arrow-button look.
- *
- * Deliberately duplicated from the product form rather than imported: that copy
- * lives inside WS-B's `product-form.tsx`, and CLAUDE.md §3 keeps workstreams out
- * of each other's app code. Hoisting it into `components/shell/` is WS-A's call
- * and the follow-up that docs/parity/product-form.md already tracks.
- */
-function Breadcrumb({ customersUrl }: { customersUrl: string }) {
-  return (
-    <InlineStack gap="100" blockAlign="center">
-      <Button
-        variant="tertiary"
-        icon={PersonIcon}
-        url={customersUrl}
-        accessibilityLabel="Customers"
-      />
-      {/* Boxed so the chevron sits inline with the title rather than filling. */}
-      <Box width="20px">
-        <Icon source={ChevronRightIcon} tone="subdued" />
-      </Box>
-      <Text as="h1" variant="headingLg" fontWeight="bold">
-        New customer
-      </Text>
-    </InlineStack>
-  );
-}
 
 /**
  * A full-width bordered row that behaves as a button: ⊕ / label / trailing `›`.
@@ -235,7 +205,12 @@ export default function NewCustomerPage() {
         onDiscard={() => router.push(`/store/${slug}/customers`)}
       />
       <BlockStack gap="400">
-        <Breadcrumb customersUrl={`/store/${slug}/customers`} />
+        <PageBreadcrumb
+          icon={PersonIcon}
+          backUrl={`/store/${slug}/customers`}
+          backLabel="Customers"
+          title="New customer"
+        />
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">

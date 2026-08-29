@@ -29,14 +29,11 @@ import type { Paginated } from '@merchant/contracts/common';
 import type { InventoryRow } from '@merchant/contracts/inventory';
 import type { Location } from '@merchant/contracts/locations';
 import type { Product } from '@merchant/contracts/products';
-import type { IconProps } from '@shopify/polaris';
 import {
   ActionList,
   BlockStack,
-  Box,
   Button,
   Card,
-  Icon,
   InlineStack,
   Layout,
   Modal,
@@ -48,7 +45,6 @@ import {
 } from '@shopify/polaris';
 import {
   ChannelsIcon,
-  ChevronRightIcon,
   MenuHorizontalIcon,
   ProductIcon,
   SettingsIcon,
@@ -56,6 +52,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RichTextField } from '../../../../../components/rich-text-field.tsx';
+import { InlineIcon, PageBreadcrumb } from '../../../../../components/shell/page-breadcrumb.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -79,7 +77,7 @@ import { InventoryCard } from './inventory-card.tsx';
 import { MediaCard } from './media-card.tsx';
 import { OrganizationCard } from './organization-card.tsx';
 import { PricingCard } from './pricing-card.tsx';
-import { RichTextField } from './rich-text-field.tsx';
+
 import { SeoCard } from './seo-card.tsx';
 import { ShippingCard } from './shipping-card.tsx';
 import { VariantsCard } from './variants-card.tsx';
@@ -99,53 +97,6 @@ const STATUS_HELP: Record<ProductDraft['status'], string> = {
 
 /** Enough for the currencies the demo ships; falls back to the code itself. */
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
-
-/**
- * Polaris `Icon` is `display:block; margin:auto`, so a bare one inside an
- * `InlineStack` centres itself in the leftover space instead of sitting next to
- * its label. Constraining the width kills the auto margins.
- */
-function InlineIcon({ source }: { source: IconProps['source'] }) {
-  return (
-    <Box width="20px">
-      <Icon source={source} tone="subdued" />
-    </Box>
-  );
-}
-
-/**
- * The page header is a breadcrumb, not a back-button + title: a product icon, a
- * chevron, then the title (docs/parity/product-form.md). Polaris `Page`'s
- * `backAction` renders the older arrow-button look, so the header is built here
- * and `Page` is used only for its content width.
- */
-function Breadcrumb({
-  title,
-  productsUrl,
-  actions,
-}: {
-  title: string;
-  productsUrl: string;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <InlineStack align="space-between" blockAlign="center" gap="200">
-      <InlineStack gap="100" blockAlign="center">
-        <Button
-          variant="tertiary"
-          icon={ProductIcon}
-          url={productsUrl}
-          accessibilityLabel="Products"
-        />
-        <InlineIcon source={ChevronRightIcon} />
-        <Text as="h1" variant="headingLg" fontWeight="bold">
-          {title}
-        </Text>
-      </InlineStack>
-      {actions}
-    </InlineStack>
-  );
-}
 
 export function ProductForm({
   slug,
@@ -329,9 +280,11 @@ export function ProductForm({
       />
 
       <BlockStack gap="400">
-        <Breadcrumb
+        <PageBreadcrumb
+          icon={ProductIcon}
+          backUrl={productsUrl}
+          backLabel="Products"
           title={product ? product.title : 'Add product'}
-          productsUrl={productsUrl}
           actions={
             product ? (
               <Popover

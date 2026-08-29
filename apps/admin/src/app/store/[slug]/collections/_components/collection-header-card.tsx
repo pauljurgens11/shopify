@@ -17,7 +17,7 @@
  */
 import { BlockStack, Box, Card, InlineError, InlineStack, Text, TextField } from '@shopify/polaris';
 import { useState } from 'react';
-import { RichTextField } from '../../products/_components/rich-text-field.tsx';
+import { RichTextField } from '../../../../../components/rich-text-field.tsx';
 import { CollectionImage } from './collection-image.tsx';
 
 /** An unstyled, full-width, left-aligned click target for the read state. */
