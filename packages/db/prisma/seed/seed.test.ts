@@ -14,6 +14,7 @@ import { themeDocSchema } from '@merchant/contracts/theme';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { dbAdmin } from '../../src/client.ts';
 import { DEMO_SHOP_SLUG, seedDemo } from './index.ts';
+import { HISTORY_DAYS, OLDEST_HISTORY_DAY } from './orders.ts';
 
 let shopId: string;
 
@@ -122,6 +123,40 @@ describe('inventory history', () => {
         level.available,
       );
       expect(level.available, 'no negative stock').toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('reconciles `sold` adjustments against what each order actually fulfilled', async () => {
+    // The level-vs-ledger test above compares two artifacts of the same
+    // in-memory ledger, so it cannot catch a fulfillment that never recorded
+    // its `sold` movement. This one cross-checks the ledger against the
+    // fulfillment rows themselves.
+    const [sold, fulfillments] = await Promise.all([
+      dbAdmin.inventoryAdjustment.groupBy({
+        by: ['referenceId'],
+        where: { ...where(), reason: 'sold' },
+        _sum: { delta: true },
+      }),
+      dbAdmin.fulfillment.findMany({ where: where(), select: { orderId: true, lineItems: true } }),
+    ]);
+
+    const fulfilledUnits = new Map<string, number>();
+    for (const f of fulfillments) {
+      const units = (f.lineItems as Array<{ quantity: number }>).reduce(
+        (acc, l) => acc + l.quantity,
+        0,
+      );
+      fulfilledUnits.set(f.orderId, (fulfilledUnits.get(f.orderId) ?? 0) + units);
+    }
+
+    expect(fulfillments.length).toBeGreaterThan(0);
+    const soldByOrder = new Map(sold.map((s) => [s.referenceId, -(s._sum.delta ?? 0)]));
+    for (const [orderId, units] of fulfilledUnits) {
+      expect(soldByOrder.get(orderId), `sold units for ${orderId}`).toBe(units);
+    }
+    // And nothing sold without a fulfillment to explain it.
+    for (const [referenceId] of soldByOrder) {
+      expect(fulfilledUnits.has(referenceId ?? ''), `fulfillment for ${referenceId}`).toBe(true);
     }
   });
 
@@ -445,6 +480,13 @@ describe('analytics', () => {
     );
     for (const r of rollups) expect(Number.isInteger(r.value)).toBe(true);
 
+    // Zero-traffic days still owe their rows: a chart that receives 59 points
+    // for a 60-day range draws a gap (or a shorter line) at the far edge.
+    const closedDaySpan = HISTORY_DAYS - OLDEST_HISTORY_DAY + 1;
+    const days = new Set(rollups.map((r) => r.date.toISOString().slice(0, 10)));
+    expect(days.size, 'every closed day has rollup rows').toBe(closedDaySpan);
+    expect(rollups.length, 'every metric on every closed day').toBe(closedDaySpan * metrics.size);
+
     // The rolled-up funnel must narrow like the raw one — begin_checkouts is
     // the stage the dashboard's funnel.reachedCheckout reads on closed days.
     const totalOf = (metric: string) =>
@@ -494,9 +536,23 @@ describe('determinism', () => {
       const orders = await dbAdmin.order.findMany({
         where: where(),
         orderBy: { orderNumber: 'asc' },
-        select: { orderNumber: true, total: true, email: true, financialStatus: true },
+        select: {
+          orderNumber: true,
+          total: true,
+          email: true,
+          financialStatus: true,
+          createdAt: true,
+        },
       });
-      return JSON.stringify({ products, orders });
+      // Timestamps are part of the guarantee: a correction stamped at the run
+      // instant (rather than the end of history) drifts between two seeds run
+      // seconds apart, and content-only fingerprints never notice.
+      const adjustments = await dbAdmin.inventoryAdjustment.findMany({
+        where: where(),
+        orderBy: [{ createdAt: 'asc' }, { reason: 'asc' }, { delta: 'asc' }],
+        select: { reason: true, delta: true, createdAt: true },
+      });
+      return JSON.stringify({ products, orders, adjustments });
     };
 
     const before = await fingerprint();

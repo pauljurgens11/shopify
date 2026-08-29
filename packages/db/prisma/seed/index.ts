@@ -30,7 +30,7 @@ import type { SeedContext } from './context.ts';
 import { createCustomers } from './customers.ts';
 import { createDiscounts } from './discounts.ts';
 import { applyStockCorrections, InventoryLedger } from './inventory.ts';
-import { createOrders } from './orders.ts';
+import { createOrders, endOfHistory } from './orders.ts';
 import { createSavedCards } from './pay.ts';
 import { createRng } from './random.ts';
 import {
@@ -109,8 +109,17 @@ export async function seedDemo(): Promise<SeedSummary> {
     sellableVariants.filter((id) => !soldOut.includes(id)),
     4,
   );
-  applyStockCorrections(ledger, soldOut, [locations.retail.id, locations.warehouse.id], ctx.now);
-  applyStockCorrections(ledger, storeOnly, [locations.retail.id], ctx.now);
+  // Stamped at the end of history, not the run instant: a correction dated
+  // "today at 07:35:09" changes with every reseed and breaks the seed's
+  // per-UTC-date determinism (DECISIONS.md — history ends at end of yesterday).
+  const correctedAt = endOfHistory(ctx);
+  applyStockCorrections(
+    ledger,
+    soldOut,
+    [locations.retail.id, locations.warehouse.id],
+    correctedAt,
+  );
+  applyStockCorrections(ledger, storeOnly, [locations.retail.id], correctedAt);
 
   // Last: the ledger has now collected opening stock, sales, restocks and
   // corrections, and writes the levels their sum implies (inventory.ts).
