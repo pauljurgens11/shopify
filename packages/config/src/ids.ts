@@ -40,6 +40,7 @@ export const ID_PREFIXES = {
   refund: 'ref',
   image: 'img',
   shippingRate: 'ship',
+  customDomain: 'dom',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

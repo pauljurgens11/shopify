@@ -5,6 +5,15 @@ RUN corepack enable
 WORKDIR /app
 
 FROM base AS build
+# next.config.ts inlines these into the client bundle as NEXT_PUBLIC_* at
+# build time, so the image is bound to a deployment's public URLs. Defaults
+# match dev; docker-compose.prod.yml overrides them from BASE_DOMAIN.
+ARG API_URL=http://api.lvh.me:3001
+ARG STOREFRONT_PROTOCOL=http
+ARG STOREFRONT_BASE_DOMAIN=lvh.me:3002
+ENV API_URL=$API_URL \
+    STOREFRONT_PROTOCOL=$STOREFRONT_PROTOCOL \
+    STOREFRONT_BASE_DOMAIN=$STOREFRONT_BASE_DOMAIN
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @merchant/db generate

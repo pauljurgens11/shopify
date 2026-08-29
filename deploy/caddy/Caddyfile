@@ -1,0 +1,70 @@
+# Caddy — the production stack's front door (A5, SPEC §17).
+#
+# Wildcard tenant routing, exactly the SPEC's shape:
+#   admin.{BASE_DOMAIN}   → admin:3000
+#   api.{BASE_DOMAIN}     → api:3001
+#   assets.{BASE_DOMAIN}  → minio:9000   (public bucket reads + presigned PUTs)
+#   everything else       → storefront:3002, with the browser-facing API paths
+#                           (/storefront/api/*, /vault/*) peeled off to api
+#
+# Tenancy keys off the Host header (SPEC §6); reverse_proxy passes Host
+# through untouched by default, which is the property everything relies on.
+#
+# TLS: `local_certs` issues from Caddy's internal CA so the whole stack can be
+# verified on BASE_DOMAIN=localhost with no real DNS. For a real domain:
+#   1. Remove `local_certs` and set `email` below — explicit hosts get
+#      Let's Encrypt automatically.
+#   2. Shop hostnames (subdomains and custom domains alike) go through the
+#      catch-all's `on_demand`, one exact cert per hostname as it is first
+#      visited (add an `on_demand_tls ask` endpoint to stop strangers minting
+#      certs against your rate limits). Deliberately NOT a `*.{BASE_DOMAIN}`
+#      wildcard cert: with a real domain that needs a DNS-challenge plugin,
+#      and on a single-label base like `localhost` a `*.tld` wildcard is
+#      rejected by Node and most clients outright.
+
+{
+	local_certs
+	# email admin@example.com
+	# on_demand_tls {
+	#	ask http://api:3001/health
+	# }
+}
+
+# One set of shopper-facing routes, shared by the wildcard-subdomain site and
+# the custom-domain catch-all: same shop, two hostnames.
+(storefront_routes) {
+	# The browser talks to the platform on the shop's own origin: the
+	# analytics beacon and cart/checkout calls post to /storefront/api/*,
+	# and the hosted card fields post the PAN to /vault/tokenize (SPEC §11)
+	# — none of that may terminate at the Next server.
+	@api path /storefront/api/* /vault/*
+	handle @api {
+		reverse_proxy api:3001
+	}
+	handle {
+		reverse_proxy storefront:3002
+	}
+}
+
+admin.{$BASE_DOMAIN} {
+	reverse_proxy admin:3000
+}
+
+api.{$BASE_DOMAIN} {
+	reverse_proxy api:3001
+}
+
+assets.{$BASE_DOMAIN} {
+	reverse_proxy minio:9000
+}
+
+# Every host the sites above did not claim is a storefront: wildcard shop
+# subdomains and registered custom domains alike, resolved by the API from the
+# Host header. Certs are minted on demand per hostname — internal CA locally,
+# ACME when configured above.
+https:// {
+	tls internal {
+		on_demand
+	}
+	import storefront_routes
+}

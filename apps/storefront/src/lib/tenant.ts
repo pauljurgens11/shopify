@@ -27,6 +27,31 @@ export async function resolveShopSlug(): Promise<string | null> {
     return slug && !slug.includes('.') && slug !== 'www' ? slug : null;
   }
 
-  // TODO(WS-E): fall back to a CustomDomain lookup for production hostnames.
-  return null;
+  return slugForCustomDomain(hostname);
+}
+
+/**
+ * A host outside the base domain can be a merchant's registered custom domain
+ * (A5, SPEC §17). The API's tenancy layer owns that table, so ask it: it
+ * resolves `/storefront/api/*` requests on custom-domain Hosts too, and the
+ * shop payload carries the slug every storefront URL is built from. Composed
+ * like `storefrontApiUrl` — hostname carries the tenant, protocol and port
+ * come from API_URL — and cached by Next's data cache (revalidate) so a page
+ * view does not pay a resolution round-trip every time.
+ */
+async function slugForCustomDomain(hostname: string): Promise<string | null> {
+  const api = new URL(env().API_URL);
+  const port = api.port ? `:${api.port}` : '';
+  try {
+    const response = await fetch(`${api.protocol}//${hostname}${port}/storefront/api/shop`, {
+      next: { revalidate: 60 },
+    });
+    if (!response.ok) return null;
+    const shop = (await response.json()) as { slug?: string };
+    return typeof shop.slug === 'string' && shop.slug.length > 0 ? shop.slug : null;
+  } catch {
+    // An unresolvable or unreachable host is "no shop here", never a crash —
+    // the caller renders its 404.
+    return null;
+  }
 }
