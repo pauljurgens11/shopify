@@ -25,12 +25,12 @@ export const CONVERSATION_KEY = ['theme-conversation'] as const;
 const POLL_MS = 2_000;
 /**
  * The server sweeps stale `pending` conversation messages to `failed` after
- * five minutes (a dead worker, a lost job). Poll one minute past that so the
- * sweep's verdict reaches an open tab: the bubble flips to Failed and the
- * composer unlocks (`busy` only counts `pending`), instead of the chat sitting
+ * STALE_PENDING_MS (nine minutes). Poll one minute past that so the sweep's
+ * verdict reaches an open tab: the bubble flips to Failed and the composer
+ * unlocks (`busy` only counts `pending`), instead of the chat sitting
  * "thinking" forever in a tab that has stopped asking.
  */
-const POLL_GIVE_UP_MS = 6 * 60_000;
+const POLL_GIVE_UP_MS = 10 * 60_000;
 
 export function useVersions() {
   return useApiQuery<{ data: ThemeVersionSummary[]; nextCursor: string | null }>(

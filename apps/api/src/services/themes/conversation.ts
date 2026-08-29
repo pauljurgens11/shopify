@@ -18,8 +18,13 @@ type StoredMessage = { id?: string; status?: string; content?: string; createdAt
 /** The blob is read and written whole, so it must not grow without bound. */
 const MAX_STORED_MESSAGES = 200;
 
-/** A pending bubble older than this lost its worker; the sweep resolves it. */
-export const STALE_PENDING_MS = 5 * 60_000;
+/**
+ * A pending bubble older than this lost its worker; the sweep resolves it.
+ * Must exceed the worker's worst-case model time (2 attempts x the SDK timeout
+ * in ai-theme-generate.ts, 8 min under Fable 5) or the sweep fails a generation
+ * that is still running; POLL_GIVE_UP_MS in the admin must in turn exceed this.
+ */
+export const STALE_PENDING_MS = 9 * 60_000;
 
 const CAS_ATTEMPTS = 3;
 
