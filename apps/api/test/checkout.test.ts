@@ -558,6 +558,49 @@ describe('complete', () => {
     expect(applied.appliedDiscounts[0]?.code).toBe('ONCE15');
   });
 
+  it('serves a completed checkout as a receipt — never repriced by its own redemption', async () => {
+    await dbAdmin.discount.create({
+      data: {
+        id: newId('discount'),
+        shopId: shop.shopId,
+        title: 'First order',
+        code: 'FROZEN10',
+        type: 'amount_off_order',
+        valueType: 'percentage',
+        value: 10,
+        appliesTo: { scope: 'all' },
+        minimumRequirement: { type: 'none' },
+        oncePerCustomer: true,
+        status: 'active',
+        startsAt: new Date(Date.now() - 86_400_000),
+      },
+    });
+
+    const { checkout } = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    const priced = await readyToPay(checkout.token, {
+      email: 'receipt@example.com',
+      discountCode: 'FROZEN10',
+    });
+    const chargedTotal = priced.totals.total.amount;
+    expect(priced.appliedDiscounts[0]?.code).toBe('FROZEN10');
+
+    const paid = await pay(checkout.token, tok.approved);
+    expect(paid.statusCode, paid.body).toBe(200);
+
+    // The thank-you page re-reads the checkout. The shopper's own redemption
+    // now trips oncePerCustomer, so a repricing read would drop the discount
+    // and show a bigger total than the card was charged (seen live: WELCOME10
+    // vanished from the confirmation sidebar the moment the order recorded).
+    const reread = await req('GET', `/storefront/api/checkouts/${checkout.token}`);
+    expect(reread.statusCode).toBe(200);
+    const receipt = reread.json();
+    expect(receipt.status).toBe('completed');
+    expect(receipt.rejectedDiscount).toBeNull();
+    expect(receipt.appliedDiscounts[0]?.code).toBe('FROZEN10');
+    expect(receipt.totals.total.amount).toBe(chargedTotal);
+    expect(receipt.totals.discountTotal.amount).toBe(priced.totals.discountTotal.amount);
+  });
+
   it('leaves the checkout payable after a decline, with no order and no stock movement', async () => {
     const { checkout } = await openCheckout([{ variantId: v.alpine, quantity: 1 }]);
     // Its own email, so the "no order" assertion cannot see another test's.
@@ -783,7 +826,7 @@ describe('complete', () => {
       const order = await dbAdmin.order.findUniqueOrThrow({
         where: { id: response.json().orderId },
       });
-      const expectedTax = Math.round((order.subtotal - order.discountTotal) * 0.2);
+      const expectedTax = Math.round(((order.subtotal - order.discountTotal) * 20) / 100);
       expect(order.taxTotal).toBe(expectedTax);
       expect(order.taxTotal).not.toBe(priced.totals.taxTotal.amount);
 
