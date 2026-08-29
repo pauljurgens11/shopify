@@ -17,7 +17,7 @@
 import { format } from '@merchant/config/money';
 import type { Checkout } from '@merchant/contracts/checkout';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { payForCheckout, updateCheckout } from '../../lib/checkout-actions.ts';
 import { randomId } from '../../lib/random-id.ts';
 import { CardFields, type CardFieldsHandle } from './card-fields.tsx';
@@ -65,34 +65,57 @@ export function CheckoutView({
 }) {
   const router = useRouter();
   const card = useRef<CardFieldsHandle>(null);
+  const initialAddress = useMemo<AddressFields>(
+    () => ({
+      ...EMPTY_ADDRESS,
+      ...(initial.shippingAddress
+        ? {
+            countryCode: initial.shippingAddress.countryCode ?? 'US',
+            firstName: initial.shippingAddress.firstName ?? '',
+            lastName: initial.shippingAddress.lastName ?? '',
+            address1: initial.shippingAddress.address1 ?? '',
+            address2: initial.shippingAddress.address2 ?? '',
+            city: initial.shippingAddress.city ?? '',
+            provinceCode: initial.shippingAddress.provinceCode ?? '',
+            zip: initial.shippingAddress.zip ?? '',
+          }
+        : {}),
+    }),
+    [initial.shippingAddress],
+  );
+
   const [checkout, setCheckout] = useState(initial);
   const [email, setEmail] = useState(initial.email ?? '');
   const [marketing, setMarketing] = useState(initial.acceptsMarketing);
-  const [address, setAddress] = useState<AddressFields>({
-    ...EMPTY_ADDRESS,
-    ...(initial.shippingAddress
-      ? {
-          countryCode: initial.shippingAddress.countryCode ?? 'US',
-          firstName: initial.shippingAddress.firstName ?? '',
-          lastName: initial.shippingAddress.lastName ?? '',
-          address1: initial.shippingAddress.address1 ?? '',
-          address2: initial.shippingAddress.address2 ?? '',
-          city: initial.shippingAddress.city ?? '',
-          provinceCode: initial.shippingAddress.provinceCode ?? '',
-          zip: initial.shippingAddress.zip ?? '',
-        }
-      : {}),
-  });
+  const [address, setAddress] = useState<AddressFields>(initialAddress);
   const [saveCard, setSaveCard] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const [paying, setPaying] = useState(false);
 
-  const save = (patch: Record<string, unknown>) =>
+  /**
+   * The rate the shopper just clicked, while its save is still in flight.
+   *
+   * Radios are otherwise driven purely by server state, so between the click
+   * and the response every radio renders empty — which a shopper reads as the
+   * checkout having discarded their choice. Only the selection is optimistic:
+   * the sidebar's money stays server-computed, so it can never disagree with
+   * what the card is charged (totals.ts).
+   */
+  const [pendingRateId, setPendingRateId] = useState<string | null>(null);
+  const selectedRateId = pendingRateId ?? checkout.selectedShippingRateId;
+
+  /** The address as last sent, so an unchanged field's blur sends nothing. */
+  const savedAddress = useRef(
+    addressComplete(initialAddress) ? JSON.stringify(initialAddress) : '',
+  );
+
+  const save = (patch: Record<string, unknown>, onSettled?: (ok: boolean) => void) =>
     startSaving(async () => {
       const result = await updateCheckout(checkout.token, patch);
       if (result.ok && result.checkout) setCheckout(result.checkout);
       else if (result.message) setBanner(result.message);
+      onSettled?.(result.ok);
     });
 
   const saveAddress = (next: AddressFields) => {
@@ -100,20 +123,34 @@ export function CheckoutView({
     // Only once it is a real address — E3 prices shipping from it, and a
     // half-typed one would flap the rate list under the shopper's cursor.
     if (!addressComplete(next)) return;
-    save({
-      shippingAddress: {
-        firstName: next.firstName,
-        lastName: next.lastName,
-        address1: next.address1,
-        address2: next.address2 || null,
-        city: next.city,
-        province: next.provinceCode || null,
-        provinceCode: next.provinceCode || null,
-        country: next.countryCode === 'US' ? 'United States' : next.countryCode,
-        countryCode: next.countryCode,
-        zip: next.zip,
+    // Every field's blur lands here, changed or not. Re-sending an identical
+    // address costs a full reprice each time, and Next runs Server Actions one
+    // at a time — so those redundant saves queue ahead of the shopper's next
+    // real action (picking a rate, applying a code) and stall the UI behind it.
+    const unchanged = JSON.stringify(next);
+    if (unchanged === savedAddress.current) return;
+    savedAddress.current = unchanged;
+
+    save(
+      {
+        shippingAddress: {
+          firstName: next.firstName,
+          lastName: next.lastName,
+          address1: next.address1,
+          address2: next.address2 || null,
+          city: next.city,
+          province: next.provinceCode || null,
+          provinceCode: next.provinceCode || null,
+          country: next.countryCode === 'US' ? 'United States' : next.countryCode,
+          countryCode: next.countryCode,
+          zip: next.zip,
+        },
       },
-    });
+      // A save that failed was never persisted, so the next blur must retry it.
+      (ok) => {
+        if (!ok) savedAddress.current = '';
+      },
+    );
   };
 
   const canPay =
@@ -275,13 +312,22 @@ export function CheckoutView({
                   key={option.id}
                   className={`flex cursor-pointer items-center gap-3 px-4 py-3.5 text-sm ${
                     index > 0 ? 'border-neutral-300 border-t' : ''
-                  } ${checkout.selectedShippingRateId === option.id ? 'bg-neutral-50' : ''}`}
+                  } ${selectedRateId === option.id ? 'bg-neutral-50' : ''}`}
                 >
                   <input
                     type="radio"
                     name="shipping-rate"
-                    checked={checkout.selectedShippingRateId === option.id}
-                    onChange={() => save({ selectedShippingRateId: option.id })}
+                    checked={selectedRateId === option.id}
+                    onChange={() => {
+                      setPendingRateId(option.id);
+                      // Handing back to server state on settle is what keeps a
+                      // rate the discount just disqualified dropping out of the
+                      // list (totals.ts). A newer click owns the pending slot,
+                      // so an older save settling must not clear it.
+                      save({ selectedShippingRateId: option.id }, () =>
+                        setPendingRateId((pending) => (pending === option.id ? null : pending)),
+                      );
+                    }}
                     className="h-4 w-4"
                   />
                   <span className="flex-1">{option.title}</span>
