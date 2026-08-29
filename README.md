@@ -63,12 +63,16 @@ say, which number to point at — is [docs/DEMO.md](docs/DEMO.md).
 last 60 days, with analytics events and daily rollups behind them.
 
 1. **Log in** at http://admin.lvh.me:3000 as `owner@demo.dev` / `password123`.
-   You land on Home: a setup guide and today's sales, orders and sessions.
+   You land on Home: a dashboard over the last 30 days — four metric tiles, a
+   two-series sales chart against the previous period, and a sales breakdown.
+   (No setup guide: its four checks all pass on the seeded store, so the card
+   hides itself. A fresh store shows it — see "A brand-new store" below.)
 2. **Tour the admin.** Products (index with tabs, search and bulk actions; open
    one for the two-column form), Orders (#1001–#1040, mixed fulfillment and
    financial states), Customers, Discounts (`WELCOME10` is Active), Inventory
-   across both locations, Analytics (range picker, sales chart, top products,
-   conversion funnel, live view).
+   across both locations, Analytics (date-range and comparison pills, sales
+   chart, sales breakdown, sales by channel and by product, conversion funnel,
+   live view).
 3. **Build the storefront.** Storefront in the nav is the AI builder: chat on
    the left, a live preview of the real storefront on the right. Describe the
    store you want and it writes a new theme; with no `ANTHROPIC_API_KEY` set,
@@ -103,9 +107,10 @@ nothing about it is prepared.
    you in; the next screen is your admin.
 2. **Onboard.** The Home setup guide has four real checks — add a product,
    customize the storefront, connect a payment processor, place a test order —
-   each of which reads actual state rather than a stored flag. The store already
-   has a published theme: signup installs the default preset so a new shop opens
-   on a real storefront instead of a blank page.
+   each of which reads actual state rather than a stored flag, and the card
+   disappears once all four pass (which is why the seeded store's Home has
+   none). The store already has a published theme: signup installs the default
+   preset so a new shop opens on a real storefront instead of a blank page.
 3. **Make it sellable.** Settings → Payments → connect **Mock Gateway** (one
    click, no credentials). Settings → Shipping and delivery → **Add rate** — a
    new shop starts with no rates, and checkout needs one to complete.
@@ -263,9 +268,13 @@ Decision log: [DECISIONS.md](DECISIONS.md) — append-only.
 
 ## Notes
 
-Named "Merchant" wherever a brand name is unavoidable. Built with Shopify's
-open-source [Polaris](https://polaris.shopify.com/) design system; not affiliated
-with or endorsed by Shopify, and the Shopify name and logo are not used.
+This is a private study clone of the Shopify admin, built to be visually
+indistinguishable from it. As of 2026-08-29 the running app therefore renders
+the Shopify name and bag mark (DECISIONS; the earlier "never render the name or
+logo" rule was reversed by the repo owner). It is **not affiliated with or
+endorsed by Shopify**, is never deployed publicly and is not distributed; the
+codebase itself keeps the neutral `@merchant/*` package scope. Built with
+Shopify's open-source [Polaris](https://polaris.shopify.com/) design system.
 
 The card vault demonstrates PAN isolation — the card number goes from the
 browser straight to `/vault/tokenize` and only a `card_tok_…` reaches the
