@@ -16,7 +16,6 @@ import {
   ActionList,
   Badge,
   BlockStack,
-  Box,
   Button,
   Card,
   IndexFilters,
@@ -28,7 +27,12 @@ import {
 } from '@shopify/polaris';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import {
+  IndexEmptyState,
+  IndexFooterHelp,
+  IndexNoMatchState,
+  IndexTableSkeleton,
+} from '../../../../components/shell/index-chrome.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
@@ -103,9 +107,11 @@ export default function DiscountsPage() {
   const resetPaging = () => setCursorStack([]);
   const createUrl = (type: Discount['type']) => `/store/${slug}/discounts/new?type=${type}`;
 
-  if (discounts.isPending) return <PageSkeleton fullWidth primaryAction />;
+  // Chrome first, skeleton only the data region (docs/parity/index-tables.md).
+  const loading = discounts.isPending;
 
-  const empty = rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
+  const empty =
+    !loading && rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
 
   // An unfiltered tab that is simply empty explains itself; a search that found
   // nothing gets the "change the filters" line instead.
@@ -138,17 +144,14 @@ export default function DiscountsPage() {
     <Page title="Discounts" primaryAction={createMenu} fullWidth>
       <Card padding="0">
         {empty ? (
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Manage discounts and promotions
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Create discount codes and automatic discounts that apply at checkout.
-              </Text>
-              <Box paddingBlockStart="300">{createMenu}</Box>
-            </BlockStack>
-          </Box>
+          // Kind A with Shopify's verbatim copy, minus its "compare at prices"
+          // clause — compare-at discounting is not a thing this build does.
+          <IndexEmptyState
+            heading="Manage discounts and promotions"
+            body="Add discount codes and automatic discounts that apply at checkout."
+          >
+            {createMenu}
+          </IndexEmptyState>
         ) : (
           <>
             <IndexFilters
@@ -211,16 +214,16 @@ export default function DiscountsPage() {
                 },
               }}
               emptyState={
-                <Box padding="800">
-                  <BlockStack gap="200" inlineAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {tabEmpty?.heading ?? 'No discounts found'}
-                    </Text>
-                    <Text as="p" tone="subdued" alignment="center">
-                      {tabEmpty?.body ?? 'Try changing the search or filters.'}
-                    </Text>
-                  </BlockStack>
-                </Box>
+                loading ? (
+                  <IndexTableSkeleton />
+                ) : (
+                  <IndexNoMatchState
+                    heading={tabEmpty?.heading ?? 'No discounts found'}
+                    body={
+                      tabEmpty?.body ?? 'Try changing the search term or removing some filters.'
+                    }
+                  />
+                )
               }
             >
               {rows.map((discount, index) => (
@@ -266,6 +269,8 @@ export default function DiscountsPage() {
           </>
         )}
       </Card>
+
+      <IndexFooterHelp resource="discounts" topic="discounts" />
     </Page>
   );
 }

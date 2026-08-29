@@ -11,9 +11,6 @@ import type { Collection } from '@merchant/contracts/collections';
 import type { Paginated } from '@merchant/contracts/common';
 import {
   Badge,
-  BlockStack,
-  Box,
-  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -29,7 +26,12 @@ import { ImageIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import {
+  IndexEmptyState,
+  IndexFooterHelp,
+  IndexNoMatchState,
+  IndexTableSkeleton,
+} from '../../../../components/shell/index-chrome.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
@@ -94,9 +96,11 @@ export default function CollectionsPage() {
     }
   };
 
-  if (collections.isPending) return <PageSkeleton fullWidth primaryAction />;
+  // Chrome first, skeleton only the data region (docs/parity/index-tables.md).
+  const loading = collections.isPending;
 
-  const empty = rows.length === 0 && query.trim() === '' && !type && cursorStack.length === 0;
+  const empty =
+    !loading && rows.length === 0 && query.trim() === '' && !type && cursorStack.length === 0;
 
   return (
     <Page
@@ -106,21 +110,11 @@ export default function CollectionsPage() {
     >
       <Card padding="0">
         {empty ? (
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Group your products into collections
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Collections make it easier for customers to find products by category.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" url={`/store/${slug}/collections/new`}>
-                  Create collection
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
+          <IndexEmptyState
+            heading="Group your products into collections"
+            body="Collections make it easier for customers to find products by category, and give you a page to send them to."
+            action={{ content: 'Create collection', url: `/store/${slug}/collections/new` }}
+          />
         ) : (
           <>
             <IndexFilters
@@ -139,7 +133,7 @@ export default function CollectionsPage() {
                 resetPaging();
               }}
               queryValue={query}
-              queryPlaceholder="Searching in all"
+              queryPlaceholder="Search and filter"
               onQueryChange={(value) => {
                 setQuery(value);
                 resetPaging();
@@ -177,11 +171,14 @@ export default function CollectionsPage() {
                 },
               }}
               emptyState={
-                <Box padding="800">
-                  <Text as="p" tone="subdued" alignment="center">
-                    No collections found. Try changing the search or filters.
-                  </Text>
-                </Box>
+                loading ? (
+                  <IndexTableSkeleton media />
+                ) : (
+                  <IndexNoMatchState
+                    heading="No collections found"
+                    body="Try changing the search term or removing some filters."
+                  />
+                )
               }
             >
               {rows.map((collection, index) => (
@@ -215,6 +212,8 @@ export default function CollectionsPage() {
           </>
         )}
       </Card>
+
+      <IndexFooterHelp resource="collections" topic="products/collections" />
 
       <Modal
         open={confirmingDelete}

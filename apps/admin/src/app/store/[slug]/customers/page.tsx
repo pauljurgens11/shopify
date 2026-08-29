@@ -16,9 +16,6 @@ import type { Customer } from '@merchant/contracts/customers';
 import {
   Badge,
   Banner,
-  BlockStack,
-  Box,
-  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -28,7 +25,12 @@ import {
 } from '@shopify/polaris';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import {
+  IndexEmptyState,
+  IndexFooterHelp,
+  IndexNoMatchState,
+  IndexTableSkeleton,
+} from '../../../../components/shell/index-chrome.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
 const PAGE_SIZE = 50;
@@ -108,7 +110,8 @@ export default function CustomersPage() {
 
   const resetPaging = () => setCursorStack([]);
 
-  if (customers.isPending) return <PageSkeleton fullWidth primaryAction />;
+  // Chrome first, skeleton only the data region (docs/parity/index-tables.md).
+  const loading = customers.isPending;
 
   // A failed load must never read as "no customers yet" — that empty state
   // invites the merchant to re-add customers they already have.
@@ -129,7 +132,8 @@ export default function CustomersPage() {
     );
   }
 
-  const empty = rows.length === 0 && query.trim() === '' && !segment && cursorStack.length === 0;
+  const empty =
+    !loading && rows.length === 0 && query.trim() === '' && !segment && cursorStack.length === 0;
 
   // An unfiltered segment that is simply empty explains itself; a search that
   // found nothing gets the "change the filters" line instead.
@@ -143,21 +147,11 @@ export default function CustomersPage() {
     >
       <Card padding="0">
         {empty ? (
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Everything customers-related in one place
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Manage customer details, see their order history and group them into segments.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" url={`/store/${slug}/customers/new`}>
-                  Add customer
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
+          <IndexEmptyState
+            heading="Everything customers-related in one place"
+            body="Manage customer details, see their order history and group them into segments."
+            action={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
+          />
         ) : (
           <>
             <IndexFilters
@@ -176,7 +170,7 @@ export default function CustomersPage() {
                 resetPaging();
               }}
               queryValue={query}
-              queryPlaceholder="Searching in all"
+              queryPlaceholder="Search customers"
               onQueryChange={(value) => {
                 setQuery(value);
                 resetPaging();
@@ -226,16 +220,18 @@ export default function CustomersPage() {
                 },
               }}
               emptyState={
-                <Box padding="800">
-                  <BlockStack gap="200" inlineAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {segmentEmpty?.heading ?? 'No customers found'}
-                    </Text>
-                    <Text as="p" tone="subdued" alignment="center">
-                      {segmentEmpty?.body ?? 'Try changing the search or filters.'}
-                    </Text>
-                  </BlockStack>
-                </Box>
+                loading ? (
+                  <IndexTableSkeleton />
+                ) : (
+                  // Kind C — quiet, a magnifier, and no button. A segment that
+                  // is legitimately empty says so in its own words instead.
+                  <IndexNoMatchState
+                    heading={segmentEmpty?.heading ?? 'No customers found'}
+                    body={
+                      segmentEmpty?.body ?? 'Try changing the search term or removing some filters.'
+                    }
+                  />
+                )
               }
             >
               {rows.map((customer, index) => (
@@ -269,6 +265,8 @@ export default function CustomersPage() {
           </>
         )}
       </Card>
+
+      <IndexFooterHelp resource="customers" topic="customers" />
     </Page>
   );
 }
