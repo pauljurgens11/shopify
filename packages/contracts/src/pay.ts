@@ -6,7 +6,13 @@
  * more. If a type here would leak a PAN, it is the wrong type.
  */
 import { z } from 'zod';
-import { addressSchema, idSchema, moneySchema, timestampsSchema } from './common.ts';
+import {
+  addressSchema,
+  idSchema,
+  moneySchema,
+  positiveMoneySchema,
+  timestampsSchema,
+} from './common.ts';
 
 export const processorKeySchema = z.enum(['mock', 'stripe', 'maverick']);
 export type ProcessorKey = z.infer<typeof processorKeySchema>;
@@ -153,8 +159,10 @@ export const routingRuleSchema = z.object({
   conditions: z
     .object({
       cardBrands: z.array(cardTokenSchema.shape.brand).optional(),
-      minAmount: moneySchema.optional(),
-      maxAmount: moneySchema.optional(),
+      // Non-negative: a negative bound can never match a charge, so accepting
+      // one stores a rule that silently routes nothing.
+      minAmount: positiveMoneySchema.optional(),
+      maxAmount: positiveMoneySchema.optional(),
     })
     .default({}),
 });
@@ -222,12 +230,21 @@ export const paymentMethodSchema = z
     isDefault: z.boolean().default(false),
   })
   .merge(timestampsSchema);
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+/** The order page's card list: one customer's saved cards, nothing broader. */
+export const listPaymentMethodsQuery = z.object({
+  customerId: idSchema,
+});
 
 /** Admin "charge saved card" on order detail. */
 export const chargeSavedCardInput = z.object({
   paymentMethodId: idSchema,
   amount: moneySchema,
   idempotencyKey: z.string().min(8).max(128),
+  /** Attaches the payment to an order, so the order page and `orders/paid` see it. */
+  orderId: idSchema.optional(),
+  checkoutId: idSchema.optional(),
 });
 
 export const refundPaymentInput = z.object({

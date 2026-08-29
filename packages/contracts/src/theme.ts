@@ -374,9 +374,19 @@ export const builderMessageSchema = z.object({
 export const sendBuilderMessageInput = z.object({ message: z.string().min(1).max(4000) });
 
 export const sendBuilderMessageResponse = z.object({
-  jobId: z.string(),
+  /** Null when nothing was queued: the no-key reply, or a queue that was down. */
+  jobId: z.string().nullable(),
   message: builderMessageSchema,
 });
+
+/**
+ * The one apology the builder ever shows for a failed generation. Shared here
+ * because both the worker (resolving a failed job) and the API (sweeping a
+ * stranded pending bubble) must say exactly the same thing.
+ */
+export const THEME_GENERATION_APOLOGY =
+  "Sorry — I couldn't put together a valid theme for that. Try describing the look you want " +
+  'in a different way, or apply one of the built-in presets and tweak it from there.';
 
 export const publishThemeInput = z.object({ themeVersionId: idSchema });
 
@@ -400,7 +410,10 @@ export const themeVersionSummary = z.object({
 });
 export type ThemeVersionSummary = z.infer<typeof themeVersionSummary>;
 
-export const themeVersionListResponse = z.object({ data: z.array(themeVersionSummary) });
+export const themeVersionListResponse = z.object({
+  data: z.array(themeVersionSummary),
+  nextCursor: z.string().nullable(),
+});
 
 /** One version with its document — what the builder preview and F4 load. */
 export const themeVersionDetail = themeVersionSummary.extend({ themeJson: themeDocSchema });

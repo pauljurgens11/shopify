@@ -37,8 +37,15 @@ export function FeaturedCollection({ settings, data }: SectionProps<'featured-co
         ) : null}
       </div>
 
-      {products.length === 0 ? (
+      {resolved === undefined ? (
         <ProductSkeletonGrid columns={columns} count={Math.min(productsToShow, columns)} />
+      ) : products.length === 0 ? (
+        // The handle resolved to a real collection that has no products — a new
+        // shop's normal state, not a loading one. A skeleton here shimmers
+        // forever; say so instead (same copy as `collection-page`).
+        <p className="py-16 text-center text-sm text-text/60">
+          No products here yet. Check back soon.
+        </p>
       ) : (
         <div className={`mt-8 grid gap-x-5 gap-y-10 ${productGridClass(columns)}`}>
           {products.map((product) => (

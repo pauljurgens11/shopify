@@ -58,13 +58,18 @@ function discount(over: Partial<Discount> = {}): Discount {
 const run = (
   lines: DiscountableLine[],
   discounts: Discount[],
-  opts: { shippingPrice?: number; enteredCode?: string | null } = {},
+  opts: {
+    shippingPrice?: number;
+    enteredCode?: string | null;
+    priorUsage?: Record<string, number>;
+  } = {},
 ) =>
   applyDiscounts({
     lines,
     shippingPrice: usd(opts.shippingPrice ?? 0),
     discounts,
     enteredCode: opts.enteredCode ?? null,
+    ...(opts.priorUsage !== undefined ? { priorUsage: opts.priorUsage } : {}),
     now: NOW,
   });
 
@@ -310,6 +315,51 @@ describe('free_shipping', () => {
     expect(result.shippingDiscount).toEqual(usd(0));
     expect(result.shippingTotal).toEqual(usd(0));
   });
+
+  it('judges its subtotal minimum POST-discount, so a coupon can price the cart out of free shipping', () => {
+    // The seeded demo interaction: free shipping over $150.00, a $162.00 cart,
+    // and WELCOME10 (10%). WS-E already drops the free RATE on the discounted
+    // subtotal (DECISIONS.md); the free_shipping DISCOUNT must agree, or the
+    // engine silently zeroes the paid rate the shopper was just moved onto.
+    const cart = [line({ unitPrice: usd(16200) })];
+    const freeShip = discount({
+      title: 'Free shipping over $150',
+      type: 'free_shipping',
+      minimumRequirement: { type: 'subtotal', value: usd(15000) },
+    });
+    const welcome = discount({ code: 'WELCOME10', value: 10 });
+
+    // Without the code: 16200 >= 15000 — shipping is free.
+    const without = run(cart, [freeShip, welcome], { shippingPrice: 995 });
+    expect(without.shippingDiscount).toEqual(usd(995));
+    expect(without.shippingTotal).toEqual(usd(0));
+
+    // With it: 16200 - 1620 = 14580 < 15000 — the paid rate stands.
+    const withCode = run(cart, [freeShip, welcome], {
+      shippingPrice: 995,
+      enteredCode: 'WELCOME10',
+    });
+    expect(withCode.discountTotal).toEqual(usd(1620));
+    expect(withCode.shippingDiscount).toEqual(usd(0));
+    expect(withCode.shippingTotal).toEqual(usd(995));
+    // The automatic simply does not apply — no phantom free-shipping chip.
+    expect(withCode.applied.map((a) => a.appliesToShipping)).toEqual([false]);
+  });
+
+  it('rejects a free-shipping CODE whose minimum only fails after line discounts', () => {
+    const cart = [line({ unitPrice: usd(16200) })];
+    const auto10 = discount({ value: 10 });
+    const shipCode = discount({
+      code: 'SHIPFREE',
+      type: 'free_shipping',
+      minimumRequirement: { type: 'subtotal', value: usd(15000) },
+    });
+
+    const result = run(cart, [auto10, shipCode], { shippingPrice: 500, enteredCode: 'SHIPFREE' });
+    expect(result.rejected).toEqual([{ code: 'SHIPFREE', reason: 'minimum_not_met' }]);
+    expect(result.shippingDiscount).toEqual(usd(0));
+    expect(result.shippingTotal).toEqual(usd(500));
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -369,6 +419,35 @@ describe('stacking', () => {
     expect(result.discountTotal).toEqual(usd(1900));
   });
 
+  it('stacks same-type discounts in a deterministic business order, not input order', () => {
+    // Sequential stacking makes order worth a cent: on 1005, 10%-then-20% takes
+    // 101 + 181 = 282; 20%-then-10% takes 201 + 80 = 281. The caller's array
+    // order is DB heap order, so the engine must impose its own: createdAt,
+    // then id.
+    const cartLine = line({ unitPrice: usd(1005) });
+    const ten = discount({ title: 'Ten', value: 10, createdAt: '2026-01-01T00:00:00.000Z' });
+    const twenty = discount({ title: 'Twenty', value: 20, createdAt: '2026-01-02T00:00:00.000Z' });
+
+    const forward = run([cartLine], [ten, twenty]);
+    const reversed = run([cartLine], [twenty, ten]);
+
+    expect(reversed).toEqual(forward);
+    expect(forward.applied.map((a) => [a.title, a.amount.amount])).toEqual([
+      ['Ten', 101],
+      ['Twenty', 181],
+    ]);
+    expect(forward.discountTotal).toEqual(usd(282));
+  });
+
+  it('breaks a createdAt tie on id, so equal timestamps still stack identically', () => {
+    const cartLine = line({ unitPrice: usd(1005) });
+    // The discount() helper gives both the same createdAt and ascending ids.
+    const first = discount({ title: 'First', value: 10 });
+    const second = discount({ title: 'Second', value: 20 });
+
+    expect(run([cartLine], [second, first])).toEqual(run([cartLine], [first, second]));
+  });
+
   it('keeps a line at zero rather than negative once it is fully discounted', () => {
     const result = run(
       [line({ unitPrice: usd(2000) })],
@@ -381,6 +460,56 @@ describe('stacking', () => {
     expect(result.discountTotal).toEqual(usd(2000));
     expect(result.lines[0]?.totalDiscount).toEqual(usd(2000));
     expect(result.applied.map((a) => a.title)).toEqual(['All of it']);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* oncePerCustomer                                                              */
+/* -------------------------------------------------------------------------- */
+
+describe('oncePerCustomer', () => {
+  const welcome = () => discount({ code: 'WELCOME10', value: 10, oncePerCustomer: true });
+
+  it('rejects a code the customer already redeemed, when usage context is provided', () => {
+    const d = welcome();
+    const result = run([line()], [d], {
+      enteredCode: 'WELCOME10',
+      priorUsage: { [d.id]: 1 },
+    });
+    expect(result.applied).toEqual([]);
+    // A per-customer limit of one IS a usage limit — same shopper-facing bucket.
+    expect(result.rejected).toEqual([{ code: 'WELCOME10', reason: 'usage_limit' }]);
+    expect(result.discountTotal).toEqual(usd(0));
+  });
+
+  it('applies for a customer with no prior redemption', () => {
+    const d = welcome();
+    const result = run([line()], [d], { enteredCode: 'WELCOME10', priorUsage: {} });
+    expect(result.applied).toHaveLength(1);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('is not enforced when the caller supplies no usage context (guest checkout)', () => {
+    // Backward-compatible by construction: existing callers pass no priorUsage
+    // and must behave exactly as before.
+    const result = run([line()], [welcome()], { enteredCode: 'WELCOME10' });
+    expect(result.applied).toHaveLength(1);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('silently skips an automatic the customer already redeemed', () => {
+    const d = discount({ oncePerCustomer: true });
+    const result = run([line()], [d], { priorUsage: { [d.id]: 1 } });
+    expect(result.applied).toEqual([]);
+    expect(result.rejected).toEqual([]);
+    expect(result.discountTotal).toEqual(usd(0));
+  });
+
+  it('ignores prior usage of a discount that is not once-per-customer', () => {
+    const d = discount({ code: 'AGAIN', oncePerCustomer: false });
+    const result = run([line()], [d], { enteredCode: 'AGAIN', priorUsage: { [d.id]: 3 } });
+    expect(result.applied).toHaveLength(1);
+    expect(result.rejected).toEqual([]);
   });
 });
 

@@ -23,15 +23,17 @@ const FIELD =
 
 export function Contact({ settings }: SectionProps<'contact'>) {
   const { heading, body, email, phone, showForm } = settings;
-  // `tel:` needs the bare number; the setting is a display string.
-  const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : null;
+  // `tel:` needs the bare number; the setting is a display string. A phone with
+  // no digits at all ("ask for Sam") still renders, just not as a link.
+  const telDigits = phone ? phone.replace(/[^\d+]/g, '') : '';
+  const telHref = telDigits ? `tel:${telDigits}` : null;
 
   return (
     <SectionShell type="contact" width="narrow" padding="lg">
       <h2 className="font-heading text-2xl text-text sm:text-3xl">{heading}</h2>
       {body ? <p className="mt-3 text-sm text-text/70">{body}</p> : null}
 
-      {email || telHref ? (
+      {email || phone ? (
         <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           {email ? (
             <li>
@@ -43,14 +45,18 @@ export function Contact({ settings }: SectionProps<'contact'>) {
               </a>
             </li>
           ) : null}
-          {telHref && phone ? (
+          {phone ? (
             <li>
-              <a
-                href={telHref}
-                className="text-text/70 underline underline-offset-4 transition-colors hover:text-text"
-              >
-                {phone}
-              </a>
+              {telHref ? (
+                <a
+                  href={telHref}
+                  className="text-text/70 underline underline-offset-4 transition-colors hover:text-text"
+                >
+                  {phone}
+                </a>
+              ) : (
+                <span className="text-text/70">{phone}</span>
+              )}
             </li>
           ) : null}
         </ul>

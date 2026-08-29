@@ -31,8 +31,10 @@ import {
 } from '@shopify/polaris';
 import { ImageIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import { SaveBar } from '../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 import { changedLevels, parseAvailable } from '../../../../lib/inventory-edits.ts';
@@ -40,6 +42,7 @@ import { changedLevels, parseAvailable } from '../../../../lib/inventory-edits.t
 const PAGE_SIZE = 50;
 
 export default function InventoryPage() {
+  const { slug } = useParams<{ slug: string }>();
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -103,36 +106,58 @@ export default function InventoryPage() {
     row.levels.find((level) => level.locationId === activeLocation?.id)?.available ?? 0;
 
   return (
-    <Page
-      title="Inventory"
-      primaryAction={
-        pending.length > 0 ? { content: 'Save', loading: saving, onAction: saveEdits } : undefined
-      }
-      secondaryActions={
-        pending.length > 0 ? [{ content: 'Discard', onAction: () => setDrafts({}) }] : undefined
-      }
-    >
+    <Page title="Inventory" fullWidth>
+      {/* The dirty grid uses the same contextual save bar as every other admin
+          form (PARITY.md → Global chrome), not a second pair of buttons. */}
+      <SaveBar
+        dirty={pending.length > 0}
+        saving={saving}
+        onSave={saveEdits}
+        onDiscard={() => setDrafts({})}
+      />
+
       <BlockStack gap="300">
-        <InlineStack align="end">
-          <Box minWidth="260px">
-            <Select
-              label="Location"
-              labelInline
-              options={(locations.data?.data ?? []).map((location) => ({
-                label: location.name,
-                value: location.id,
-              }))}
-              value={activeLocation?.id ?? ''}
-              onChange={(next) => {
-                setLocationId(next);
-                resetPaging();
-              }}
-            />
-          </Box>
-        </InlineStack>
+        {activeLocation ? (
+          <InlineStack align="end">
+            <Box minWidth="260px">
+              <Select
+                label="Location"
+                labelInline
+                options={(locations.data?.data ?? []).map((location) => ({
+                  label: location.name,
+                  value: location.id,
+                }))}
+                value={activeLocation.id}
+                onChange={(next) => {
+                  setLocationId(next);
+                  resetPaging();
+                }}
+              />
+            </Box>
+          </InlineStack>
+        ) : null}
 
         <Card padding="0">
-          {rows.length === 0 && query.trim() === '' && cursorStack.length === 0 ? (
+          {!activeLocation ? (
+            // A brand-new shop has no locations, and stock is counted per
+            // location — so the honest empty state points at Locations rather
+            // than blaming an empty catalog.
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Add a location to track inventory
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  Stock is counted at the places you store and ship products from.
+                </Text>
+                <Box paddingBlockStart="300">
+                  <Button variant="primary" url={`/store/${slug}/locations`}>
+                    Add location
+                  </Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          ) : rows.length === 0 && query.trim() === '' && cursorStack.length === 0 ? (
             <Box padding="800">
               <BlockStack gap="200" inlineAlign="center">
                 <Text as="h2" variant="headingMd">
@@ -141,6 +166,11 @@ export default function InventoryPage() {
                 <Text as="p" tone="subdued" alignment="center">
                   Inventory appears here once you add products.
                 </Text>
+                <Box paddingBlockStart="300">
+                  <Button variant="primary" url={`/store/${slug}/products/new`}>
+                    Add product
+                  </Button>
+                </Box>
               </BlockStack>
             </Box>
           ) : (
@@ -248,18 +278,6 @@ export default function InventoryPage() {
             </>
           )}
         </Card>
-
-        {pending.length > 0 ? (
-          <InlineStack align="end" gap="200">
-            <Text as="span" tone="subdued">
-              {pending.length} unsaved {pending.length === 1 ? 'change' : 'changes'}
-            </Text>
-            <Button onClick={() => setDrafts({})}>Discard</Button>
-            <Button variant="primary" loading={saving} onClick={saveEdits}>
-              Save
-            </Button>
-          </InlineStack>
-        ) : null}
       </BlockStack>
     </Page>
   );

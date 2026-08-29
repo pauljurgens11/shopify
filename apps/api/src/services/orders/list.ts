@@ -53,8 +53,12 @@ function searchFilter(query: string | undefined): Prisma.OrderWhereInput {
     { customer: { lastName: { contains: term, mode: 'insensitive' } } },
   ];
 
+  // Clamp to int32: a pasted tracking number parses as a huge float that would
+  // overflow Prisma's Int and 500 instead of returning an empty match.
   const numeric = Number.parseInt(term.replace(/^#/, ''), 10);
-  if (Number.isInteger(numeric)) or.push({ orderNumber: numeric });
+  if (Number.isSafeInteger(numeric) && numeric >= 0 && numeric <= 2_147_483_647) {
+    or.push({ orderNumber: numeric });
+  }
 
   return { OR: or };
 }
@@ -72,20 +76,27 @@ export async function listOrders(
   const sortKey = SORT_KEYS.has(query.sortKey ?? '') ? (query.sortKey as string) : 'createdAt';
   const direction = query.sortOrder;
 
+  // Composed with AND, never object spread: tabFilter and searchFilter both
+  // produce `OR`/`financialStatus` keys, and a spread would let the later one
+  // silently clobber the earlier (Closed tab + search showed open orders).
   const where: Prisma.OrderWhereInput = {
-    ...tabFilter(query.tab),
-    ...searchFilter(query.query),
-    ...(query.financialStatus ? { financialStatus: query.financialStatus } : {}),
-    ...(query.fulfillmentStatus ? { fulfillmentStatus: query.fulfillmentStatus } : {}),
-    ...(query.customerId ? { customerId: query.customerId } : {}),
-    ...(query.createdAtMin || query.createdAtMax
-      ? {
-          createdAt: {
-            ...(query.createdAtMin ? { gte: new Date(query.createdAtMin) } : {}),
-            ...(query.createdAtMax ? { lte: new Date(query.createdAtMax) } : {}),
-          },
-        }
-      : {}),
+    AND: [
+      tabFilter(query.tab),
+      searchFilter(query.query),
+      ...(query.financialStatus ? [{ financialStatus: query.financialStatus }] : []),
+      ...(query.fulfillmentStatus ? [{ fulfillmentStatus: query.fulfillmentStatus }] : []),
+      ...(query.customerId ? [{ customerId: query.customerId }] : []),
+      ...(query.createdAtMin || query.createdAtMax
+        ? [
+            {
+              createdAt: {
+                ...(query.createdAtMin ? { gte: new Date(query.createdAtMin) } : {}),
+                ...(query.createdAtMax ? { lte: new Date(query.createdAtMax) } : {}),
+              },
+            },
+          ]
+        : []),
+    ],
   };
 
   // orderNumber breaks ties: it is unique per shop and strictly increasing, so
@@ -101,7 +112,9 @@ export async function listOrders(
     where,
     orderBy,
     take: query.limit,
-    include: { lineItems: true },
+    // The name renders the index's Customer column; the count and spend that
+    // `orderDetailSchema` carries would be a per-row join the index never shows.
+    include: { lineItems: true, customer: { select: { firstName: true, lastName: true } } },
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
   });
 

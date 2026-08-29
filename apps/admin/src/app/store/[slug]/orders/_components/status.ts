@@ -6,7 +6,7 @@
  * merchant's screen. Kept as data, and pinned by `status.test.ts`.
  */
 import type { MoneyDto } from '@merchant/contracts/common';
-import type { Order } from '@merchant/contracts/orders';
+import type { Fulfillment, Order } from '@merchant/contracts/orders';
 import type { Payment } from '@merchant/contracts/pay';
 
 type Tone = 'success' | 'attention' | 'warning' | 'critical' | 'info' | undefined;
@@ -54,6 +54,21 @@ export function fulfillmentBadge(status: Order['fulfillmentStatus']): BadgeSpec 
 /** A cancelled order reads as cancelled first; Shopify shows this before the rest. */
 export function cancelledBadge(): BadgeSpec {
   return { label: 'Cancelled', tone: 'critical', progress: 'complete' };
+}
+
+/**
+ * Badge for a single fulfillment card. A `pending` fulfillment has NOT shipped,
+ * so labelling it `Fulfilled` (and green — the header badge for the same state
+ * is subdued) lies twice; route every card through this instead.
+ */
+const FULFILLMENT_ROW: Record<Fulfillment['status'], BadgeSpec> = {
+  pending: { label: 'Pending', tone: 'attention', progress: 'incomplete' },
+  success: FULFILLMENT.fulfilled,
+  cancelled: { label: 'Cancelled', tone: 'critical', progress: 'complete' },
+};
+
+export function fulfillmentRowBadge(status: Fulfillment['status']): BadgeSpec {
+  return FULFILLMENT_ROW[status];
 }
 
 /** Units on a line that are neither fulfilled nor refunded — the fulfil default. */

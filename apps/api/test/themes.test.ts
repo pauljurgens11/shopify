@@ -170,6 +170,36 @@ describe('versions', () => {
     if (theirs) expect(ids.has(theirs.id)).toBe(false);
   });
 
+  it('paginates by cursor: limit rounds down, nextCursor picks up where it left off', async () => {
+    // Three fresh drafts guarantee more rows than the limit below.
+    for (const preset of ['aurora', 'bloom', 'monochrome']) {
+      await admin('POST', `/admin/api/themes/presets/${preset}/apply`);
+    }
+
+    const first = (await admin('GET', '/admin/api/themes/versions?limit=2')).json();
+    expect(first.data).toHaveLength(2);
+    expect(first.nextCursor).toBe(first.data[1].id);
+
+    const second = (
+      await admin('GET', `/admin/api/themes/versions?limit=2&cursor=${first.nextCursor}`)
+    ).json();
+    expect(second.data.length).toBeGreaterThan(0);
+    const firstIds = new Set(first.data.map((v: { id: string }) => v.id));
+    for (const version of second.data as { id: string }[]) {
+      expect(firstIds.has(version.id)).toBe(false);
+    }
+  });
+
+  it('400s a repeated versionId on preview-token instead of 500ing in Prisma', async () => {
+    const id = `thm_${'2'.repeat(26)}`;
+    const response = await admin(
+      'GET',
+      `/admin/api/themes/preview-token?versionId=${id}&versionId=${id}`,
+    );
+    expect(response.statusCode).toBe(400);
+    expect(response.json().errors[0].code).toBe('invalid_request');
+  });
+
   it('restores an old version as a new draft, leaving the original alone', async () => {
     const source = (await admin('POST', '/admin/api/themes/presets/monochrome/apply')).json();
     const response = await admin('POST', `/admin/api/themes/versions/${source.id}/restore`);
@@ -239,5 +269,45 @@ describe('builder conversation', () => {
   it('rejects an empty message', async () => {
     const response = await admin('POST', '/admin/api/themes/conversation', { message: '' });
     expect(response.statusCode).toBe(400);
+  });
+
+  /**
+   * The backstop for a generation job that died past its last retry: a bubble
+   * pending for longer than the stale window comes back failed — and stays
+   * failed in the database, not just in this response.
+   */
+  it('sweeps a pending message stranded past the stale window', async () => {
+    await admin('GET', '/admin/api/themes/conversation');
+    const conversation = await dbAdmin.builderConversation.findFirst({
+      where: { shopId: shop.shopId },
+    });
+    expect(conversation).not.toBeNull();
+
+    const stored = Array.isArray(conversation?.messages) ? conversation.messages : [];
+    const stale = {
+      id: 'msg_stale_pending_test',
+      role: 'assistant',
+      content: '',
+      themeVersionId: null,
+      status: 'pending',
+      createdAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    };
+    await dbAdmin.builderConversation.update({
+      where: { id: conversation?.id ?? '' },
+      data: { messages: [...stored, stale] },
+    });
+
+    const { messages } = (await admin('GET', '/admin/api/themes/conversation')).json();
+    const swept = messages.find((m: { id: string }) => m.id === stale.id);
+    expect(swept.status).toBe('failed');
+    expect(swept.content.toLowerCase()).toContain('sorry');
+
+    const after = await dbAdmin.builderConversation.findFirst({
+      where: { id: conversation?.id ?? '' },
+    });
+    const storedAfter = Array.isArray(after?.messages)
+      ? (after.messages as { id: string; status: string }[])
+      : [];
+    expect(storedAfter.find((m) => m.id === stale.id)?.status).toBe('failed');
   });
 });

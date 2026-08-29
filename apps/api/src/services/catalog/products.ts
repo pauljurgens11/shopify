@@ -419,6 +419,12 @@ export async function createProduct(
   }
 }
 
+/** The caller's explicit fields only — `undefined` is "not sent", never a value. */
+const definedProps = <T extends object>(payload: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+
 /** An existing row seen as a caller payload, so an options-only edit keeps its attributes. */
 const rowAsPayload = (row: VariantRow, currencyCode: string): VariantPayload => ({
   id: row.id,
@@ -474,6 +480,41 @@ function planVariants(
   return { keep, create, remove: existing.filter((row) => !claimed.has(row.id)) };
 }
 
+/**
+ * Option identity is positional in the builder ("Option 1", "Option 2"), so a
+ * PUT that renames an option must not orphan the rows keyed by the old name:
+ * with the keys left alone neither the id match (the form drops ids when it
+ * regenerates its table) nor the signature match could claim them, and every
+ * variant would be deleted and recreated — destroying skus and the inventory
+ * levels hanging off the old ids. When the option COUNT is unchanged, existing
+ * rows' optionValues are re-keyed position-for-position onto the new names
+ * before matching; adding or removing an option changes no surviving name, so
+ * those cases need no remap.
+ */
+function withRenamedOptionKeys(
+  oldOptions: readonly { name: string }[],
+  newOptions: readonly NormalizedOption[],
+  rows: VariantRow[],
+): VariantRow[] {
+  if (oldOptions.length !== newOptions.length) return rows;
+  const renames = new Map<string, string>();
+  oldOptions.forEach((option, index) => {
+    const next = newOptions[index];
+    if (next && next.name !== option.name) renames.set(option.name, next.name);
+  });
+  if (renames.size === 0) return rows;
+
+  return rows.map((row) => ({
+    ...row,
+    optionValues: Object.fromEntries(
+      Object.entries(asOptionValues(row.optionValues)).map(([key, value]) => [
+        renames.get(key) ?? key,
+        value,
+      ]),
+    ),
+  }));
+}
+
 export async function updateProduct(
   db: TenantClient,
   shopId: string,
@@ -510,8 +551,12 @@ export async function updateProduct(
 
   // Derived only when the payload touches the matrix — a status-only edit must
   // not be able to trip the variant ceiling on a product that already exists.
+  const existingForPlan =
+    input.options !== undefined
+      ? withRenamedOptionKeys(existing.options, options, existing.variants)
+      : existing.variants;
   const plan = touchesMatrix
-    ? planVariants(options, resolveVariants<VariantPayload>(options, provided), existing.variants)
+    ? planVariants(options, resolveVariants<VariantPayload>(options, provided), existingForPlan)
     : null;
 
   try {
@@ -523,11 +568,14 @@ export async function updateProduct(
           });
         }
         for (const { resolved: variant, row } of plan.keep) {
-          // A kept row the payload did not mention keeps its OWN values. The
-          // template is for brand-new combinations only — falling back to it
-          // here would reset prices and null skus on rows a partial `variants`
-          // payload never touched.
-          const match = variant.match ?? rowAsPayload(row, currencyCode);
+          // A kept row the payload did not mention keeps its OWN values, and a
+          // mentioned row keeps its own values for every FIELD the payload
+          // omitted — `upsertVariantInput` has no defaults, so `undefined`
+          // reliably means "not sent". Without the overlay, a client that only
+          // carries price/sku (the admin form) wiped barcode, compareAtPrice,
+          // weight and the oversell policy on every save.
+          const own = rowAsPayload(row, currencyCode);
+          const match = variant.match ? { ...own, ...definedProps(variant.match) } : own;
           await tx.productVariant.update({
             where: { id: row.id },
             data: variantColumns({ ...variant, match }, template, currencyCode),

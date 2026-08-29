@@ -396,6 +396,53 @@ describe('charge — idempotency', () => {
     expect(calls).toEqual(['mock']);
     expect(await db.payment.count()).toBe(1);
   });
+
+  it('refuses a reused key whose charge does not match the original', async () => {
+    // Silently returning the old Payment would tell the caller "you charged
+    // $99" while handing back the $25 row. A mismatched replay is a client
+    // bug worth surfacing, exactly as replayRefund treats it.
+    await connectProcessor('mock', { position: 0 });
+    const cardTokenId = await tokenFor(TEST_CARDS.approved);
+    const idempotencyKey = key();
+    const adapters = adaptersOf({ mock: mockAdapter });
+
+    await charge(db, shopId, { cardTokenId, amount: usd(2500), idempotencyKey }, { adapters });
+    await expect(
+      charge(db, shopId, { cardTokenId, amount: usd(9900), idempotencyKey }, { adapters }),
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(await db.payment.count()).toBe(1);
+  });
+});
+
+describe('onPaid — fires when money is captured, never before', () => {
+  it('stays silent on an authorize-only approval and fires on the capture', async () => {
+    // orders/paid on an authorization would announce money that has not moved.
+    await connectProcessor('mock', { position: 0 });
+    const paid: string[] = [];
+    const deps = {
+      adapters: adaptersOf({ mock: mockAdapter }),
+      onPaid: (event: { paymentId: string }) => {
+        paid.push(event.paymentId);
+      },
+    };
+
+    const payment = await charge(
+      db,
+      shopId,
+      {
+        cardTokenId: await tokenFor(TEST_CARDS.approved),
+        amount: usd(2500),
+        capture: false,
+        idempotencyKey: key(),
+      },
+      deps,
+    );
+    expect(payment.status).toBe('authorized');
+    expect(paid).toEqual([]);
+
+    await capturePayment(db, payment.id, undefined, deps);
+    expect(paid).toEqual([payment.id]);
+  });
 });
 
 describe('capture, void and refund', () => {
@@ -582,6 +629,89 @@ describe('capture, void and refund', () => {
     const row = await db.payment.findUnique({ where: { id: payment.id } });
     expect(row).toMatchObject({ status: 'captured', refundedAmount: 0 });
     expect(await db.paymentRefund.count({ where: { paymentId: payment.id } })).toBe(0);
+  });
+
+  it('a fresh pending reservation still blocks its key and counts against the cap', async () => {
+    const payment = await authorized(usd(2500));
+    await capturePayment(db, payment.id, undefined, withMock);
+
+    const inFlightKey = key();
+    await dbAdmin.paymentRefund.create({
+      data: {
+        id: newId('refund'),
+        shopId,
+        paymentId: payment.id,
+        amount: 2000,
+        status: 'pending',
+        idempotencyKey: inFlightKey,
+      },
+    });
+
+    // Same key: the first attempt's processor call is (as far as anyone can
+    // tell) still in flight — replaying now could double-refund.
+    await expect(
+      refundPayment(
+        db,
+        shopId,
+        payment.id,
+        { amount: usd(2000), idempotencyKey: inFlightKey },
+        withMock,
+      ),
+    ).rejects.toMatchObject({ code: 'conflict' });
+
+    // New key: the reservation holds its 2000 against the cap.
+    await expect(
+      refundPayment(db, shopId, payment.id, { amount: usd(1000), idempotencyKey: key() }, withMock),
+    ).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('releases a pending reservation older than the TTL — cap and key both recover', async () => {
+    // A process crash between the processor call and SETTLE used to strand the
+    // reservation forever: its amount held against the cap, its key answering
+    // "still in progress" until database surgery.
+    const payment = await authorized(usd(2500));
+    await capturePayment(db, payment.id, undefined, withMock);
+
+    const staleId = newId('refund');
+    const staleKey = key();
+    await dbAdmin.paymentRefund.create({
+      data: {
+        id: staleId,
+        shopId,
+        paymentId: payment.id,
+        amount: 2000,
+        status: 'pending',
+        idempotencyKey: staleKey,
+        createdAt: new Date(Date.now() - 16 * 60 * 1000),
+      },
+    });
+
+    // A fresh refund that only fits if the stale row no longer counts.
+    const refunded = await refundPayment(
+      db,
+      shopId,
+      payment.id,
+      { amount: usd(1500), idempotencyKey: key() },
+      withMock,
+    );
+    expect(refunded.status).toBe('partially_refunded');
+    expect(refunded.refundedAmount.amount).toBe(1500);
+
+    // The stale reservation was released and its key freed…
+    const stale = await dbAdmin.paymentRefund.findUnique({ where: { id: staleId } });
+    expect(stale?.status).toBe('failed');
+    expect(stale?.idempotencyKey).toBeNull();
+
+    // …so the admin can simply retry the refund that died.
+    const retried = await refundPayment(
+      db,
+      shopId,
+      payment.id,
+      { amount: usd(1000), idempotencyKey: staleKey },
+      withMock,
+    );
+    expect(retried.status).toBe('refunded');
+    expect(retried.refundedAmount.amount).toBe(2500);
   });
 });
 

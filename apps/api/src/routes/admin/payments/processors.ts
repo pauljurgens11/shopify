@@ -34,8 +34,9 @@ interface ProcessorConfigRow {
 
 /**
  * `connected` is derived, not stored: a config with no credential blob is a row
- * the merchant started and abandoned. `mock` is the exception — it needs no
- * credentials and is connected the moment it exists.
+ * the merchant started and abandoned. `mock` and `maverick` are the
+ * exceptions — mock takes no credentials at all, and maverick runs simulated
+ * without them (SPEC §11), so both are connected the moment they exist.
  */
 function toConfig(row: ProcessorConfigRow) {
   return processorConfigSchema.parse({
@@ -44,7 +45,7 @@ function toConfig(row: ProcessorConfigRow) {
     displayName: row.displayName,
     enabled: row.enabled,
     testMode: row.testMode,
-    connected: row.processor === 'mock' || row.encryptedCredentials !== null,
+    connected: row.processor !== 'stripe' || row.encryptedCredentials !== null,
     lastVerifiedAt: row.lastVerifiedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

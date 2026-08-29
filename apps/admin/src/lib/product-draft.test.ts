@@ -20,6 +20,7 @@ import {
   isSimpleHtml,
   matrixOf,
   reconcileVariants,
+  renameOptionKeys,
   stockChanges,
   textToHtml,
   validate,
@@ -112,6 +113,41 @@ describe('reconcileVariants', () => {
   it('drops the rows whose option value went away', () => {
     const before = reconcileVariants([option('Size', ['S', 'M'])], emptyDraft().variants);
     expect(reconcileVariants([option('Size', ['M'])], before).map((v) => v.title)).toEqual(['M']);
+  });
+
+  it('keeps every row across an option RENAME, via renameOptionKeys', () => {
+    // Renaming "Size" → "Sizing" used to orphan every row (keys no longer
+    // matched), resetting ids, skus and prices — and the save then destroyed
+    // the variants server-side. The card re-keys before reconciling.
+    const oldOptions = [option('Size', ['S', 'M'])];
+    const before = reconcileVariants(oldOptions, emptyDraft().variants).map((row, i) => ({
+      ...row,
+      id: `var_kept${i}`,
+      price: `${10 + i}.00`,
+      sku: `SKU-${i}`,
+      available: '7',
+    }));
+
+    const newOptions = [option('Sizing', ['S', 'M'])];
+    const after = reconcileVariants(newOptions, renameOptionKeys(oldOptions, newOptions, before));
+
+    expect(after.map((v) => v.title)).toEqual(['S', 'M']);
+    expect(at(after, 0)).toMatchObject({
+      id: 'var_kept0',
+      price: '10.00',
+      sku: 'SKU-0',
+      available: '7',
+      optionValues: { Sizing: 'S' },
+    });
+    expect(at(after, 1)).toMatchObject({ id: 'var_kept1', sku: 'SKU-1' });
+  });
+
+  it('leaves variants untouched when the option count changed', () => {
+    const oldOptions = [option('Size', ['S'])];
+    const newOptions = [option('Size', ['S']), option('Color', ['Black'])];
+    const variants = reconcileVariants(oldOptions, emptyDraft().variants);
+
+    expect(renameOptionKeys(oldOptions, newOptions, variants)).toBe(variants);
   });
 });
 

@@ -111,7 +111,7 @@ export async function charge(
   // Idempotency first, before anything is decrypted or any processor is told
   // about this charge. A retry after a dropped response must be free.
   const existing = await db.payment.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
-  if (existing) return toPayment(existing);
+  if (existing) return replayCharge(existing, input);
 
   const card = await getCard(db, input.cardTokenId);
   if (!card) throw new PaymentError('not_found', 'Card token not found');
@@ -152,28 +152,61 @@ export async function charge(
     if (!isUniqueViolation(error)) throw error;
     const winner = await db.payment.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
     if (!winner) throw error;
-    return toPayment(winner);
+    return replayCharge(winner, input);
   }
 
-  if (result.outcome === 'approved' && deps.onPaid) {
-    // The money has already moved and the row is committed. A queue push that
-    // fails must not turn a successful payment into an error at checkout, so
-    // this is best-effort — the handler owns its own logging and retries.
-    try {
-      await deps.onPaid({
-        shopId,
-        paymentId: payment.id,
-        orderId: payment.orderId,
-        checkoutId: payment.checkoutId,
-        amount: payment.amount,
-        processor: payment.processor,
-      });
-    } catch {
-      // Intentionally swallowed. See above.
-    }
+  // Only once money has actually MOVED: an authorize-only approval has not
+  // collected anything yet, so `orders/paid` for it would be a lie — the
+  // capture is what fires it (see `capturePayment`).
+  if (result.outcome === 'approved' && result.captured) {
+    await firePaid(deps, shopId, payment);
   }
 
   return payment;
+}
+
+/**
+ * The payment a reused idempotency key refers to. A key can only ever mean one
+ * charge: silently returning the old row for a DIFFERENT card or amount would
+ * tell the caller "you charged $99" while handing back the $25 payment.
+ * Mirrors `replayRefund`.
+ */
+function replayCharge(row: PaymentRow, input: ChargeInput): Payment {
+  const matches =
+    row.cardTokenId === input.cardTokenId &&
+    row.amount === input.amount.amount &&
+    row.currencyCode === input.amount.currencyCode;
+  if (!matches) {
+    // Note: a partial capture rewrites `row.amount`, so replaying the original
+    // charge key after one lands here too — loudly, which beats silently.
+    throw new PaymentError(
+      'conflict',
+      'This idempotency key was already used for a different charge.',
+    );
+  }
+  return toPayment(row);
+}
+
+/**
+ * Fire `onPaid` for money that is now captured. The row is already committed:
+ * a queue push that fails must not turn a successful payment into an error at
+ * checkout, so this is best-effort — the handler owns its own logging and
+ * retries (G1's producer does both).
+ */
+async function firePaid(deps: RouterDeps, shopId: string, payment: Payment): Promise<void> {
+  if (!deps.onPaid) return;
+  try {
+    await deps.onPaid({
+      shopId,
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      checkoutId: payment.checkoutId,
+      amount: payment.amount,
+      processor: payment.processor,
+    });
+  } catch {
+    // Intentionally swallowed. See above.
+  }
 }
 
 interface ChainLink extends RoutingCandidate {
@@ -362,12 +395,18 @@ export async function capturePayment(
   );
   if (result.outcome === 'failure') throw new PaymentError('conflict', result.message);
 
-  return toPayment(
+  const captured = toPayment(
     await db.payment.update({
       where: { id: payment.id },
       data: { status: 'captured', amount: money.amount },
     }),
   );
+
+  // This is the moment the money moves for an authorize-then-capture flow, so
+  // this is where `orders/paid` belongs — `charge()` stays silent for it.
+  await firePaid(deps, payment.shopId, captured);
+
+  return captured;
 }
 
 export async function voidPayment(
@@ -400,6 +439,17 @@ export interface RefundInput {
   reason?: string;
   idempotencyKey: string;
 }
+
+/**
+ * A `pending` reservation older than this belongs to a process that died
+ * between the processor call and SETTLE. Left alone it holds its amount
+ * against the cap and answers "still in progress" on its key forever; expiring
+ * it lets the admin simply retry. Retrying is safe even if the dead attempt
+ * DID reach the processor: `input.idempotencyKey` travels to the adapter, so a
+ * same-key retry replays rather than double-refunds, and a new-key retry is
+ * capped by the processor's own refund ceiling.
+ */
+const PENDING_REFUND_TTL_MS = 15 * 60 * 1000;
 
 /**
  * Refund against the SAME processor and transaction that took the money.
@@ -452,6 +502,18 @@ export async function refundPayment(
         throw new PaymentError('invalid_request', 'Refund currency must match the payment.');
       }
 
+      // Under the same lock as the cap check, so an expiry cannot interleave
+      // with a SETTLE (which locks the payment first too): release
+      // reservations whose process died mid-refund, freeing their keys.
+      await tx.paymentRefund.updateMany({
+        where: {
+          paymentId: row.id,
+          status: 'pending',
+          createdAt: { lt: new Date(Date.now() - PENDING_REFUND_TTL_MS) },
+        },
+        data: { status: 'failed', idempotencyKey: null },
+      });
+
       const refunded = await sumRefunds(tx, row.id, ['succeeded', 'pending']);
       const refundable = row.amount - refunded;
       if (input.amount.amount > refundable) {
@@ -484,7 +546,9 @@ export async function refundPayment(
 
   const result = await adapterFrom(db, payment, deps).then((adapter) =>
     adapter.run((processor, credentials) =>
-      processor.refund(payment.processorTxnId ?? '', input.amount, credentials),
+      processor.refund(payment.processorTxnId ?? '', input.amount, credentials, {
+        idempotencyKey: input.idempotencyKey,
+      }),
     ),
   );
   if (result.outcome === 'failure') {
@@ -519,7 +583,9 @@ export async function refundPayment(
  * The outcome a reused idempotency key refers to, or null if the key is new.
  * A key can only ever mean one refund: a different payment behind it is a
  * client bug worth surfacing, and a still-`pending` row is a refund whose
- * processor call is in flight right now.
+ * processor call is in flight right now — unless it is past the TTL, in which
+ * case its process is dead and the RESERVE phase will release it under the
+ * payment lock (returning null here is what lets the retry proceed to it).
  */
 async function replayRefund(
   db: TenantClient,
@@ -535,6 +601,7 @@ async function replayRefund(
     );
   }
   if (replay.status === 'pending') {
+    if (replay.createdAt.getTime() < Date.now() - PENDING_REFUND_TTL_MS) return null;
     throw new PaymentError('conflict', 'A refund with this idempotency key is still in progress.');
   }
   return toPayment(await loadPayment(db, replay.paymentId));
@@ -644,6 +711,7 @@ export async function chargeSavedCard(
 
 interface PaymentRow {
   id: string;
+  shopId: string;
   orderId: string | null;
   checkoutId: string | null;
   amount: number;

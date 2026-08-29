@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildSystemPrompt,
   buildUserMessage,
+  collectReferencedHandles,
   runThemeGeneration,
   type ThemeGenerator,
 } from './ai-theme-generate.ts';
@@ -61,6 +62,33 @@ describe('prompt assembly', () => {
 
   it('states the handle rule explicitly rather than hoping', () => {
     expect(buildSystemPrompt().toLowerCase()).toContain('do not invent');
+  });
+
+  /**
+   * A fresh shop's current doc references handles it does not have (the aurora
+   * preset points at "featured"). Unless the prompt says so, the model keeps
+   * them and validation rejects every attempt.
+   */
+  it('warns about current-doc handles that do not exist in this shop', () => {
+    const message = buildUserMessage({
+      ...CONTEXT,
+      missingHandles: { products: ['ghost-product'], collections: ['featured'] },
+    });
+    expect(message).toContain('DO NOT exist');
+    expect(message).toContain('collection handle "featured"');
+    expect(message).toContain('product handle "ghost-product"');
+  });
+
+  it('omits the missing-handle warning when nothing is missing', () => {
+    expect(buildUserMessage(CONTEXT)).not.toContain('DO NOT exist');
+  });
+});
+
+describe('collectReferencedHandles', () => {
+  it('gathers every product and collection handle the doc points at', () => {
+    const referenced = collectReferencedHandles(presetThemeDoc('aurora'));
+    expect(referenced.collections).toContain('featured');
+    expect(Array.isArray(referenced.products)).toBe(true);
   });
 });
 
@@ -119,6 +147,32 @@ describe('runThemeGeneration', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message.toLowerCase()).toContain('sorry');
+  });
+
+  /**
+   * The prompt catalog is truncated (60/40); the injected resolver is the DB.
+   * A real-but-old handle outside the catalog must NOT burn the retry.
+   */
+  it('trusts the injected handle resolver over the prompt catalog', async () => {
+    const doc = presetThemeDoc('aurora');
+    const hero = doc.pages.home.find((s) => s.type === 'featured-collection');
+    if (hero?.type === 'featured-collection') hero.settings.collectionHandle = 'archive-classics';
+
+    const generate = vi.fn<ThemeGenerator>().mockResolvedValue({ doc, summary: 'Done.' });
+    const result = await runThemeGeneration(
+      {
+        ...CONTEXT,
+        // Every referenced handle "exists", catalog notwithstanding.
+        resolveHandles: async (referenced) => ({
+          products: new Set(referenced.products),
+          collections: new Set(referenced.collections),
+        }),
+      },
+      generate,
+    );
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
   });
 
   it('rejects a document that references a collection the shop does not have', async () => {

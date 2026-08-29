@@ -52,6 +52,17 @@ export function deltaPercent(current: number, previous: number): number | null {
   return ((current - previous) / previous) * 100;
 }
 
+/**
+ * The previous period's average order value, in minor units.
+ *
+ * The comparison payload carries sales and orders but not the AOV itself, and
+ * the delta chip is only honest if this rounds exactly the way the API rounds
+ * the current figure (`Math.round`, half-up, integer minor units).
+ */
+export function averageOrderValueOf(totalSales: number, orderCount: number): number {
+  return orderCount === 0 ? 0 : Math.round(totalSales / orderCount);
+}
+
 export type FunnelStage = {
   label: string;
   value: number;

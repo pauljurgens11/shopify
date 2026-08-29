@@ -13,7 +13,6 @@ import {
   BlockStack,
   Button,
   Card,
-  Checkbox,
   InlineStack,
   Layout,
   Page,
@@ -44,7 +43,6 @@ export default function FulfillPage() {
   const [locationId, setLocationId] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingUrl, setTrackingUrl] = useState('');
-  const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Default every line to what is still owed, once the order arrives.
@@ -66,7 +64,17 @@ export default function FulfillPage() {
 
   if (order.isPending || locations.isPending) return <PageSkeleton />;
   const detail = order.data;
-  if (!detail) return null;
+  // A bare `return null` here paints a blank white page, which reads as a
+  // crash rather than a missing order.
+  if (!detail) {
+    return (
+      <Page title="Fulfill items" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>
+        <Card>
+          <Text as="p">{order.error?.message ?? 'This order could not be found.'}</Text>
+        </Card>
+      </Page>
+    );
+  }
 
   const fulfillable = detail.lineItems.filter((line) => remainingToFulfil(line) > 0);
   const lineItems = fulfillable
@@ -79,16 +87,19 @@ export default function FulfillPage() {
     try {
       await apiFetch(`/admin/api/orders/${id}/fulfillments`, {
         method: 'POST',
+        // No `notifyCustomer`: no shipping-notification job exists, so the
+        // checkbox promising one was cut with its UI (CLAUDE.md §8). The
+        // contract field is optional and simply goes unsent.
         body: {
           locationId,
           lineItems,
-          notifyCustomer: notify,
           ...(trackingNumber.trim() ? { trackingNumber: trackingNumber.trim() } : {}),
           ...(trackingUrl.trim() ? { trackingUrl: trackingUrl.trim() } : {}),
         },
       });
       await queryClient.invalidateQueries({ queryKey: ['order', id] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['open-orders-count'] });
       toast.show('Items fulfilled');
       router.push(`/store/${slug}/orders/${id}`);
     } catch (cause) {
@@ -200,11 +211,6 @@ export default function FulfillPage() {
                   placeholder="https://"
                   value={trackingUrl}
                   onChange={setTrackingUrl}
-                />
-                <Checkbox
-                  label="Send shipping confirmation to the customer"
-                  checked={notify}
-                  onChange={setNotify}
                 />
               </BlockStack>
             </Card>

@@ -6,7 +6,15 @@
  * The `name="email"` / `name="password"` attributes are load-bearing: H2's
  * smoke flow (a) selects on them. Do not rename them.
  */
-import { Banner, BlockStack, Button, Form, FormLayout, Link, TextField } from '@shopify/polaris';
+import {
+  Banner,
+  Button,
+  Form,
+  FormLayout,
+  Link,
+  SkeletonBodyText,
+  TextField,
+} from '@shopify/polaris';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { AuthCard } from '../../components/shell/auth-card.tsx';
@@ -67,11 +75,9 @@ function LoginForm() {
             error={login.error?.fieldErrors.password}
           />
 
-          <BlockStack gap="200">
-            <Button submit variant="primary" fullWidth loading={login.isPending}>
-              Log in
-            </Button>
-          </BlockStack>
+          <Button submit variant="primary" fullWidth loading={login.isPending}>
+            Log in
+          </Button>
         </FormLayout>
       </Form>
     </AuthCard>
@@ -79,9 +85,17 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  // useSearchParams needs a Suspense boundary to prerender (Next 15).
+  // useSearchParams needs a Suspense boundary to prerender (Next 15). The
+  // fallback is the same card with skeleton lines rather than an empty one, so
+  // the first screen of the demo does not visibly change height on hydration.
   return (
-    <Suspense fallback={<AuthCard title="Log in">{null}</AuthCard>}>
+    <Suspense
+      fallback={
+        <AuthCard title="Log in" subtitle="Continue to your store">
+          <SkeletonBodyText lines={4} />
+        </AuthCard>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

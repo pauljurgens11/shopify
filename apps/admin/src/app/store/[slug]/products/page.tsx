@@ -25,6 +25,7 @@ import {
   Modal,
   Page,
   Text,
+  TextField,
   Thumbnail,
   useIndexResourceState,
   useSetIndexFiltersMode,
@@ -46,6 +47,14 @@ const TABS = [
   { label: 'Archived', status: 'archived' },
 ] as const;
 
+/** B5: sort by title/created. The value encodes `sortKey sortOrder` for the API. */
+const SORT_OPTIONS = [
+  { label: 'Created', value: 'createdAt desc', directionLabel: 'Newest first' },
+  { label: 'Created', value: 'createdAt asc', directionLabel: 'Oldest first' },
+  { label: 'Title', value: 'title asc', directionLabel: 'A–Z' },
+  { label: 'Title', value: 'title desc', directionLabel: 'Z–A' },
+] as const;
+
 /** PARITY.md badge table: Active is success, Draft is info. */
 function StatusBadge({ status }: { status: Product['status'] }) {
   if (status === 'active') return <Badge tone="success">Active</Badge>;
@@ -57,7 +66,9 @@ function StatusBadge({ status }: { status: Product['status'] }) {
 function inventorySummary(product: Product): string {
   const total = product.variants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
   const count = product.variants.length;
-  if (count <= 1) return total > 0 ? `${total} in stock` : 'Inventory not tracked';
+  // A sold-out product reads "0 in stock", the way Shopify shows it — nothing
+  // in this model is "untracked".
+  if (count <= 1) return `${total} in stock`;
   return `${total} in stock for ${count} variants`;
 }
 
@@ -78,6 +89,8 @@ export default function ProductsPage() {
 
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
+  const [vendor, setVendor] = useState('');
+  const [sortSelected, setSortSelected] = useState<string[]>([SORT_OPTIONS[0].value]);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -90,9 +103,13 @@ export default function ProductsPage() {
     const search = new URLSearchParams({ limit: String(PAGE_SIZE) });
     if (status) search.set('status', status);
     if (query.trim() !== '') search.set('query', query.trim());
+    if (vendor.trim() !== '') search.set('vendor', vendor.trim());
+    const [sortKey, sortOrder] = (sortSelected[0] ?? '').split(' ');
+    if (sortKey) search.set('sortKey', sortKey);
+    if (sortOrder) search.set('sortOrder', sortOrder);
     if (cursor) search.set('cursor', cursor);
     return `/admin/api/products?${search.toString()}`;
-  }, [status, query, cursor]);
+  }, [status, query, vendor, sortSelected, cursor]);
 
   const products = useApiQuery<Paginated<Product>>(['products', path], path);
   const rows = products.data?.data ?? [];
@@ -119,17 +136,22 @@ export default function ProductsPage() {
   };
 
   const setStatus = (next: Product['status']) =>
-    applyToSelection(
-      next === 'active' ? 'Products set to active' : `Products set to ${next}`,
-      (id) => apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
+    applyToSelection(next === 'archived' ? 'Products archived' : `Products set to ${next}`, (id) =>
+      apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
     );
 
   if (products.isPending) return <PageSkeleton />;
 
-  const empty = rows.length === 0 && query.trim() === '' && !status && cursorStack.length === 0;
+  const empty =
+    rows.length === 0 &&
+    query.trim() === '' &&
+    vendor.trim() === '' &&
+    !status &&
+    cursorStack.length === 0;
 
   return (
     <Page
+      fullWidth
       title="Products"
       primaryAction={{ content: 'Add product', url: `/store/${slug}/products/new` }}
     >
@@ -137,8 +159,7 @@ export default function ProductsPage() {
         {empty ? (
           // Hand-built rather than Polaris `EmptyState`, which requires an
           // `image`: the only on-brand illustrations are Shopify's own CDN
-          // assets, and PARITY.md forbids rendering those (A3 hit the same wall
-          // in `ComingOnline`).
+          // assets, and PARITY.md forbids rendering those.
           <Box padding="800">
             <BlockStack gap="200" inlineAlign="center">
               <Text as="h2" variant="headingMd">
@@ -181,9 +202,48 @@ export default function ProductsPage() {
                 setQuery('');
                 resetPaging();
               }}
-              filters={[]}
+              sortOptions={[...SORT_OPTIONS]}
+              sortSelected={sortSelected}
+              onSort={(selected) => {
+                setSortSelected(selected);
+                resetPaging();
+              }}
+              filters={[
+                {
+                  key: 'vendor',
+                  label: 'Vendor',
+                  shortcut: true,
+                  filter: (
+                    <TextField
+                      label="Vendor"
+                      labelHidden
+                      autoComplete="off"
+                      value={vendor}
+                      onChange={(value) => {
+                        setVendor(value);
+                        resetPaging();
+                      }}
+                    />
+                  ),
+                },
+              ]}
+              appliedFilters={
+                vendor.trim() === ''
+                  ? []
+                  : [
+                      {
+                        key: 'vendor',
+                        label: `Vendor: ${vendor.trim()}`,
+                        onRemove: () => {
+                          setVendor('');
+                          resetPaging();
+                        },
+                      },
+                    ]
+              }
               onClearAll={() => {
                 setQuery('');
+                setVendor('');
                 resetPaging();
               }}
               mode={mode}
@@ -223,11 +283,11 @@ export default function ProductsPage() {
                 },
               }}
               emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
+                <Box padding="800">
+                  <Text as="p" tone="subdued" alignment="center">
                     No products found. Try changing the search or filters.
                   </Text>
-                </div>
+                </Box>
               }
             >
               {rows.map((product, index) => (

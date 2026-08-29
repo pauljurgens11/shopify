@@ -89,12 +89,25 @@ const BUTTON_STYLES: Record<ThemeTokens['buttonStyle'], Record<string, string>> 
   },
 };
 
+/**
+ * Anchored hex check at the point of emission. Callers already validate colours
+ * through the contracts `hexColor` schema, but that defense lives in another
+ * workstream's file — and these strings land verbatim in a `style` attribute,
+ * where `;}` would inject live CSS. A bad value gets a neutral fallback rather
+ * than a throw: a wrong colour beats a crashed storefront.
+ */
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function safeColor(value: string, fallback: string): string {
+  return HEX_COLOR.test(value) ? value : fallback;
+}
+
 export function themeCssVariables(tokens: ThemeTokens): Record<string, string> {
   return {
-    '--theme-color-primary': tokens.colorPrimary,
-    '--theme-color-background': tokens.colorBackground,
-    '--theme-color-text': tokens.colorText,
-    '--theme-color-accent': tokens.colorAccent,
+    '--theme-color-primary': safeColor(tokens.colorPrimary, '#000000'),
+    '--theme-color-background': safeColor(tokens.colorBackground, '#ffffff'),
+    '--theme-color-text': safeColor(tokens.colorText, '#000000'),
+    '--theme-color-accent': safeColor(tokens.colorAccent, '#000000'),
     '--theme-font-heading': FONT_STACKS[tokens.fontHeading] ?? FONT_STACKS.inter ?? 'sans-serif',
     '--theme-font-body': FONT_STACKS[tokens.fontBody] ?? FONT_STACKS.inter ?? 'sans-serif',
     '--theme-radius': RADIUS[tokens.radius],

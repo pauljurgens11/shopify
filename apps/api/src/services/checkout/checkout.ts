@@ -16,7 +16,7 @@ import type { CartLine } from '@merchant/contracts/cart';
 import type { Checkout, UpdateCheckoutInput } from '@merchant/contracts/checkout';
 import { checkoutSchema } from '@merchant/contracts/checkout';
 import type { AddressDto } from '@merchant/contracts/common';
-import type { Discount } from '@merchant/contracts/discounts';
+import type { Discount, DiscountPriorUsage } from '@merchant/contracts/discounts';
 import { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { badRequest, conflict, notFound } from '../../lib/errors.ts';
@@ -87,6 +87,33 @@ async function candidateDiscounts(
   }));
 }
 
+/**
+ * C1 enforces `oncePerCustomer` only when told who is buying. The checkout's
+ * identity is its email (normalized on write); a guest with no customer row —
+ * or no once-per-customer candidate in play — skips the two reads entirely,
+ * and omitting the field keeps the engine's guest behavior.
+ */
+async function priorUsageFor(
+  db: TenantClient,
+  email: string | null,
+  discounts: Discount[],
+): Promise<DiscountPriorUsage | undefined> {
+  if (!email || !discounts.some((d) => d.oncePerCustomer)) return undefined;
+
+  const customer = await db.customer.findFirst({
+    where: { email: email.trim().toLowerCase() },
+    select: { id: true },
+  });
+  if (!customer) return undefined;
+
+  const counts = await db.discountRedemption.groupBy({
+    by: ['discountId'],
+    where: { customerId: customer.id, discountId: { in: discounts.map((d) => d.id) } },
+    _count: true,
+  });
+  return Object.fromEntries(counts.map((c) => [c.discountId, c._count]));
+}
+
 /** Collection membership per product, so collection-scoped discounts can match. */
 async function collectionsByProduct(
   db: TenantClient,
@@ -136,6 +163,7 @@ export async function priceCheckout(db: TenantClient, row: CheckoutRow): Promise
     candidateDiscounts(db, row.discountCode),
     collectionsByProduct(db, [...new Set(lines.map((line) => line.productId))]),
   ]);
+  const priorUsage = await priorUsageFor(db, row.email, discounts);
 
   const pricing = computeCheckoutTotals({
     currencyCode: settings.currencyCode,
@@ -146,6 +174,7 @@ export async function priceCheckout(db: TenantClient, row: CheckoutRow): Promise
     taxRatePercentage: settings.taxRatePercentage,
     discounts,
     enteredCode: row.discountCode,
+    priorUsage,
     now: new Date(),
   });
 

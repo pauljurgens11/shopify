@@ -7,7 +7,8 @@
  * real storefront on the right. The page frame stays Polaris so it feels native
  * to the admin; the two panes are our own surface, drawn with `--p-*` tokens.
  */
-import { Page } from '@shopify/polaris';
+import { Banner, Box, Page } from '@shopify/polaris';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
@@ -18,24 +19,25 @@ import { type Device, PreviewPane } from './preview-pane.tsx';
 import type { PreviewPage } from './preview-url.ts';
 import { PublishModal } from './publish-modal.tsx';
 import {
+  PREVIEW_TOKEN_KEY,
   useBuilderActions,
   useConversation,
+  useFirstCollectionHandle,
   useFirstProductHandle,
   usePreviewToken,
   useVersions,
 } from './use-builder.ts';
 import { VersionHistory } from './version-history.tsx';
 
-/** H1 seeds a collection with this handle, and every preset references it. */
-const SEEDED_COLLECTION = 'featured';
-
 export default function StorefrontBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
   const toast = useToast();
+  const client = useQueryClient();
 
   const versions = useVersions();
   const conversation = useConversation();
   const productHandle = useFirstProductHandle();
+  const collectionHandle = useFirstCollectionHandle();
   const { sendMessage, applyPreset, publish, restore } = useBuilderActions();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -64,6 +66,17 @@ export default function StorefrontBuilderPage() {
   const token = isPublished ? null : (tokenQuery.data?.token ?? null);
 
   const reload = () => setNonce((value) => value + 1);
+  // The toolbar's Refresh must also carry a fresh token: an expired one makes
+  // the storefront silently fall back to the published theme while the toolbar
+  // still says "Viewing draft". (The token refetch changes `token`, so the
+  // effect below reloads a second time with the new value — a manual refresh
+  // is deliberate enough that the brief double load is fine.)
+  const refresh = () => {
+    if (!isPublished && selectedId) {
+      void client.invalidateQueries({ queryKey: PREVIEW_TOKEN_KEY });
+    }
+    reload();
+  };
   const view = (versionId: string) => {
     setSelectedId(versionId);
     setHistoryOpen(false);
@@ -83,8 +96,11 @@ export default function StorefrontBuilderPage() {
    * the merchant would see the OLD theme flash while switching versions.
    */
   const previewReady = !selected || isPublished || Boolean(token);
+  // Only surface a token failure when there is no token to show — a failed
+  // BACKGROUND re-mint keeps the last (still likely valid) token on screen.
+  const tokenError = !isPublished && !token ? (tokenQuery.error ?? null) : null;
 
-  if (versions.isPending && conversation.isPending) {
+  if (versions.isPending || conversation.isPending) {
     return (
       <Page title="Storefront">
         <PageSkeleton />
@@ -98,6 +114,15 @@ export default function StorefrontBuilderPage() {
       title="Storefront"
       subtitle="Describe the storefront you want and watch it build."
     >
+      {/* Without this a failed request is indistinguishable from "no versions yet". */}
+      {versions.error ? (
+        <Box paddingBlockEnd="400">
+          <Banner tone="critical" title="Theme versions couldn’t be loaded">
+            <p>{versions.error.message}</p>
+          </Banner>
+        </Box>
+      ) : null}
+
       <div
         style={{
           display: 'grid',
@@ -144,11 +169,13 @@ export default function StorefrontBuilderPage() {
           device={device}
           onDeviceChange={setDevice}
           token={token}
+          tokenError={tokenError}
+          onRetryToken={() => void tokenQuery.refetch()}
           productHandle={productHandle}
-          collectionHandle={SEEDED_COLLECTION}
+          collectionHandle={collectionHandle}
           nonce={nonce}
           ready={previewReady}
-          onRefresh={reload}
+          onRefresh={refresh}
           isPublished={isPublished}
           hasVersion={Boolean(selected)}
           publishing={publish.isPending}

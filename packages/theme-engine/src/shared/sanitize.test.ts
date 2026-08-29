@@ -46,6 +46,14 @@ describe('sanitizeRichText', () => {
     expect(out).toContain('rel="noopener noreferrer"');
   });
 
+  it('adds rel=noopener to any targeted link, not just _blank', () => {
+    // `_top` and named targets survive the allowlist too, opener intact.
+    for (const target of ['_top', 'shopwin']) {
+      const out = sanitizeRichText(`<a href="https://example.com" target="${target}">Ex</a>`);
+      expect(out).toContain('rel="noopener noreferrer"');
+    }
+  });
+
   it('escapes bare text so a stray angle bracket cannot open a tag', () => {
     expect(sanitizeRichText('5 < 6 & 7 > 6')).toBe('5 &lt; 6 &amp; 7 &gt; 6');
   });

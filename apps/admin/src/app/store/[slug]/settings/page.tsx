@@ -50,6 +50,12 @@ const CARDS: Array<{ title: string; description: string; href: string; icon: Ico
     icon: CreditCardIcon,
   },
   {
+    title: 'Checkout',
+    description: 'How checkout behaves',
+    href: '/settings/checkout',
+    icon: SettingsIcon,
+  },
+  {
     title: 'Shipping and delivery',
     description: 'Rates customers see at checkout',
     href: '/settings/shipping',
@@ -66,12 +72,6 @@ const CARDS: Array<{ title: string; description: string; href: string; icon: Ico
     description: 'Where you stock and ship from',
     href: '/locations',
     icon: LocationIcon,
-  },
-  {
-    title: 'Checkout',
-    description: 'How checkout behaves',
-    href: '/settings/checkout',
-    icon: SettingsIcon,
   },
   {
     title: 'Notifications',

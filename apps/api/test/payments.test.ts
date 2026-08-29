@@ -15,6 +15,9 @@
  */
 import { newId } from '@merchant/config/ids';
 import { dbAdmin } from '@merchant/db/client';
+import { dbForShop } from '@merchant/db/tenant';
+import { savePaymentMethod } from '@merchant/pay/router';
+import { tokenizeCard } from '@merchant/pay/vault';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -77,6 +80,23 @@ describe('processor configuration', () => {
     expect(
       await dbAdmin.processorConfig.count({ where: { shopId: shop.shopId, processor: 'mock' } }),
     ).toBe(1);
+  });
+
+  it('reports maverick connected without credentials — simulated mode is a real state', async () => {
+    // Found in the browser: `connected` derived purely from the credential
+    // blob showed a freshly connected simulated maverick as "Error".
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/processors',
+      headers: auth(),
+      payload: { processor: 'maverick', displayName: 'Maverick', credentials: {} },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ processor: 'maverick', connected: true });
+
+    await dbAdmin.processorConfig.deleteMany({
+      where: { shopId: shop.shopId, processor: 'maverick' },
+    });
   });
 
   it('rejects credentials the processor itself refuses', async () => {
@@ -234,5 +254,170 @@ describe('routing rules', () => {
     });
     expect(second.json().data).toHaveLength(1);
     expect(await dbAdmin.routingRule.count({ where: { shopId: shop.shopId } })).toBe(1);
+  });
+});
+
+describe('saved cards (D4: the repeat-billing beat)', () => {
+  let customerId: string;
+  let methodId: string;
+
+  beforeAll(async () => {
+    customerId = newId('customer');
+    await dbAdmin.customer.create({
+      data: {
+        id: customerId,
+        shopId: shop.shopId,
+        email: `repeat-${shop.shopId}@example.com`,
+        firstName: 'Repeat',
+        lastName: 'Buyer',
+      },
+    });
+
+    const db = dbForShop(shop.shopId);
+    const token = await tokenizeCard(db, shop.shopId, {
+      number: '4242424242424242',
+      expMonth: 12,
+      expYear: 2030,
+      cvc: '123',
+    });
+    const method = await savePaymentMethod(db, shop.shopId, customerId, token.cardTokenId);
+    methodId = method.id;
+  });
+
+  it("lists a customer's saved cards for the order page, default first", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/admin/api/payments/payment-methods?customerId=${customerId}`,
+      headers: auth(),
+    });
+    expect(response.statusCode).toBe(200);
+
+    const { data } = response.json();
+    expect(data).toHaveLength(1);
+    expect(data[0]).toMatchObject({
+      id: methodId,
+      customerId,
+      brand: 'visa',
+      last4: '4242',
+      isDefault: true,
+    });
+    // The vault token is pay-internal plumbing; the card list the admin renders
+    // has no use for it and no other endpoint accepts it.
+    expect(response.body).not.toContain('4242424242424242');
+  });
+
+  it("another shop's session sees no cards for the same customer id", async () => {
+    const otherCookie = await sessionCookie(app, {
+      shopId: other.shopId,
+      staffUserId: other.ownerId,
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url: `/admin/api/payments/payment-methods?customerId=${customerId}`,
+      headers: { cookie: otherCookie, 'x-requested-with': 'fetch' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toHaveLength(0);
+  });
+
+  it('charges a saved card over HTTP and dedupes on the idempotency key', async () => {
+    const idempotencyKey = `d4-charge-${newId('payment')}`;
+    const payload = {
+      paymentMethodId: methodId,
+      amount: { amount: 2500, currencyCode: 'USD' },
+      idempotencyKey,
+    };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: 'captured',
+      amount: { amount: 2500, currencyCode: 'USD' },
+      last4: '4242',
+    });
+
+    // The double-clicked Charge button: same key, same payment row, one charge.
+    const replay = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload,
+    });
+    expect(replay.json().id).toBe(response.json().id);
+    expect(await dbAdmin.payment.count({ where: { shopId: shop.shopId, idempotencyKey } })).toBe(1);
+  });
+
+  it('collecting the outstanding balance marks the order paid', async () => {
+    // The charge block prefills exactly this: an unpaid order's outstanding
+    // total. Money collected with the badge stuck on "Payment pending" is a
+    // ledger the admin cannot trust.
+    const orderId = newId('order');
+    await dbAdmin.order.create({
+      data: {
+        id: orderId,
+        shopId: shop.shopId,
+        orderNumber: 990001,
+        email: 'repeat@example.com',
+        subtotal: 2500,
+        total: 2500,
+        financialStatus: 'pending',
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload: {
+        paymentMethodId: methodId,
+        amount: { amount: 2500, currencyCode: 'USD' },
+        idempotencyKey: `d4-collect-${newId('payment')}`,
+        orderId,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'captured', orderId });
+
+    const order = await dbAdmin.order.findUnique({ where: { id: orderId } });
+    expect(order?.financialStatus).toBe('paid');
+  });
+
+  it('an under-collection leaves the order unpaid', async () => {
+    // There is no partial-paid state in the SPEC enum; a short charge must not
+    // pretend the order is settled.
+    const orderId = newId('order');
+    await dbAdmin.order.create({
+      data: {
+        id: orderId,
+        shopId: shop.shopId,
+        orderNumber: 990002,
+        email: 'repeat@example.com',
+        subtotal: 2500,
+        total: 2500,
+        financialStatus: 'pending',
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/api/payments/charge-saved-card',
+      headers: auth(),
+      payload: {
+        paymentMethodId: methodId,
+        amount: { amount: 1000, currencyCode: 'USD' },
+        idempotencyKey: `d4-partial-${newId('payment')}`,
+        orderId,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'captured' });
+
+    const order = await dbAdmin.order.findUnique({ where: { id: orderId } });
+    expect(order?.financialStatus).toBe('pending');
   });
 });

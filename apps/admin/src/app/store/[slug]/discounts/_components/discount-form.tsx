@@ -11,11 +11,12 @@
  * Which controls appear depends on the type, which is why the index's create
  * button is a split menu rather than a plain "New".
  */
-import { format } from '@merchant/config/money';
+import { format, fromDecimal } from '@merchant/config/money';
 import type { Discount } from '@merchant/contracts/discounts';
 import {
   BlockStack,
   Button,
+  ButtonGroup,
   Card,
   Checkbox,
   ChoiceList,
@@ -24,6 +25,7 @@ import {
   InlineError,
   InlineStack,
   Layout,
+  Modal,
   Page,
   Text,
   TextField,
@@ -34,16 +36,51 @@ import { useMemo, useState } from 'react';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
-import { type DiscountDraft, draftToInput, generateCode, validate } from './discount-draft.ts';
+import {
+  type DiscountDraft,
+  draftToInput,
+  generateCode,
+  serverFieldToDraftKey,
+  validate,
+} from './discount-draft.ts';
 import { ResourcePickerModal } from './resource-picker.tsx';
 
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
+
+/**
+ * The draft keys whose inputs actually render an `error=` prop. A server field
+ * error that does not land on one of these must fall back to a toast, or Save
+ * fails silently (the merchant sees nothing at all).
+ */
+const RENDERED_ERROR_KEYS = new Set([
+  'title',
+  'code',
+  'value',
+  'appliesTo',
+  'minimumSubtotal',
+  'minimumQuantity',
+  'usageLimit',
+  'endsAt',
+]);
 
 const TYPE_TITLES: Record<Discount['type'], string> = {
   amount_off_order: 'Amount off order',
   amount_off_products: 'Amount off products',
   free_shipping: 'Free shipping',
 };
+
+/** What a half-typed money field looks like: "", "19", "19.", "19.99". */
+const DECIMAL = /^\d+(\.\d*)?$/;
+
+/**
+ * Format a dollars-as-typed field for the summary. Goes through `fromDecimal`
+ * like `draftToInput` does, so the summary and the saved discount agree — and
+ * so a zero-decimal currency is not silently multiplied by 100 (CLAUDE.md §5).
+ */
+function typedMoney(value: string, currencyCode: string): string {
+  const trimmed = value.trim();
+  return format(fromDecimal(DECIMAL.test(trimmed) ? trimmed : '0', currencyCode));
+}
 
 /** The summary card's bullets — the same sentences Shopify uses. */
 function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
@@ -55,11 +92,7 @@ function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
     const target = draft.type === 'amount_off_products' ? 'the selected products' : 'the order';
     lines.push(`${draft.value || '0'}% off ${target}`);
   } else {
-    const amount = format({
-      amount: Math.round(Number(draft.value || '0') * 100),
-      currencyCode,
-    });
-    lines.push(`${amount} off`);
+    lines.push(`${typedMoney(draft.value, currencyCode)} off`);
   }
 
   if (draft.appliesToScope === 'collections') {
@@ -73,7 +106,7 @@ function summaryLines(draft: DiscountDraft, currencyCode: string): string[] {
   }
 
   if (draft.minimumKind === 'subtotal' && draft.minimumSubtotal !== '') {
-    lines.push(`Minimum purchase of ${draft.minimumSubtotal}`);
+    lines.push(`Minimum purchase of ${typedMoney(draft.minimumSubtotal, currencyCode)}`);
   }
   if (draft.minimumKind === 'quantity' && draft.minimumQuantity !== '') {
     lines.push(`Minimum quantity of ${draft.minimumQuantity} items`);
@@ -114,13 +147,15 @@ export function DiscountForm({
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<'products' | 'collections' | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const set = <K extends keyof DiscountDraft>(key: K, value: DiscountDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setServerErrors({});
   };
 
-  const errors = validate(draft);
+  const errors = validate(draft, currencyCode);
   const shown = submitted ? { ...errors, ...serverErrors } : serverErrors;
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const symbol = CURRENCY_SYMBOLS[currencyCode] ?? currencyCode;
@@ -139,12 +174,24 @@ export function DiscountForm({
         { method: discountId ? 'PUT' : 'POST', body },
       );
       await queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      // Without this, reopening within staleTime shows (and can re-save) the
+      // pre-edit values.
+      if (discountId) {
+        await queryClient.invalidateQueries({ queryKey: ['discount', discountId] });
+      }
       setBaseline(draft);
       toast.show(discountId ? 'Discount saved' : 'Discount created');
       if (!discountId) router.push(`/store/${slug}/discounts/${saved.id}`);
     } catch (cause) {
       const error = cause as ApiError;
-      if (error.field) setServerErrors({ [error.field]: error.message });
+      // Place each server field error on the input that renders it; anything
+      // the form has no input for becomes a toast — never a silent no-op.
+      const placed: Record<string, string> = {};
+      for (const [field, message] of Object.entries(error.fieldErrors ?? {})) {
+        const key = serverFieldToDraftKey(field, draft);
+        if (RENDERED_ERROR_KEYS.has(key)) placed[key] = message;
+      }
+      if (Object.keys(placed).length > 0) setServerErrors(placed);
       else toast.error(error.message);
     } finally {
       setSaving(false);
@@ -153,13 +200,19 @@ export function DiscountForm({
 
   const remove = async () => {
     if (!discountId) return;
+    setDeleting(true);
     try {
       await apiFetch(`/admin/api/discounts/${discountId}`, { method: 'DELETE' });
       await queryClient.invalidateQueries({ queryKey: ['discounts'] });
       toast.show('Discount deleted');
+      setConfirmingDelete(false);
       router.push(`/store/${slug}/discounts`);
+      // Drop the cached row so a back-navigation cannot resurrect it.
+      queryClient.removeQueries({ queryKey: ['discount', discountId] });
     } catch (cause) {
       toast.error((cause as ApiError).message);
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -169,7 +222,15 @@ export function DiscountForm({
       title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
       subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
       secondaryActions={
-        discountId ? [{ content: 'Delete', destructive: true, onAction: remove }] : undefined
+        discountId
+          ? [
+              {
+                content: 'Delete',
+                destructive: true,
+                onAction: () => setConfirmingDelete(true),
+              },
+            ]
+          : undefined
       }
     >
       <SaveBar
@@ -208,9 +269,12 @@ export function DiscountForm({
                         value={draft.code}
                         onChange={(value) => set('code', value.toUpperCase())}
                         error={shown.code}
-                        connectedRight={
-                          <Button onClick={() => set('code', generateCode())}>Generate</Button>
-                        }
+                        // Shopify puts Generate on the label row as a link, not
+                        // as a button welded to the field (PARITY.md → C6).
+                        labelAction={{
+                          content: 'Generate',
+                          onAction: () => set('code', generateCode()),
+                        }}
                         helpText="Customers enter this code at checkout."
                       />
                     </FormLayout>
@@ -243,30 +307,39 @@ export function DiscountForm({
                     <Text as="h2" variant="headingMd">
                       Value
                     </Text>
-                    <FormLayout>
-                      <ChoiceList
-                        title="Value type"
-                        titleHidden
-                        choices={[
-                          { label: 'Percentage', value: 'percentage' },
-                          { label: 'Fixed amount', value: 'fixed' },
-                        ]}
-                        selected={[draft.valueType]}
-                        onChange={([value]) =>
-                          set('valueType', value as DiscountDraft['valueType'])
-                        }
-                      />
-                      <TextField
-                        label="Value"
-                        type="number"
-                        autoComplete="off"
-                        value={draft.value}
-                        onChange={(value) => set('value', value)}
-                        error={shown.value}
-                        prefix={draft.valueType === 'fixed' ? symbol : undefined}
-                        suffix={draft.valueType === 'percentage' ? '%' : undefined}
-                      />
-                    </FormLayout>
+                    {/* Segmented control + field on one row, which is how
+                        Shopify's value picker reads (PARITY.md → C6). Aligned
+                        to the start so a validation message growing under the
+                        field does not drag the buttons down with it. */}
+                    <InlineStack gap="300" blockAlign="start" wrap={false}>
+                      <ButtonGroup variant="segmented">
+                        <Button
+                          pressed={draft.valueType === 'percentage'}
+                          onClick={() => set('valueType', 'percentage')}
+                        >
+                          Percentage
+                        </Button>
+                        <Button
+                          pressed={draft.valueType === 'fixed'}
+                          onClick={() => set('valueType', 'fixed')}
+                        >
+                          Fixed amount
+                        </Button>
+                      </ButtonGroup>
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label="Value"
+                          labelHidden
+                          type="number"
+                          autoComplete="off"
+                          value={draft.value}
+                          onChange={(value) => set('value', value)}
+                          error={shown.value}
+                          prefix={draft.valueType === 'fixed' ? symbol : undefined}
+                          suffix={draft.valueType === 'percentage' ? '%' : undefined}
+                        />
+                      </div>
+                    </InlineStack>
                   </BlockStack>
                 </Card>
               )}
@@ -337,6 +410,7 @@ export function DiscountForm({
                       prefix={symbol}
                       value={draft.minimumSubtotal}
                       onChange={(value) => set('minimumSubtotal', value)}
+                      error={shown.minimumSubtotal}
                     />
                   )}
                   {draft.minimumKind === 'quantity' && (
@@ -346,6 +420,7 @@ export function DiscountForm({
                       autoComplete="off"
                       value={draft.minimumQuantity}
                       onChange={(value) => set('minimumQuantity', value)}
+                      error={shown.minimumQuantity}
                     />
                   )}
                 </BlockStack>
@@ -369,6 +444,7 @@ export function DiscountForm({
                       autoComplete="off"
                       value={draft.usageLimit}
                       onChange={(value) => set('usageLimit', value)}
+                      error={shown.usageLimit}
                     />
                   )}
                   <Checkbox
@@ -460,6 +536,25 @@ export function DiscountForm({
           setPicker(null);
         }}
       />
+
+      <Modal
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title="Delete discount?"
+        primaryAction={{
+          content: 'Delete',
+          destructive: true,
+          loading: deleting,
+          onAction: remove,
+        }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setConfirmingDelete(false) }]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            This can’t be undone. Orders that already used this discount keep their totals.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

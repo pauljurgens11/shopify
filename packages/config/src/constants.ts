@@ -9,6 +9,8 @@ export const ORDER_NUMBER_START = 1001;
 
 /** SPEC §8 */
 export const SESSION_COOKIE = '_merchant_session';
+/** Storefront customer login (SPEC §8, optional path) — never grants admin access. */
+export const CUSTOMER_SESSION_COOKIE = '_merchant_customer';
 export const CART_COOKIE = '_merchant_cart';
 export const CSRF_HEADER = 'x-requested-with';
 export const CSRF_HEADER_VALUE = 'merchant-admin';

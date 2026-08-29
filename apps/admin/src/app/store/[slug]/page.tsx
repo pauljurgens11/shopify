@@ -6,8 +6,17 @@
  */
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
-import { BlockStack, Card, Grid, InlineStack, Page, Text } from '@shopify/polaris';
+import {
+  BlockStack,
+  Card,
+  Grid,
+  InlineStack,
+  Page,
+  SkeletonDisplayText,
+  Text,
+} from '@shopify/polaris';
 import { useMemo } from 'react';
+import { PageSkeleton } from '../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../lib/api.ts';
 import { useSession } from '../../../lib/session.ts';
 import { rangeQueryString } from './analytics/range.ts';
@@ -19,16 +28,30 @@ function greeting(hour: number): string {
   return 'Good evening';
 }
 
-function TodayMetric({ label, value }: { label: string; value: string }) {
+function TodayMetric({
+  label,
+  value,
+  loading,
+}: {
+  label: string;
+  value: string;
+  loading: boolean;
+}) {
   return (
     <Card>
       <BlockStack gap="200">
         <Text as="h3" variant="bodySm" tone="subdued">
           {label}
         </Text>
-        <Text as="p" variant="headingLg">
-          {value}
-        </Text>
+        {/* A metric that reads $0.00 while it loads is a wrong number, not a
+            loading state — PARITY.md: skeleton, never a spinner or a stand-in. */}
+        {loading ? (
+          <SkeletonDisplayText size="medium" />
+        ) : (
+          <Text as="p" variant="headingLg">
+            {value}
+          </Text>
+        )}
       </BlockStack>
     </Card>
   );
@@ -38,16 +61,19 @@ export default function HomePage() {
   const { data: session } = useSession();
   const today = useMemo(() => rangeQueryString('today', new Date()), []);
 
-  const { data: dashboard } = useApiQuery<AnalyticsDashboard>(
+  const { data: dashboard, error } = useApiQuery<AnalyticsDashboard>(
     ['analytics', 'dashboard', 'today'],
     `/admin/api/analytics?${today}`,
     { enabled: Boolean(session) },
   );
 
-  if (!session) return null;
+  if (!session) return <PageSkeleton />;
 
   const summary = dashboard?.summary;
   const currencyCode = summary?.totalSales.currencyCode ?? 'USD';
+  // A failed report must not skeleton forever: the cards fall back to their
+  // zero values rather than pretending they are still on the way.
+  const pending = !summary && !error;
 
   return (
     <Page title={`${greeting(new Date().getHours())}, ${session.shop.name}`}>
@@ -65,18 +91,21 @@ export default function HomePage() {
               <TodayMetric
                 label="Total sales"
                 value={format(summary?.totalSales ?? { amount: 0, currencyCode })}
+                loading={pending}
               />
             </Grid.Cell>
             <Grid.Cell columnSpan={{ xs: 6, sm: 2, md: 2, lg: 4, xl: 4 }}>
               <TodayMetric
                 label="Orders"
                 value={(summary?.orderCount ?? 0).toLocaleString('en-US')}
+                loading={pending}
               />
             </Grid.Cell>
             <Grid.Cell columnSpan={{ xs: 6, sm: 2, md: 2, lg: 4, xl: 4 }}>
               <TodayMetric
                 label="Sessions"
                 value={(summary?.sessionCount ?? 0).toLocaleString('en-US')}
+                loading={pending}
               />
             </Grid.Cell>
           </Grid>

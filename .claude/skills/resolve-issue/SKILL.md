@@ -1,6 +1,6 @@
 ---
 name: resolve-issue
-description: Take one issue from docs/issues/ and land it as a merged PR. Use when picking up backlog work, when asked to "do C3" / "work on the next issue", or when resuming an issue already claimed in AGENT-LOG. Covers claiming, TDD that catches real bugs, verifying against the running stack, and the swarm/environment traps that cost hours. Applies to every workstream — API, admin, storefront, worker, pay, theme, seed.
+description: Build ONE issue from docs/issues/ and land it as a merged PR. Use when picking up backlog work, when asked to "do C3" / "work on the next issue", or when resuming an issue already claimed in AGENT-LOG. Covers claiming, TDD that catches real bugs, verifying against the running stack, and the swarm/environment traps that cost hours. Applies to every workstream — API, admin, storefront, worker, pay, theme, seed. To judge existing code rather than build: critical-review for one named scope, repo-review for the whole project.
 ---
 
 # Resolving an issue
@@ -13,11 +13,48 @@ cost real time when ignored.
 **The bar:** a merged PR whose behaviour you have *seen work*, not one that
 compiles and has green tests.
 
+**This skill vs the others:** `resolve-issue` *builds*.
+[`critical-review`](../critical-review/SKILL.md) audits one named scope in depth
+and only reports. [`repo-review`](../repo-review/SKILL.md) surveys the whole
+build, drives the app in a browser, and lands the small fixes itself.
+
 **The tiebreaker, for every judgement call below:** the KPI — a Shopify user
 opens our admin and cannot tell it isn't Shopify. Resolve trade-offs in
 CLAUDE.md §0's order — appearance parity → functionality → performance →
 everything else. When two defensible options exist, take the one that serves
 that, log a line in `DECISIONS.md`, and keep moving.
+
+### Delegating — leverage, not ceremony
+
+Delegating is available and sometimes clearly better. It is never required, and
+forcing it costs more than it saves.
+
+**Worth delegating:**
+
+- A question that spans many files where you only want the conclusion — "which
+  workstreams call this helper", "where is tenant scoping applied inconsistently".
+  A read-only search agent returns the answer instead of filling your context
+  with file dumps.
+- Genuinely independent work you would otherwise do serially — several unrelated
+  audits, or reading three subsystems at once before a design decision.
+- An adversarial second pass on a finished diff — that is what
+  [`critical-review`](../critical-review/SKILL.md) is for. Running it over your
+  own work before pushing is cheap and catches what you have gone blind to.
+
+**Not worth it:**
+
+- A focused change in files you already have open. The handoff costs more than
+  the work.
+- Anything needing your live state — a running dev server, a logged-in browser
+  session, uncommitted edits. A subagent does not share them, and will report
+  confidently about a stack it cannot see.
+- A single-fact lookup you could answer with one `grep`.
+
+**The rule that does not bend:** a subagent's report is not verification. It can
+tell you where to look and what it believes; it cannot discharge "I have seen
+this work". Treat its findings as leads to confirm, not conclusions to relay —
+they are sometimes confidently wrong, and the bar at the top of this file is
+still yours to meet.
 
 ---
 
@@ -242,6 +279,10 @@ item below is something this pass actually caught, after the tests were green.
   trains you to ignore the next one. The linter will tell you.
 - **Rendered controls for cut features.** A button that cannot work must not
   exist.
+- **Is it reachable?** A page nothing links to is not shipped. I built a
+  settings sub-page whose only entry point was a hub another issue had not
+  built yet — it worked perfectly and no one could get to it. Follow the nav
+  registry or an existing link to your screen before calling it done.
 - **Anything branded or external that PARITY forbids** — a CDN asset, a logo, a
   vendor name in copy.
 - **Scope creep and leftovers** — debug logging, a temporary `.env` or
@@ -253,8 +294,11 @@ Then run the repo's own reviewer over it before you push:
 pnpm verify      # lint + typecheck + unit
 ```
 
-If a finding is real, fix it and re-run the loop. If it is not, say why rather
-than silently ignoring it.
+This is also the natural place to hand the diff to
+[`critical-review`](../critical-review/SKILL.md): an adversarial pass catches
+what you have stopped being able to see. Its findings are leads — confirm each
+against the code before acting, and if one is wrong, say why rather than
+silently dropping it.
 
 ---
 
@@ -331,6 +375,7 @@ every suite creates its own shop.
 - [ ] Every bug found by hand got a test BEFORE it got a fix
 - [ ] Read the whole diff back: no lying comments, unsafe casts, dead state,
       stale suppressions, or controls for cut features
+- [ ] Any delegated finding confirmed against the code, not relayed on trust
 - [ ] Cut features not rendered; UI rules enforced server-side too
 - [ ] `pnpm verify` green *after* merging main, installing and migrating
 - [ ] DECISIONS.md + AGENT-LOG handoffs addressed to named downstream issues

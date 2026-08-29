@@ -33,6 +33,16 @@ export type OrderNotification = {
   >;
   order: OrderSummary;
   /**
+   * `refunds/create` only: the refund itself. Without it the body's only money
+   * is the order's FULL original total, so a partial refund is
+   * indistinguishable from a full one on the wire (DECISIONS.md).
+   */
+  refund?: {
+    id: string;
+    /** Refunded amount in minor units; becomes a Money on the way out. */
+    amount: number;
+  };
+  /**
    * Absolute thank-you URL for the confirmation email's button. Only checkout
    * knows it (the token is the credential), so it arrives here as an option;
    * null omits the button rather than linking a customer at a guessed 404.
@@ -63,10 +73,20 @@ export async function notifyOrder({
   shopId,
   topic,
   order,
+  refund,
   orderStatusUrl,
 }: OrderNotification): Promise<void> {
   try {
-    await emitWebhookEvent(shopId, topic, orderPayload(order));
+    const payload = refund
+      ? {
+          ...orderPayload(order),
+          refund: {
+            id: refund.id,
+            amount: { amount: refund.amount, currencyCode: order.currencyCode },
+          },
+        }
+      : orderPayload(order);
+    await emitWebhookEvent(shopId, topic, payload);
     if (topic === 'orders/create') {
       await enqueueOrderConfirmationEmail(shopId, order.id, orderStatusUrl ?? null);
     }

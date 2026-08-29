@@ -1,6 +1,16 @@
 'use client';
 
-import { Badge, Button, ButtonGroup, InlineStack, Select, Text, Tooltip } from '@shopify/polaris';
+import {
+  Badge,
+  Banner,
+  Button,
+  ButtonGroup,
+  InlineStack,
+  Select,
+  Spinner,
+  Text,
+  Tooltip,
+} from '@shopify/polaris';
 /**
  * The live preview and its toolbar (SPEC §12). Owner: WS-F.
  *
@@ -10,6 +20,7 @@ import { Badge, Button, ButtonGroup, InlineStack, Select, Text, Tooltip } from '
  * anything.
  */
 import { RefreshIcon } from '@shopify/polaris-icons';
+import type { ApiError } from '../../../../lib/api.ts';
 import { type PreviewPage, previewUrl } from './preview-url.ts';
 
 const DEVICE_WIDTH = { desktop: '100%', mobile: '390px' } as const;
@@ -22,6 +33,8 @@ export function PreviewPane({
   device,
   onDeviceChange,
   token,
+  tokenError,
+  onRetryToken,
   productHandle,
   collectionHandle,
   nonce,
@@ -39,8 +52,11 @@ export function PreviewPane({
   device: Device;
   onDeviceChange: (device: Device) => void;
   token: string | null;
+  /** Set when a draft's token request failed and there is no token to fall back on. */
+  tokenError: ApiError | null;
+  onRetryToken: () => void;
   productHandle: string | null;
-  collectionHandle: string;
+  collectionHandle: string | null;
   nonce: number;
   /** False while a draft's preview token is still loading. */
   ready: boolean;
@@ -133,7 +149,23 @@ export function PreviewPane({
           padding: device === 'mobile' ? 'var(--p-space-400)' : 0,
         }}
       >
-        {!ready ? null : (
+        {/* Three states, all visible: a broken token gets a banner with a
+            retry, a loading one a spinner — never an empty grey rectangle. */}
+        {tokenError ? (
+          <div style={{ width: '100%', padding: 'var(--p-space-400)', alignSelf: 'start' }}>
+            <Banner
+              tone="critical"
+              title="Preview couldn’t be loaded"
+              action={{ content: 'Try again', onAction: onRetryToken }}
+            >
+              <p>{tokenError.message}</p>
+            </Banner>
+          </div>
+        ) : !ready ? (
+          <div style={{ alignSelf: 'center' }}>
+            <Spinner accessibilityLabel="Loading preview" size="large" />
+          </div>
+        ) : (
           <iframe
             key={device}
             title="Storefront preview"

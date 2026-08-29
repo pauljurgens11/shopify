@@ -258,6 +258,87 @@ describe('PUT reconciliation', () => {
     });
   });
 
+  it('leaves fields alone that a mentioned variant does not carry', async () => {
+    // The admin form sends only id/price/sku/optionValues per variant. Fields
+    // it does not carry — barcode, compareAtPrice, weight, the oversell policy
+    // — must survive the save, not reset to their create-time defaults.
+    const created = await createProduct({
+      title: 'Sparse Payload Tee',
+      variants: [
+        {
+          price: usd(1999),
+          compareAtPrice: usd(2999),
+          sku: 'SPARSE-1',
+          barcode: '0123456789012',
+          weightGrams: 500,
+          inventoryPolicy: 'continue',
+        },
+      ],
+    });
+    const variant = created.variants[0];
+
+    const response = await write('PUT', `${PRODUCTS}/${created.id}`, {
+      title: 'Sparse Payload Tee',
+      options: [],
+      variants: [{ id: variant.id, price: usd(1799), sku: 'SPARSE-1', optionValues: {} }],
+      images: [],
+    });
+    expect(response.statusCode, response.body).toBe(200);
+
+    expect(response.json().variants[0]).toMatchObject({
+      id: variant.id,
+      price: usd(1799),
+      compareAtPrice: usd(2999),
+      barcode: '0123456789012',
+      weightGrams: 500,
+      inventoryPolicy: 'continue',
+    });
+  });
+
+  it('keeps variant identity and stock across an option rename', async () => {
+    const created = await createProduct({
+      title: 'Rename Hat',
+      options: [{ name: 'Size', position: 0, values: ['S', 'M'] }],
+      variants: [
+        { optionValues: { Size: 'S' }, price: usd(2200), sku: 'HAT-S' },
+        { optionValues: { Size: 'M' }, price: usd(2400), sku: 'HAT-M' },
+      ],
+    });
+    const small = created.variants.find((v: VariantDto) => v.title === 'S');
+
+    const location = await write('POST', '/admin/api/locations', { name: 'Rename Depot' });
+    expect(location.statusCode, location.body).toBe(201);
+    const adjusted = await write('POST', '/admin/api/inventory/adjust', {
+      variantId: small.id,
+      locationId: location.json().id,
+      delta: 7,
+      reason: 'received',
+    });
+    expect(adjusted.statusCode, adjusted.body).toBe(200);
+
+    // The form regenerates its table on a rename and carries no ids — the
+    // positional re-key must still claim the old rows, or their skus and
+    // inventory levels are destroyed.
+    const response = await write('PUT', `${PRODUCTS}/${created.id}`, {
+      options: [{ name: 'Sizing', position: 0, values: ['S', 'M'] }],
+      variants: [
+        { optionValues: { Sizing: 'S' }, price: usd(2200) },
+        { optionValues: { Sizing: 'M' }, price: usd(2400) },
+      ],
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const updated = response.json();
+
+    const smallAfter = updated.variants.find((v: VariantDto) => v.title === 'S');
+    expect(smallAfter).toMatchObject({
+      id: small.id,
+      sku: 'HAT-S',
+      optionValues: { Sizing: 'S' },
+      inventoryQuantity: 7,
+    });
+    expect(updated.options).toMatchObject([{ name: 'Sizing', values: ['S', 'M'] }]);
+  });
+
   it('rejects an oversized option matrix without materializing it', async () => {
     const values = (n: number) => Array.from({ length: n }, (_, i) => `v${i}`);
     const started = Date.now();

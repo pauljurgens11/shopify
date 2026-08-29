@@ -31,6 +31,7 @@ import { createCustomers } from './customers.ts';
 import { createDiscounts } from './discounts.ts';
 import { applyStockCorrections, InventoryLedger } from './inventory.ts';
 import { createOrders } from './orders.ts';
+import { createSavedCards } from './pay.ts';
 import { createRng } from './random.ts';
 import {
   applyShopSettings,
@@ -92,6 +93,10 @@ export async function seedDemo(): Promise<SeedSummary> {
     discounts,
     ledger,
   });
+
+  // After orders: the saved cards go to customers who demonstrably buy, so the
+  // order pages a reviewer opens actually show D4's "charge saved card" block.
+  await createSavedCards(dbAdmin, ctx, { customers, orders });
 
   // A handful of genuinely sold-out variants: two everywhere (storefront
   // sold-out badge) and four more only in the store (the per-location split B6

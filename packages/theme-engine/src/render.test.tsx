@@ -38,6 +38,21 @@ describe('themeCssVariables', () => {
     expect(vars['--theme-font-heading']).toContain('Fraunces');
   });
 
+  it('substitutes a safe fallback for a colour that is not an anchored hex', () => {
+    // The contracts schema already rejects this upstream; this is the emit-time
+    // belt-and-braces for the string that lands in a `style` attribute.
+    const vars = themeCssVariables({
+      ...TOKENS,
+      colorAccent: 'red;} body{display:none}',
+      colorBackground: 'url(javascript:1)',
+    });
+    expect(vars['--theme-color-accent']).toBe('#000000');
+    expect(vars['--theme-color-background']).toBe('#ffffff');
+    // Valid hexes — 6- or 3-digit — pass through untouched.
+    expect(vars['--theme-color-primary']).toBe('#7c4a2d');
+    expect(themeCssVariables({ ...TOKENS, colorText: '#abc' })['--theme-color-text']).toBe('#abc');
+  });
+
   it('derives button colors from the palette so ThemeButton needs no token access', () => {
     const solid = themeCssVariables({ ...TOKENS, buttonStyle: 'solid' });
     const outline = themeCssVariables({ ...TOKENS, buttonStyle: 'outline' });

@@ -1,4 +1,5 @@
 import type { QueueName } from '@merchant/config/constants';
+import type { JobName } from '@merchant/config/queue';
 
 /**
  * What the queue knows about this run. Handlers need it to tell "will retry"
@@ -13,8 +14,11 @@ export type JobContext = {
 };
 
 export type JobDefinition<T = unknown> = {
-  /** Must be unique across all jobs; also the filename. */
-  name: string;
+  /**
+   * Must come from `JOB_NAMES` — the same constant the producer enqueues with,
+   * so a drift between the two sides is a compile error, not an unhandled job.
+   */
+  name: JobName;
   queue: QueueName;
   handler: (payload: T, ctx: JobContext) => Promise<void>;
 };

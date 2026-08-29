@@ -19,7 +19,11 @@ const connection = new IORedis(config.REDIS_URL, {
 });
 
 const workers = Object.values(QUEUES).map((queue) => {
-  const jobsForQueue = new Map(JOBS.filter((j) => j.queue === queue).map((j) => [j.name, j]));
+  // Keyed by plain string: job.name arrives from Redis, so the lookup takes
+  // untrusted input on purpose — the miss branch below is the safety net.
+  const jobsForQueue = new Map<string, (typeof JOBS)[number]>(
+    JOBS.filter((j) => j.queue === queue).map((j) => [j.name, j]),
+  );
 
   const worker = new Worker(
     queue,

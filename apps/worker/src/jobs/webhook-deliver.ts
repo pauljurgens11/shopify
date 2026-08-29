@@ -35,7 +35,15 @@ async function handler(raw: unknown, ctx: JobContext): Promise<void> {
   }
 
   const subscriptions = await db.webhookSubscription.findMany({
-    where: { topic: event.topic, isActive: true, app: { uninstalledAt: null } },
+    where: {
+      topic: event.topic,
+      isActive: true,
+      deletedAt: null,
+      app: { uninstalledAt: null },
+      // A targeted event (a "send test event" click) goes to that one
+      // subscription only — never to other endpoints sharing the topic.
+      ...(event.subscriptionId ? { id: event.subscriptionId } : {}),
+    },
     select: { id: true, url: true, secret: true },
   });
   if (subscriptions.length === 0) return;

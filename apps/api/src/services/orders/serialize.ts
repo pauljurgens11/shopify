@@ -35,6 +35,10 @@ type CustomerRow = {
 };
 
 export type OrderWithLines = OrderRow & { lineItems: LineRow[] };
+/** The index row joins just the customer's name — see `orderSummarySchema`. */
+export type OrderWithCustomerName = OrderWithLines & {
+  customer?: { firstName: string | null; lastName: string | null } | null;
+};
 export type OrderWithDetail = OrderWithLines & {
   events?: OrderEventRow[];
   customer?: CustomerRow | null;
@@ -164,8 +168,16 @@ function base(order: OrderWithLines) {
 }
 
 /** Index-table row: no fulfillments, no refunds, no timeline. */
-export function toOrderSummary(order: OrderWithLines): OrderSummary {
-  return orderSummarySchema.parse(base(order));
+export function toOrderSummary(order: OrderWithCustomerName): OrderSummary {
+  // Both "the caller never joined the relation" (undefined) and "joined it and
+  // the order has no customer" (null) collapse to null — a guest order and an
+  // unjoined query must not render differently in the Customer column.
+  return orderSummarySchema.parse({
+    ...base(order),
+    customer: order.customer
+      ? { firstName: order.customer.firstName, lastName: order.customer.lastName }
+      : null,
+  });
 }
 
 export function toOrderDetail(

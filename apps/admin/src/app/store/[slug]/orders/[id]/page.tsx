@@ -15,6 +15,7 @@ import type { OrderDetail } from '@merchant/contracts/orders';
 import {
   Badge,
   BlockStack,
+  Button,
   Card,
   InlineStack,
   Layout,
@@ -26,11 +27,13 @@ import {
   TextField,
 } from '@shopify/polaris';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
+// D4's saved-card charge block (WS-D owns it; mounted here per the D4 issue).
+import { ChargeSavedCard } from '../../settings/payments/charge-saved-card.tsx';
 import { LineItemsCards } from '../_components/line-items-card.tsx';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from '../_components/order-badges.tsx';
 import { PaymentCard } from '../_components/payment-card.tsx';
@@ -75,7 +78,6 @@ function AddressBlock({ address }: { address: AddressDto | null }) {
 
 export default function OrderDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
-  const _router = useRouter();
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -89,7 +91,14 @@ export default function OrderDetailPage() {
   const query = useApiQuery<OrderDetail>(['order', id], `/admin/api/orders/${id}`);
   const order = query.data;
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['order', id] });
+  // Cancel (and any other mutation here) changes what the orders index and the
+  // nav's open-orders badge show, so those caches go stale together.
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['order', id] }),
+      queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      queryClient.invalidateQueries({ queryKey: ['open-orders-count'] }),
+    ]);
 
   if (query.isPending) return <PageSkeleton />;
   if (!order) {
@@ -110,15 +119,22 @@ export default function OrderDetailPage() {
     minute: '2-digit',
   });
 
-  /** Shopify disables Cancel once money has been captured. */
+  /**
+   * Shopify disables Cancel while the merchant still holds the customer's
+   * money — refund first, then cancel. A FULLY refunded order is cancellable
+   * (the server accepts it), which is exactly the "refund, then cancel" path.
+   */
   const paid = order.financialStatus === 'paid' || order.financialStatus === 'partially_refunded';
   const alreadyCancelled = Boolean(order.cancelledAt);
+  /** Nothing left to send back once the order is cancelled or fully refunded. */
+  const refundable = !alreadyCancelled && order.refundedTotal.amount < order.total.amount;
 
   const postComment = async (message: string) => {
     setPosting(true);
     try {
       await apiFetch(`/admin/api/orders/${id}/events`, { method: 'POST', body: { message } });
       await refresh();
+      toast.show('Comment added');
     } catch (cause) {
       toast.error((cause as ApiError).message);
       throw cause;
@@ -171,17 +187,26 @@ export default function OrderDetailPage() {
         </InlineStack>
       }
       subtitle={placed}
+      // PARITY.md → Order detail: `Refund` then `More actions ▾`, top-right.
       secondaryActions={
+        refundable ? [{ content: 'Refund', url: `/store/${slug}/orders/${id}/refund` }] : []
+      }
+      actionGroups={
         alreadyCancelled
           ? []
           : [
               {
-                content: 'Cancel order',
-                destructive: true,
-                disabled: paid,
-                onAction: () => setCancelOpen(true),
-                // Shopify explains the disabled state rather than hiding it.
-                helpText: paid ? 'Refund the payment before cancelling this order.' : undefined,
+                title: 'More actions',
+                actions: [
+                  {
+                    content: 'Cancel order',
+                    destructive: true,
+                    disabled: paid,
+                    onAction: () => setCancelOpen(true),
+                    // Shopify explains the disabled state rather than hiding it.
+                    helpText: paid ? 'Refund the payment before cancelling this order.' : undefined,
+                  },
+                ],
               },
             ]
       }
@@ -190,7 +215,7 @@ export default function OrderDetailPage() {
         <Layout.Section>
           <BlockStack gap="400">
             <LineItemsCards order={order} fulfilHref={`/store/${slug}/orders/${id}/fulfill`} />
-            <PaymentCard order={order} refundHref={`/store/${slug}/orders/${id}/refund`} />
+            <PaymentCard order={order} />
             <Card>
               <Timeline events={order.events} onComment={postComment} posting={posting} />
             </Card>
@@ -214,11 +239,16 @@ export default function OrderDetailPage() {
                   onChange={setNote}
                 />
                 {note !== null && note !== (order.note ?? '') ? (
+                  // Buttons, not text links: Shopify's inline note editor ends
+                  // in a Cancel/Save button pair, and `loading` on the primary
+                  // is the in-button spinner PARITY.md asks for.
                   <InlineStack align="end" gap="200">
-                    <Link onClick={() => setNote(null)}>Discard</Link>
-                    <Link onClick={savingNote ? undefined : saveNote}>
-                      {savingNote ? 'Saving…' : 'Save'}
-                    </Link>
+                    <Button disabled={savingNote} onClick={() => setNote(null)}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" loading={savingNote} onClick={() => void saveNote()}>
+                      Save
+                    </Button>
                   </InlineStack>
                 ) : null}
               </BlockStack>
@@ -276,6 +306,8 @@ export default function OrderDetailPage() {
                 </BlockStack>
               </BlockStack>
             </Card>
+
+            <ChargeSavedCard order={order} onCharged={refresh} />
 
             {order.tags.length > 0 ? (
               <Card>

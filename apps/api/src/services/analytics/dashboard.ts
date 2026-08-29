@@ -3,9 +3,11 @@
  *
  * SPEC is explicit about the read model: **rollups plus today's raw**. Closed
  * days come from `AnalyticsRollupDaily` — written by H1's seed for history and
- * by the worker's 5-minute job since — and any day the rollup has not closed
- * yet is aggregated from raw events at read time. That is what keeps a dashboard
- * that must feel live off a table with millions of rows in it.
+ * by the worker's 5-minute job since. Today is ALWAYS aggregated from raw
+ * events at read time, even though the worker upserts today's rollup too (that
+ * row is up to 5 minutes stale by definition); so is any past day the worker
+ * has not reached. That is what keeps a dashboard that must feel live off a
+ * table with millions of rows in it.
  *
  * Every amount stays integer minor units the whole way through; the chart layer
  * formats (SPEC §5).
@@ -64,10 +66,15 @@ function daysBetween(from: Date, to: Date): Date[] {
 const money = (amount: number, currencyCode: string) => ({ amount, currencyCode });
 
 /**
- * Per-day totals for a window: rollup rows for the days that have them, raw
- * events (and Orders) for the days that do not.
+ * Per-day totals for a window: rollup rows for the closed days that have them,
+ * raw events (and Orders) for the days that do not — and for today, always.
  */
-async function dailyTotals(db: TenantClient, from: Date, to: Date): Promise<Map<number, Totals>> {
+async function dailyTotals(
+  db: TenantClient,
+  from: Date,
+  to: Date,
+  now: Date = new Date(),
+): Promise<Map<number, Totals>> {
   const days = daysBetween(from, to);
   const byDay = new Map<number, Totals>(days.map((d) => [d.getTime(), emptyTotals()]));
   if (days.length === 0) return byDay;
@@ -80,15 +87,22 @@ async function dailyTotals(db: TenantClient, from: Date, to: Date): Promise<Map<
     select: { date: true, metric: true, value: true },
   });
 
+  // TODAY is never closed: the worker upserts the current day's rollup every 5
+  // minutes, so a row existing for it means "up to 5 minutes stale", not
+  // "final". Skip its rows and let the raw branch below read today live.
+  const todayKey = startOfUtcDay(now).getTime();
+
   const rolledUp = new Set<number>();
   for (const row of rollups) {
-    const bucket = byDay.get(startOfUtcDay(row.date).getTime());
+    const key = startOfUtcDay(row.date).getTime();
+    if (key === todayKey) continue;
+    const bucket = byDay.get(key);
     if (!bucket) continue;
-    rolledUp.add(startOfUtcDay(row.date).getTime());
+    rolledUp.add(key);
     if (row.metric in bucket) bucket[row.metric as Metric] = row.value;
   }
 
-  // Days the worker has not closed yet — today, and anything it has not reached.
+  // Days the worker has not closed — today, and anything it has not reached.
   const open = days.filter((d) => !rolledUp.has(d.getTime()));
   if (open.length === 0) return byDay;
 
@@ -216,6 +230,7 @@ export async function getDashboard(
   db: TenantClient,
   shopId: string,
   range: { from: Date; to: Date },
+  now: Date = new Date(),
 ): Promise<AnalyticsDashboard> {
   const shop = await db.shop.findUnique({
     where: { id: shopId },
@@ -223,7 +238,7 @@ export async function getDashboard(
   });
   const currencyCode = shop?.currencyCode ?? DEFAULT_CURRENCY;
 
-  const byDay = await dailyTotals(db, range.from, range.to);
+  const byDay = await dailyTotals(db, range.from, range.to, now);
   const totals = sumTotals(byDay);
 
   // The comparison window is the same length, immediately before. Measured in
@@ -235,6 +250,7 @@ export async function getDashboard(
     db,
     new Date(startOfUtcDay(range.from).getTime() - spanMs),
     new Date(startOfUtcDay(range.from).getTime() - DAY_MS),
+    now,
   );
   const previousTotals = sumTotals(previous);
 

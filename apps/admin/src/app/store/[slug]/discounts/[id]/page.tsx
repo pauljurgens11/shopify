@@ -4,6 +4,7 @@
  * Edit discount (C6). Same form as create; the draft is seeded from the row.
  */
 import type { Discount } from '@merchant/contracts/discounts';
+import { Banner, Page } from '@shopify/polaris';
 import { useParams } from 'next/navigation';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../../lib/api.ts';
@@ -16,7 +17,18 @@ export default function EditDiscountPage() {
   const session = useSession();
   const discount = useApiQuery<Discount>(['discount', id], `/admin/api/discounts/${id}`);
 
-  if (discount.isPending || !session.data || !discount.data) return <PageSkeleton />;
+  if (discount.isPending || session.isPending) return <PageSkeleton />;
+
+  // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
+  if (discount.error || !discount.data || !session.data) {
+    return (
+      <Page backAction={{ content: 'Discounts', url: `/store/${slug}/discounts` }} title="Discount">
+        <Banner tone="critical" title="This discount could not be loaded">
+          <p>{discount.error?.message ?? 'It may have been deleted.'}</p>
+        </Banner>
+      </Page>
+    );
+  }
 
   return (
     <DiscountForm
