@@ -101,6 +101,35 @@ domain redirects to the admin, so that is the URL to hand out.
 
 `docs/DEMO.md` is the click-through path once it's up.
 
+## 5. Redeploying (ship a new `main` to a live box)
+
+One command, on the server, from the repo checkout:
+
+```bash
+bash deploy/redeploy.sh
+```
+
+It hard-resets the checkout to `origin/main` (the server clone is disposable;
+the untracked `.env` survives), rebuilds the four app images, `up`s the stack,
+waits for every healthcheck, and probes the public URLs — exiting non-zero
+with the failing service's logs if anything doesn't come up. Idempotent: run
+it as often as you like, and a failed build leaves the previous containers
+serving. `--no-pull` rebuilds whatever is checked out instead.
+
+Notes for whoever (or whatever agent) operates it:
+
+- **Merge to `main` first, then redeploy.** The script deploys `origin/main`,
+  nothing else — there is no "deploy a branch" path, on purpose.
+- Wait for `main-checks` to be green before redeploying: it runs the e2e
+  smoke and all four Docker builds, so a red run is a broken deploy caught
+  early. `pr-checks` alone is not enough — it skips e2e.
+- Redeploying **preserves data** (orders, shops, uploads). For a fresh demo
+  reset, see *Living with it* below — that is a different, destructive step.
+- A redeploy interrupts the site for roughly the container swap (~seconds per
+  service, staggered by the dependency order). Don't run it mid-demo.
+- Certificates, DNS and secrets are untouched by a redeploy; they were done
+  once in §1–§2.
+
 ---
 
 ## Living with it
