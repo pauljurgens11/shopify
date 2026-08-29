@@ -299,12 +299,14 @@ export async function runThemeGeneration(
  */
 export const anthropicGenerator: ThemeGenerator = async (input) => {
   const config = env();
-  // The SDK's defaults (~10 min timeout, 2 retries) can outlive the client's
-  // polling and the 5-min stale-pending sweep. runThemeGeneration already does
-  // one semantic retry, so worst case here stays ≈ 2 × 2 min.
+  // This timeout is one rung of a ladder: 2 semantic attempts must finish
+  // inside STALE_PENDING_MS (api themes/conversation.ts), which must finish
+  // inside POLL_GIVE_UP_MS (admin use-builder.ts). Raise one, raise all three.
+  // Sized for Fable 5, whose turns run far longer than Sonnet's: worst case
+  // here is 2 × 4 min = 8 min, under the 9-min sweep and 10-min give-up.
   const client = new Anthropic({
     apiKey: config.ANTHROPIC_API_KEY,
-    timeout: 120_000,
+    timeout: 240_000,
     maxRetries: 0,
   });
 
