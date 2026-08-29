@@ -17,6 +17,7 @@
  */
 import { BlockStack, Box, Card, InlineError, InlineStack, Text, TextField } from '@shopify/polaris';
 import { useState } from 'react';
+import { RichTextField } from '../../products/_components/rich-text-field.tsx';
 import { CollectionImage } from './collection-image.tsx';
 
 /** An unstyled, full-width, left-aligned click target for the read state. */
@@ -34,10 +35,13 @@ const AFFORDANCE: React.CSSProperties = {
   display: 'block',
 };
 
+/** `<p><br></p>` is what an emptied rich text editor leaves behind. */
+const hasContent = (html: string) =>
+  html.replace(/<[^>]*>/g, '').trim() !== '' || /<img\b/i.test(html);
+
 export function CollectionHeaderCard({
   title,
-  description,
-  descriptionIsRich,
+  descriptionHtml,
   imageUrl,
   titleError,
   onTitle,
@@ -45,13 +49,12 @@ export function CollectionHeaderCard({
   onImage,
 }: {
   title: string;
-  description: string;
-  /** The description is raw HTML we could not safely unwrap, so it is shown as-is. */
-  descriptionIsRich: boolean;
+  /** Html in and out, like the product form's — the editor owns the markup. */
+  descriptionHtml: string;
   imageUrl: string | null;
   titleError?: string;
   onTitle: (title: string) => void;
-  onDescription: (description: string) => void;
+  onDescription: (descriptionHtml: string) => void;
   onImage: (imageUrl: string | null) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -112,21 +115,16 @@ export function CollectionHeaderCard({
             {titleError ? <InlineError message={titleError} fieldID="title" /> : null}
 
             {editingDescription ? (
-              <TextField
+              // The same editor the product form uses: Shopify's collection
+              // description is rich text, and a bare textarea beside a
+              // toolbar'd product description is a loud "not Shopify" tell.
+              // Once revealed it stays revealed for the visit — it has no blur
+              // to close on, because reaching for the toolbar blurs the editor.
+              <RichTextField
                 label="Description"
                 labelHidden
-                autoComplete="off"
-                autoFocus
-                multiline={4}
-                placeholder="Add description"
-                value={description}
-                helpText={
-                  descriptionIsRich
-                    ? 'This description uses formatting, so it is shown as HTML.'
-                    : undefined
-                }
+                value={descriptionHtml}
                 onChange={onDescription}
-                onBlur={() => setEditingDescription(false)}
               />
             ) : (
               <button
@@ -135,13 +133,16 @@ export function CollectionHeaderCard({
                 aria-label="Edit collection description"
                 onClick={() => setEditingDescription(true)}
               >
-                {/* `pre-wrap` so a multi-line description reads back the way it
-                    was typed rather than collapsing to one paragraph. */}
-                <div style={{ whiteSpace: 'pre-wrap' }}>
-                  <Text as="p" variant="bodyMd" tone={description ? undefined : 'subdued'}>
-                    {description || 'Add description'}
+                {hasContent(descriptionHtml) ? (
+                  // The merchant's own markup, written by the editor above and
+                  // already rendered verbatim on the storefront.
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: see above
+                  <div dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
+                ) : (
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Add description
                   </Text>
-                </div>
+                )}
               </button>
             )}
           </BlockStack>

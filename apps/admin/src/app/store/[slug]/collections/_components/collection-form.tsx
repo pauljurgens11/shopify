@@ -32,7 +32,6 @@ import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
 import { membershipEdit } from '../../../../../lib/collection-edits.ts';
 import { completeRules, newRule } from '../../../../../lib/collection-rules.ts';
-import { htmlToText, isSimpleHtml, textToHtml } from '../../../../../lib/description-html.ts';
 import { previewUrl } from '../../storefront/preview-url.ts';
 import { CollectionHeaderCard } from './collection-header-card.tsx';
 import { type CollectionItem, toCollectionItem } from './collection-items.tsx';
@@ -45,9 +44,8 @@ const PREVIEW_LIMIT = 50;
 
 type Draft = {
   title: string;
-  /** Plain text normally; the raw HTML when it is too rich to unwrap. */
-  description: string;
-  descriptionIsRich: boolean;
+  /** Html in and out — `RichTextField` owns the markup, nothing unwraps it. */
+  descriptionHtml: string;
   type: 'manual' | 'smart';
   sortOrder: CollectionSortOrder;
   imageUrl: string | null;
@@ -62,8 +60,7 @@ const emptyRuleSet = (): CollectionRuleSet => ({
 
 const emptyDraft = (): Draft => ({
   title: '',
-  description: '',
-  descriptionIsRich: false,
+  descriptionHtml: '',
   type: 'manual',
   sortOrder: 'manual',
   imageUrl: null,
@@ -101,10 +98,7 @@ export function CollectionForm({
     if (!collection) return emptyDraft();
     return {
       title: collection.title,
-      description: isSimpleHtml(collection.descriptionHtml)
-        ? htmlToText(collection.descriptionHtml)
-        : collection.descriptionHtml,
-      descriptionIsRich: !isSimpleHtml(collection.descriptionHtml),
+      descriptionHtml: collection.descriptionHtml,
       type: collection.type,
       sortOrder: collection.sortOrder,
       imageUrl: collection.imageUrl,
@@ -248,9 +242,7 @@ export function CollectionForm({
     try {
       const body: Record<string, unknown> = {
         title: draft.title.trim(),
-        descriptionHtml: draft.descriptionIsRich
-          ? draft.description
-          : textToHtml(draft.description),
+        descriptionHtml: draft.descriptionHtml,
         type: draft.type,
         sortOrder: draft.sortOrder,
         imageUrl: draft.imageUrl,
@@ -422,12 +414,11 @@ export function CollectionForm({
           <BlockStack gap="400">
             <CollectionHeaderCard
               title={draft.title}
-              description={draft.description}
-              descriptionIsRich={draft.descriptionIsRich}
+              descriptionHtml={draft.descriptionHtml}
               imageUrl={draft.imageUrl}
               titleError={submitted ? titleError : undefined}
               onTitle={(title) => patch({ title })}
-              onDescription={(description) => patch({ description })}
+              onDescription={(descriptionHtml) => patch({ descriptionHtml })}
               onImage={(imageUrl) => patch({ imageUrl })}
             />
 
