@@ -19,6 +19,9 @@ import { THEME_PREVIEW_HEADER } from '../middleware.ts';
 import { apiGet } from './api.ts';
 import { resolveShopSlug } from './tenant.ts';
 
+/** One tag per shop: publishing only ever needs to invalidate one store's theme. */
+export const themeCacheTag = (slug: string): string => `theme:${slug}`;
+
 export interface StorefrontShop {
   id: string;
   name: string;
@@ -54,7 +57,9 @@ const loadShopContext = cache(async (): Promise<ShopContext | null> => {
   const [shop, theme] = await Promise.all([
     apiGet<StorefrontShop>(slug, '/shop'),
     apiGet<StorefrontThemeResponse>(slug, `/theme${preview}`, {
-      freshness: previewToken ? 'no-store' : { revalidate: 60 },
+      // Tagged so a Publish from the builder can bust this fetch immediately
+      // (app/api/revalidate) instead of shoppers riding out the 60s window.
+      freshness: previewToken ? 'no-store' : { revalidate: 60, tags: [themeCacheTag(slug)] },
     }),
   ]);
 
