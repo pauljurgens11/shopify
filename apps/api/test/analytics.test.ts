@@ -26,8 +26,10 @@ let app: FastifyInstance;
 let shop: TestShop;
 let neighbour: TestShop;
 let staleShop: TestShop;
+let breakdownShop: TestShop;
 let cookie: string;
 let staleCookie: string;
+let breakdownCookie: string;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Rollups cover closed days; "today" must come from raw events. */
@@ -170,6 +172,63 @@ beforeAll(async () => {
       createdAt: now,
     },
   });
+
+  // A shop whose orders carry every money component, so the breakdown card has
+  // something to tie out against. Today and yesterday are both OPEN days here
+  // (no rollup rows), which is the only state in which the rollup-backed `sales`
+  // metric and the order-backed breakdown are reading the same underlying rows —
+  // exactly the production case, where the worker computes the rollup FROM those
+  // orders.
+  breakdownShop = await createTestShop();
+  breakdownCookie = await sessionCookie(app, {
+    shopId: breakdownShop.shopId,
+    staffUserId: breakdownShop.ownerId,
+  });
+  const breakdownToday = startOfUtcDay(now);
+  const breakdownYesterday = new Date(breakdownToday.getTime() - DAY_MS);
+  const order = (
+    orderNumber: number,
+    createdAt: Date,
+    totals: {
+      subtotal: number;
+      discountTotal?: number;
+      shippingTotal?: number;
+      taxTotal?: number;
+      total: number;
+    },
+    cancelledAt?: Date,
+  ) =>
+    dbAdmin.order.create({
+      data: {
+        id: newId('order'),
+        shopId: breakdownShop.shopId,
+        orderNumber,
+        email: 'buyer@example.com',
+        currencyCode: 'USD',
+        createdAt,
+        cancelledAt: cancelledAt ?? null,
+        ...totals,
+      },
+    });
+
+  // 10,000 - 1,500 + 500 + 800 = 9,800
+  await order(2001, breakdownToday, {
+    subtotal: 10_000,
+    discountTotal: 1_500,
+    shippingTotal: 500,
+    taxTotal: 800,
+    total: 9_800,
+  });
+  // 4,000 + 320 = 4,320
+  await order(2002, breakdownToday, { subtotal: 4_000, taxTotal: 320, total: 4_320 });
+  // Cancelled: revenue the store never earned must stay out of every row.
+  await order(
+    2003,
+    breakdownToday,
+    { subtotal: 99_999, total: 99_999 },
+    new Date(breakdownToday.getTime() + 60_000),
+  );
+  await order(2004, breakdownYesterday, { subtotal: 5_000, total: 5_000 });
 });
 
 afterAll(async () => {
@@ -177,9 +236,11 @@ afterAll(async () => {
   // Orders are not part of `deleteTestShops` (payments reference them), so this
   // suite clears its own.
   await dbAdmin.order.deleteMany({
-    where: { shopId: { in: [shop.shopId, neighbour.shopId, staleShop.shopId] } },
+    where: {
+      shopId: { in: [shop.shopId, neighbour.shopId, staleShop.shopId, breakdownShop.shopId] },
+    },
   });
-  await deleteTestShops([shop.shopId, neighbour.shopId, staleShop.shopId]);
+  await deleteTestShops([shop.shopId, neighbour.shopId, staleShop.shopId, breakdownShop.shopId]);
 });
 
 describe('GET /admin/api/analytics', () => {
@@ -294,6 +355,78 @@ describe('GET /admin/api/analytics', () => {
     const response = await get(`/admin/api/analytics?${range(-1, 0)}`, { cookie: staffCookie });
     expect(response.statusCode).toBe(403);
     expect(response.json().errors[0].code).toBe('forbidden');
+  });
+});
+
+describe('sales breakdown and comparison series', () => {
+  const todayOnly = () => {
+    const day = startOfUtcDay(new Date()).toISOString();
+    return `from=${day}&to=${day}`;
+  };
+
+  it('breaks the period down into rows that tie back to the headline figure', async () => {
+    const body = (
+      await get(`/admin/api/analytics?${todayOnly()}`, { cookie: breakdownCookie })
+    ).json();
+
+    expect(body.salesBreakdown).toEqual({
+      grossSales: { amount: 14_000, currencyCode: 'USD' },
+      discounts: { amount: 1_500, currencyCode: 'USD' },
+      netSales: { amount: 12_500, currencyCode: 'USD' },
+      shippingCharges: { amount: 500, currencyCode: 'USD' },
+      taxes: { amount: 1_120, currencyCode: 'USD' },
+      totalSales: { amount: 14_120, currencyCode: 'USD' },
+    });
+
+    // The card sits directly under the `Total sales` tile. If these two ever
+    // disagree the dashboard is telling a merchant two different numbers.
+    expect(body.salesBreakdown.totalSales).toEqual(body.summary.totalSales);
+
+    // The identities the card renders as arithmetic the reader can follow.
+    const { grossSales, discounts, netSales, shippingCharges, taxes, totalSales } =
+      body.salesBreakdown;
+    expect(netSales.amount).toBe(grossSales.amount - discounts.amount);
+    expect(totalSales.amount).toBe(netSales.amount + shippingCharges.amount + taxes.amount);
+  });
+
+  it('leaves a cancelled order out of every breakdown row', async () => {
+    const body = (
+      await get(`/admin/api/analytics?${todayOnly()}`, { cookie: breakdownCookie })
+    ).json();
+
+    // Order 2003 is 99,999 and cancelled — it must not appear anywhere.
+    expect(body.salesBreakdown.grossSales.amount).toBe(14_000);
+    expect(body.summary.orderCount).toBe(2);
+  });
+
+  it('returns the previous period as its own breakdown, for the delta chips', async () => {
+    const body = (
+      await get(`/admin/api/analytics?${todayOnly()}`, { cookie: breakdownCookie })
+    ).json();
+
+    expect(body.comparisonSalesBreakdown.totalSales).toEqual({
+      amount: 5_000,
+      currencyCode: 'USD',
+    });
+  });
+
+  it('returns a comparison series aligned to the current one, index for index', async () => {
+    const body = (
+      await get(`/admin/api/analytics?${todayOnly()}`, { cookie: breakdownCookie })
+    ).json();
+
+    // The chart overlays the two lines on one x-axis, so a length mismatch
+    // silently shifts the dashed line by a day.
+    expect(body.comparisonSalesOverTime).toHaveLength(body.salesOverTime.length);
+    expect(body.comparisonSalesOverTime[0].value).toBe(5_000);
+    expect(body.salesOverTime[0].value).toBe(14_120);
+  });
+
+  it('reports zeroed rows, not missing ones, for a period with no orders', async () => {
+    const body = (await get(`/admin/api/analytics?${range(-30, -20)}`)).json();
+
+    expect(body.salesBreakdown.totalSales).toEqual({ amount: 0, currencyCode: 'USD' });
+    expect(body.salesBreakdown.grossSales).toEqual({ amount: 0, currencyCode: 'USD' });
   });
 });
 

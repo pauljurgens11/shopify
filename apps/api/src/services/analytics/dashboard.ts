@@ -13,7 +13,7 @@
  * formats (SPEC §5).
  */
 import { DEFAULT_CURRENCY } from '@merchant/config/money';
-import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
+import type { AnalyticsDashboard, SalesBreakdown } from '@merchant/contracts/analytics';
 import type { TenantClient } from '@merchant/db/tenant';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -226,6 +226,43 @@ async function topProducts(db: TenantClient, from: Date, to: Date, currencyCode:
     .slice(0, 10);
 }
 
+/**
+ * The `Total sales breakdown` card, for one window (parity: dashboard.md).
+ *
+ * Read straight off the Order rows rather than off the rollups: the rollup
+ * table stores one `sales` number per day and cannot say how much of it was
+ * shipping or tax. Orders are low-volume next to events, so one aggregate is
+ * cheap — and it is the same window and the same `cancelledAt: null` filter the
+ * `sales` metric uses, which is what keeps the card tied to the tile above it.
+ *
+ * `create.ts` enforces `subtotal - discountTotal + shippingTotal + taxTotal ===
+ * total` on every order, so `totalSales` here equals `summary.totalSales`
+ * exactly. Do not "improve" a row into a value that breaks that identity.
+ */
+async function salesBreakdown(
+  db: TenantClient,
+  from: Date,
+  toExclusive: Date,
+  currencyCode: string,
+): Promise<SalesBreakdown> {
+  const { _sum } = await db.order.aggregate({
+    where: { createdAt: { gte: from, lt: toExclusive }, cancelledAt: null },
+    _sum: { subtotal: true, discountTotal: true, shippingTotal: true, taxTotal: true, total: true },
+  });
+
+  const grossSales = _sum.subtotal ?? 0;
+  const discounts = _sum.discountTotal ?? 0;
+
+  return {
+    grossSales: money(grossSales, currencyCode),
+    discounts: money(discounts, currencyCode),
+    netSales: money(grossSales - discounts, currencyCode),
+    shippingCharges: money(_sum.shippingTotal ?? 0, currencyCode),
+    taxes: money(_sum.taxTotal ?? 0, currencyCode),
+    totalSales: money(_sum.total ?? 0, currencyCode),
+  };
+}
+
 export async function getDashboard(
   db: TenantClient,
   shopId: string,
@@ -246,13 +283,16 @@ export async function getDashboard(
   // spans two days but only 24h of clock, and comparing it against a single day
   // makes every delta chip on the dashboard wrong.
   const spanMs = daysBetween(range.from, range.to).length * DAY_MS;
-  const previous = await dailyTotals(
-    db,
-    new Date(startOfUtcDay(range.from).getTime() - spanMs),
-    new Date(startOfUtcDay(range.from).getTime() - DAY_MS),
-    now,
-  );
+  const previousFrom = new Date(startOfUtcDay(range.from).getTime() - spanMs);
+  const previousTo = new Date(startOfUtcDay(range.from).getTime() - DAY_MS);
+  const previous = await dailyTotals(db, previousFrom, previousTo, now);
   const previousTotals = sumTotals(previous);
+
+  const toExclusive = new Date(startOfUtcDay(range.to).getTime() + DAY_MS);
+  const [breakdown, previousBreakdown] = await Promise.all([
+    salesBreakdown(db, startOfUtcDay(range.from), toExclusive, currencyCode),
+    salesBreakdown(db, previousFrom, startOfUtcDay(range.from), currencyCode),
+  ]);
 
   return {
     summary: {
@@ -268,14 +308,12 @@ export async function getDashboard(
       },
     },
     salesOverTime: series(byDay, 'sales'),
+    comparisonSalesOverTime: series(previous, 'sales'),
+    salesBreakdown: breakdown,
+    comparisonSalesBreakdown: previousBreakdown,
     ordersOverTime: series(byDay, 'orders'),
     sessionsOverTime: series(byDay, 'sessions'),
-    topProducts: await topProducts(
-      db,
-      range.from,
-      new Date(range.to.getTime() + DAY_MS),
-      currencyCode,
-    ),
+    topProducts: await topProducts(db, range.from, toExclusive, currencyCode),
     // SPEC §13: render one channel, do not architect channels.
     salesByChannel: [{ channel: 'Online Store', revenue: money(totals.sales, currencyCode) }],
     funnel: {

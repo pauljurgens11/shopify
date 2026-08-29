@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 /**
- * Titles the tab "Products · Merchant" (H3; PARITY.md). Owner: WS-H.
+ * Titles the tab "Products · Shopify" (H3; PARITY.md). Owner: WS-H.
  *
  * A server layout is the only thing that can name these pages: every leaf under
  * `/store/{slug}` is a client component, and a client component cannot export

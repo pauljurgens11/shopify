@@ -28,7 +28,7 @@ workstream's foundation: the shell is the first thing a Shopify user sees.**
 **Layout authority: [PARITY.md](PARITY.md). It overrides your memory of Shopify — read your page's section before writing JSX.**
 
 1. **Login page** at `/login`: replicate Shopify's login look with Polaris —
-   centered card, "Merchant" wordmark (never the Shopify name/logo), email +
+   centered card, Shopify bag + wordmark lockup (`BrandLogo`), email +
    password, error banner on 401. Posts to api `/auth/login` with
    `credentials: 'include'` and the `x-requested-with` CSRF header.
    **Signup page** at `/signup` (linked "Get started" from login): shop
@@ -73,7 +73,7 @@ workstream's foundation: the shell is the first thing a Shopify user sees.**
 ## Landmines
 - Polaris v13 components only, no custom CSS beyond `--p-*` tokens; 20-minute
   escape hatch → plain JSX with tokens + a `DECISIONS.md` line (CLAUDE.md §7).
-- Never render the Shopify name or logo — brand is "Merchant".
+- Brand is "Shopify" (`BRAND_NAME`) with the bag mark; see DECISIONS.md.
 - Don't invent nav items or reorder them — the registry is the SPEC §9 list.
 - Other workstreams import your `src/lib/api.ts`; breaking its signature later
   needs a `DECISIONS.md` line first.

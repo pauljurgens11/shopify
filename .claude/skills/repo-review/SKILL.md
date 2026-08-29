@@ -67,7 +67,8 @@ Watch for:
   skeletons and empty states
 - seed data that reads as fake: lorem, placeholder images, $0.00, flat charts
 - console errors, hydration warnings, failed requests — parity defects, not hygiene
-- the word "Shopify" or their logo anywhere. Brand string is "Merchant".
+- brand drift: the admin chrome is "Shopify" + the bag mark (`BRAND_NAME`);
+  a leftover "Merchant" wordmark or a "Powered by …" line is the defect now.
 
 ## 2. Check the joins between workstreams
 

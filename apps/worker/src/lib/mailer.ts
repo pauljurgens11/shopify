@@ -13,7 +13,7 @@ export type OutgoingMail = {
   subject: string;
   html: string;
   text: string;
-  /** Display name on the From header — the shop, not "Merchant". */
+  /** Display name on the From header — the shop, not the platform brand. */
   fromName: string;
 };
 

@@ -36,9 +36,9 @@ import { privateResponse } from '../../../services/storefront/cache.ts';
 import {
   clearCustomerSessionCookie,
   createCustomerSession,
+  currentCustomerId,
   customerSessionIdFromRequest,
   destroyCustomerSession,
-  getCustomerSession,
   setCustomerSessionCookie,
 } from '../../../services/storefront/customer-sessions.ts';
 
@@ -103,14 +103,13 @@ function toStorefrontOrder(order: OrderSummary): StorefrontOrderSummary {
  * per-shop.
  */
 async function requireCustomer(request: FastifyRequest): Promise<string> {
-  const sessionId = customerSessionIdFromRequest(request);
-  if (!sessionId) throw unauthorized('Sign in to continue.');
+  if (!customerSessionIdFromRequest(request)) throw unauthorized('Sign in to continue.');
 
-  const session = await getCustomerSession(sessionId);
-  if (!session || session.shopId !== requireShop(request)) {
-    throw unauthorized('Your session has expired. Sign in again.');
-  }
-  return session.customerId;
+  // One implementation of "who is signed in here", shared with checkout's
+  // optional read — the per-shop check must not exist twice and drift.
+  const customerId = await currentCustomerId(request, requireShop(request));
+  if (!customerId) throw unauthorized('Your session has expired. Sign in again.');
+  return customerId;
 }
 
 async function customerResponse(request: FastifyRequest, customerId: string) {

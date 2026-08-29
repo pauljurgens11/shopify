@@ -19,7 +19,7 @@ SPEC §8: customer accounts are **optional** — guest checkout is the default
 path, so this issue is deliberately small. `Customer.passwordHash` is
 nullable; `customerLoginInput` exists in contracts. Sessions: reuse A1's
 Redis session machinery with a distinct cookie (add
-`CUSTOMER_SESSION_COOKIE = '_merchant_customer'` to `config/constants.ts` —
+`CUSTOMER_SESSION_COOKIE = '_shopify_customer'` to `config/constants.ts` —
 additive) and a `customerId` payload, scoped per storefront host.
 
 ## Build (SPEC §10)

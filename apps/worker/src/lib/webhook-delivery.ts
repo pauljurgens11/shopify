@@ -50,7 +50,7 @@ export async function postWebhook(params: {
       body,
       headers: {
         'content-type': 'application/json',
-        'user-agent': 'Merchant-Webhooks/1.0',
+        'user-agent': 'Shopify-Webhooks/1.0',
         [WEBHOOK_HMAC_HEADER]: signWebhookBody(body, secret),
         [WEBHOOK_TOPIC_HEADER]: envelope.topic,
         [WEBHOOK_SHOP_HEADER]: envelope.shopId,

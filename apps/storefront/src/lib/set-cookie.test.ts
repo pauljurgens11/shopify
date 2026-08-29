@@ -18,7 +18,7 @@ describe('cartTokenFromSetCookie', () => {
   });
 
   it('ignores a cleared cookie rather than pinning an empty token', () => {
-    // Relaying `''` would send `_merchant_cart=` on the next request and the
+    // Relaying `''` would send `_shopify_cart=` on the next request and the
     // shopper would be stuck on a cart that no longer exists.
     expect(cartTokenFromSetCookie([`${CART_COOKIE}=; Path=/; Max-Age=0`])).toBeNull();
   });

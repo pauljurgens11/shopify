@@ -54,10 +54,13 @@ const addressComplete = (a: AddressFields) =>
 export function CheckoutView({
   initial,
   shopName,
+  accountEmail,
   tokenizeUrl,
 }: {
   initial: Checkout;
   shopName: string;
+  /** The signed-in shopper's email, or null for a guest. Gates "save this card". */
+  accountEmail: string | null;
   tokenizeUrl: string;
 }) {
   const router = useRouter();
@@ -80,6 +83,7 @@ export function CheckoutView({
         }
       : {}),
   });
+  const [saveCard, setSaveCard] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const [paying, setPaying] = useState(false);
@@ -115,6 +119,12 @@ export function CheckoutView({
   const canPay =
     Boolean(email) && addressComplete(address) && Boolean(checkout.selectedShippingRateId);
 
+  // Only offered to a signed-in shopper paying under their own address — the
+  // API saves for nobody else, and a checkbox that quietly does nothing is
+  // worse than no checkbox. Retyping the email to someone else's withdraws it.
+  const canSaveCard =
+    accountEmail !== null && email.trim().toLowerCase() === accountEmail.toLowerCase();
+
   const pay = async () => {
     setBanner(null);
     setPaying(true);
@@ -126,7 +136,12 @@ export function CheckoutView({
       // One key per click: a double-submit charges once, and a retry after a
       // decline is a new attempt that must reach the processor (E3).
       const idempotencyKey = `pay_${randomId()}`;
-      const result = await payForCheckout(checkout.token, cardTokenId, idempotencyKey);
+      const result = await payForCheckout(
+        checkout.token,
+        cardTokenId,
+        idempotencyKey,
+        canSaveCard && saveCard,
+      );
 
       if (result.outcome === 'success') {
         router.push(`/checkouts/${checkout.token}/thank-you`);
@@ -294,6 +309,17 @@ export function CheckoutView({
             </div>
           ) : null}
           <CardFields ref={card} tokenizeUrl={tokenizeUrl} />
+          {canSaveCard ? (
+            <label className="mt-3 flex items-center gap-2 text-neutral-600 text-sm">
+              <input
+                type="checkbox"
+                checked={saveCard}
+                onChange={(event) => setSaveCard(event.target.checked)}
+                className="h-4 w-4 rounded border-neutral-300"
+              />
+              Save this card for future purchases
+            </label>
+          ) : null}
           <label className="mt-3 flex items-center gap-2 text-neutral-600 text-sm">
             <input type="radio" checked readOnly className="h-4 w-4" />
             Billing address same as shipping address

@@ -123,7 +123,7 @@ export default async function routes(app: FastifyInstance) {
     const eventId = await emitWebhookEvent(
       request.shopId as string,
       subscription.topic,
-      { id: webhookId, test: true, message: 'Test event from Merchant.' },
+      { id: webhookId, test: true, message: 'Test event from Shopify.' },
       { subscriptionId: webhookId },
     );
 

@@ -25,7 +25,7 @@ let db: TenantClient;
 const shopIds: string[] = [];
 
 const usd = (amount: number) => ({ amount, currencyCode: 'USD' });
-const CSRF = { 'x-requested-with': 'merchant-admin' };
+const CSRF = { 'x-requested-with': 'shopify-admin' };
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 const ids: Record<string, string> = {};
