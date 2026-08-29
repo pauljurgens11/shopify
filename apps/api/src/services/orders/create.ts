@@ -11,6 +11,7 @@
  */
 import { ORDER_NUMBER_START } from '@merchant/config/constants';
 import { newId } from '@merchant/config/ids';
+import { format } from '@merchant/config/money';
 import type { MoneyDto } from '@merchant/contracts/common';
 import {
   type CreateOrderInput,
@@ -176,6 +177,21 @@ export async function createOrder(
               // null actor = the system placed it, which is every checkout.
               actor: options.actor ?? null,
             },
+            // An order recorded as already paid (every completed checkout) gets
+            // its capture on the timeline too — `payment_captured` was a
+            // producer-less enum member, and DEMO.md's beat 6 points at this
+            // exact entry ("order placed, payment captured").
+            ...(data.financialStatus === 'paid'
+              ? [
+                  {
+                    id: newId('event'),
+                    shopId,
+                    type: 'payment_captured' as const,
+                    message: `A ${format(data.totals.total)} payment was captured.`,
+                    actor: options.actor ?? null,
+                  },
+                ]
+              : []),
           ],
         },
       },
