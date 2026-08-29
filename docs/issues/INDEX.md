@@ -59,6 +59,8 @@ eight interpretations. Read your page's section before writing JSX.
 | [H5](H5-demo-seed-gaps.md) | Seed: jane's orders, a demo app, abandoned checkouts | H | S | H1 |
 | [H6](H6-next-start-standalone.md) | CI/`pnpm start` boot the Next apps in an unsupported mode | H | S | — |
 | [E8](E8-storefront-action-hang-in-production.md) | Storefront Server Actions never settle in a production build | E | M | E1, E2 |
+| [E9](E9-checkout-discount-keeps-shipping.md) | Applying a discount must not drop the chosen shipping method | E | S | E3, E4 |
+| [B7](B7-variant-images.md) | Variant images: populate `variantIds`, wire the PDP gallery swap | B | M | B5 |
 
 Deferred hardening (explicitly NOT issues — do not build unless promoted via
 `DECISIONS.md`): per-app env sub-schemas so each app parses only its own vars

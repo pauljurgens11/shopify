@@ -116,9 +116,10 @@ Toast reads *"Monochrome applied"*.
 version you just published. Then the version list: "Every generation is a
 version. You can restore any of them."
 
-> Timing note: the storefront caches a published theme for 60 seconds. Publish
-> here, keep talking, and it will be live by the time you open the shop in
-> Beat 4. If it is not, reload once.
+> Timing note: Publish pings the storefront's revalidation hook, so the live
+> shop flips within a second or two (measured live, repo review 2026-08-29).
+> If the ping ever misses (its one dev-mode gap: the route's first compile),
+> the 60-second cache is the fallback — reload once.
 
 ---
 
@@ -315,8 +316,9 @@ API. A subscription engine on top of it is a scheduler, not a payments problem."
 - **The admin bounces you to /login mid-demo.** Another dev stack has taken port
   3001 and your session id is not in its Redis. `pnpm stack status`, then
   `pnpm stack up`.
-- **The storefront still shows the old theme.** The published-theme cache is 60
-  seconds. Wait and reload.
+- **The storefront still shows the old theme.** Publish revalidates it within
+  ~2s; if that ping missed, the fallback cache expires in 60 seconds. Wait and
+  reload.
 - **No shipping rates at checkout.** The address is not complete yet — every
   required field, then blur the last one.
 - **The order number is not #1041.** Someone has placed orders since the last
