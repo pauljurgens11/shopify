@@ -1,22 +1,28 @@
 'use client';
 
-/** Top products by revenue for the range (SPEC §13). Owner: WS-G. */
+/**
+ * `Total sales by product` (SPEC §13; docs/parity/dashboard.md §Chart cards).
+ * Owner: WS-G.
+ */
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
 import { BlockStack, Card, InlineStack, Text, Thumbnail } from '@shopify/polaris';
 import { ImageIcon } from '@shopify/polaris-icons';
+import { NoDataForRange } from './dashboard-filters.tsx';
+import { MetricLabel } from './metric-card.tsx';
 
 export function TopProductsCard({ products }: { products: AnalyticsDashboard['topProducts'] }) {
   return (
     <Card>
       <BlockStack gap="400">
-        <Text as="h3" variant="headingMd">
-          Top products
-        </Text>
+        <MetricLabel
+          variant="headingSm"
+          help="Products ranked by the sales they earned in this period, net of line discounts."
+        >
+          Total sales by product
+        </MetricLabel>
         {products.length === 0 ? (
-          <Text as="p" tone="subdued">
-            No sales in this period yet.
-          </Text>
+          <NoDataForRange />
         ) : (
           <BlockStack gap="300">
             {products.slice(0, 5).map((product) => (
@@ -36,7 +42,7 @@ export function TopProductsCard({ products }: { products: AnalyticsDashboard['to
                     </Text>
                   </BlockStack>
                 </div>
-                <Text as="span" variant="bodyMd" fontWeight="semibold">
+                <Text as="span" variant="bodyMd" fontWeight="semibold" numeric>
                   {format(product.revenue)}
                 </Text>
               </InlineStack>

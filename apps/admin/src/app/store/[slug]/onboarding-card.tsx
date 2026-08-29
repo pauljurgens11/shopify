@@ -19,8 +19,6 @@ import {
   Icon,
   InlineStack,
   ProgressBar,
-  SkeletonBodyText,
-  SkeletonDisplayText,
   Text,
 } from '@shopify/polaris';
 import { CheckCircleIcon } from '@shopify/polaris-icons';
@@ -92,17 +90,17 @@ export function OnboardingCard({ slug }: { slug: string }) {
 
   // Every check is a separate request, so the count is wrong until all four
   // answer — and "0 of 4 tasks complete" flashing on the first screen of the
-  // demo is a wrong number, not a loading state (PARITY.md: skeleton on load).
+  // demo is a wrong number, not a loading state. Nothing renders until they do:
+  // a skeleton here would reserve space that a finished store then gives back.
   if (products.isPending || orders.isPending || themes.isPending || processors.isPending) {
-    return (
-      <Card>
-        <BlockStack gap="400">
-          <SkeletonDisplayText size="small" />
-          <SkeletonBodyText lines={6} />
-        </BlockStack>
-      </Card>
-    );
+    return null;
   }
+
+  // A setup guide that is permanently 4 of 4 is not guidance, it is furniture —
+  // Shopify retires it once a store is set up, and on our seeded demo it would
+  // otherwise sit at 100% above the dashboard forever. A new tenant (signup,
+  // DEMO.md §"New store") still gets it, at 1 of 4.
+  if (complete === tasks.length) return null;
 
   return (
     <Card>

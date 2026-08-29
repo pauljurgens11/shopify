@@ -11,11 +11,16 @@ import { describe, expect, it } from 'vitest';
 import {
   axisLabel,
   chartSeries,
+  comparisonRangeFor,
   deltaPercent,
   formatDelta,
   formatPercent,
+  formatRangeLabel,
   funnelStages,
+  parseDayInput,
+  presetForRange,
   rangeFor,
+  spanDays,
   toChartValue,
 } from './range.ts';
 
@@ -50,6 +55,78 @@ describe('rangeFor', () => {
   it('is timezone-proof — a late-evening UTC time is still the same day', () => {
     const late = rangeFor('today', new Date('2026-08-28T23:59:59.999Z'));
     expect(late.from.toISOString()).toBe('2026-08-28T00:00:00.000Z');
+  });
+
+  it('makes "yesterday" a single closed day, not today minus one open one', () => {
+    const { from, to } = rangeFor('yesterday', NOW);
+    expect(from.toISOString()).toBe('2026-08-27T00:00:00.000Z');
+    expect(to.toISOString()).toBe('2026-08-27T00:00:00.000Z');
+  });
+
+  it('anchors every period-to-date preset at its own boundary', () => {
+    // 2026-08-28 is a Friday, so the week began on Sunday the 23rd.
+    expect(rangeFor('wtd', NOW).from.toISOString()).toBe('2026-08-23T00:00:00.000Z');
+    expect(rangeFor('mtd', NOW).from.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    // August is in Q3, which starts in July.
+    expect(rangeFor('qtd', NOW).from.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(rangeFor('ytd', NOW).from.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+    for (const preset of ['wtd', 'mtd', 'qtd', 'ytd'] as const) {
+      expect(rangeFor(preset, NOW).to.toISOString()).toBe('2026-08-28T00:00:00.000Z');
+    }
+  });
+});
+
+describe('comparisonRangeFor', () => {
+  it('matches the server: the same number of DAYS, immediately before', () => {
+    // `getDashboard` compares [from - spanDays, from - 1 day]. If the pill said
+    // anything else it would announce a window the deltas were not measured on.
+    const previous = comparisonRangeFor(rangeFor('7d', NOW));
+    expect(previous.from.toISOString()).toBe('2026-08-15T00:00:00.000Z');
+    expect(previous.to.toISOString()).toBe('2026-08-21T00:00:00.000Z');
+    expect(spanDays(previous)).toBe(7);
+  });
+
+  it('compares a single day against the single day before it', () => {
+    const previous = comparisonRangeFor(rangeFor('today', NOW));
+    expect(previous.from.toISOString()).toBe('2026-08-27T00:00:00.000Z');
+    expect(previous.to.toISOString()).toBe('2026-08-27T00:00:00.000Z');
+  });
+});
+
+describe('presetForRange', () => {
+  it('recognises a hand-picked range that happens to equal a preset', () => {
+    expect(presetForRange(rangeFor('30d', NOW), NOW)).toBe('30d');
+    expect(presetForRange(rangeFor('yesterday', NOW), NOW)).toBe('yesterday');
+  });
+
+  it('falls back to custom for anything else', () => {
+    const range = {
+      from: new Date('2026-08-03T00:00:00.000Z'),
+      to: new Date('2026-08-11T00:00:00.000Z'),
+    };
+    expect(presetForRange(range, NOW)).toBe('custom');
+  });
+});
+
+describe('parseDayInput', () => {
+  it('reads what the popover prints back, as the SAME UTC day', () => {
+    // The landmine: `new Date('August 29, 2026')` is local midnight, which is
+    // the 28th in UTC for anyone west of Greenwich.
+    expect(parseDayInput('August 29, 2026')?.toISOString()).toBe('2026-08-29T00:00:00.000Z');
+    expect(parseDayInput('2026-08-29')?.toISOString()).toBe('2026-08-29T00:00:00.000Z');
+  });
+
+  it('returns null for text that is not a date, instead of 1970', () => {
+    expect(parseDayInput('Augst 29')).toBeNull();
+    expect(parseDayInput('')).toBeNull();
+    expect(parseDayInput('2026-13-01')).toBeNull();
+  });
+});
+
+describe('formatRangeLabel', () => {
+  it('prints one day as a date and a span as a range', () => {
+    expect(formatRangeLabel(rangeFor('today', NOW))).toBe('Aug 28, 2026');
+    expect(formatRangeLabel(rangeFor('7d', NOW))).toBe('Aug 22–Aug 28, 2026');
   });
 });
 
