@@ -25,10 +25,18 @@ const config: NextConfig = {
   // treats as cross-origin to its own /_next/* assets. Declaring the dev hosts
   // silences the warning now and keeps it working when Next starts enforcing it.
   allowedDevOrigins: ['admin.lvh.me', '*.lvh.me'],
-  // Required for the Dockerfile: pnpm's node_modules is a symlink farm into the
-  // store, so copying it between build stages produces a broken tree. Standalone
-  // emits a self-contained server with only the files actually imported.
-  output: 'standalone',
+  // Standalone is what the Dockerfile ships: pnpm's node_modules is a symlink
+  // farm into the store, so copying it between build stages produces a broken
+  // tree, and standalone emits a self-contained server with only the files
+  // actually imported. It is OPT-IN, because `next start` — which `pnpm start`
+  // and the Playwright suite both run — cannot serve a standalone build. Next
+  // says so on every boot ("next start does not work with output: standalone"),
+  // and the failure is real: Server Action responses abort mid-stream, so a
+  // `revalidatePath` never reaches the client and the transition that fired it
+  // never settles. The Dockerfiles set NEXT_OUTPUT=standalone; nothing else
+  // should, and if it is ever dropped there the image build fails loudly on the
+  // missing .next/standalone rather than shipping something subtly broken.
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   // In a monorepo, file tracing must start at the workspace root or standalone
   // silently omits the workspace packages this app imports.
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
