@@ -1,19 +1,17 @@
 'use client';
 
 /**
- * Manual collection membership: the chosen products, and the modal that picks
- * them (PARITY.md → Collection form). Owner: WS-B (B6).
+ * The `Add products` browser for a manual collection
+ * (docs/parity/collection-detail.md → Right rail 1). Owner: WS-B (B6).
  *
- * Order is the collection's `manual` sort order, so the ↑/↓ controls are the
- * merchant's merchandising, not decoration.
+ * Only the modal lives here: the chosen products are rendered by the
+ * `Collection items` grid, which is where Shopify shows them.
  */
 import type { Paginated } from '@merchant/contracts/common';
 import type { Product } from '@merchant/contracts/products';
 import {
   BlockStack,
   Box,
-  Button,
-  Card,
   Checkbox,
   InlineStack,
   Modal,
@@ -26,23 +24,21 @@ import {
 import { ImageIcon } from '@shopify/polaris-icons';
 import { useState } from 'react';
 import { useApiQuery } from '../../../../../lib/api.ts';
+import { type CollectionItem, toCollectionItem } from './collection-items.tsx';
 
-/** Just enough of a product to render a row; the form never edits one here. */
-export type PickedProduct = { id: string; title: string; imageUrl: string | null };
-
-function PickerModal({
+export function ProductPickerModal({
   open,
   selected,
   onClose,
   onDone,
 }: {
   open: boolean;
-  selected: PickedProduct[];
+  selected: CollectionItem[];
   onClose: () => void;
-  onDone: (products: PickedProduct[]) => void;
+  onDone: (products: CollectionItem[]) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [chosen, setChosen] = useState<PickedProduct[]>(selected);
+  const [chosen, setChosen] = useState<CollectionItem[]>(selected);
 
   const search = new URLSearchParams({ limit: '50' });
   if (query.trim() !== '') search.set('query', query.trim());
@@ -54,10 +50,7 @@ function PickerModal({
       checked
         ? current.some((p) => p.id === product.id)
           ? current
-          : [
-              ...current,
-              { id: product.id, title: product.title, imageUrl: product.images[0]?.url ?? null },
-            ]
+          : [...current, toCollectionItem(product)]
         : current.filter((p) => p.id !== product.id),
     );
   };
@@ -95,6 +88,9 @@ function PickerModal({
             }
             renderItem={(product) => (
               <ResourceItem
+                // ResourceList renders the items straight into its `ul`, so the
+                // key has to come from here or React warns on every open.
+                key={product.id}
                 id={product.id}
                 onClick={() => toggle(product, !chosen.some((p) => p.id === product.id))}
                 media={
@@ -118,108 +114,5 @@ function PickerModal({
         </BlockStack>
       </Modal.Section>
     </Modal>
-  );
-}
-
-export function ProductPicker({
-  products,
-  onChange,
-}: {
-  products: PickedProduct[];
-  onChange: (products: PickedProduct[]) => void;
-}) {
-  const [picking, setPicking] = useState(false);
-
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= products.length) return;
-    const next = [...products];
-    const [moved] = next.splice(from, 1);
-    if (moved) next.splice(to, 0, moved);
-    onChange(next);
-  };
-
-  return (
-    <Card>
-      <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="h2" variant="headingSm">
-            Products
-          </Text>
-          <Button onClick={() => setPicking(true)}>Add products</Button>
-        </InlineStack>
-
-        {products.length === 0 ? (
-          <Box paddingBlock="400">
-            <Text as="p" tone="subdued" alignment="center">
-              There are no products in this collection yet.
-            </Text>
-          </Box>
-        ) : (
-          <BlockStack gap="0">
-            {products.map((product, index) => (
-              <Box
-                key={product.id}
-                borderBlockStartWidth={index === 0 ? '0' : '025'}
-                borderColor="border"
-                paddingBlock="300"
-              >
-                <InlineStack gap="300" blockAlign="center" wrap={false}>
-                  <Text as="span" tone="subdued" variant="bodySm">
-                    {index + 1}
-                  </Text>
-                  <Thumbnail source={product.imageUrl ?? ImageIcon} alt="" size="small" />
-                  <Box width="100%">
-                    <Text as="span" variant="bodyMd">
-                      {product.title}
-                    </Text>
-                  </Box>
-                  {/* Reordering by buttons, not drag: the locked stack has no
-                      DnD library and adding one is a substitution (SPEC §3). */}
-                  <Button
-                    size="micro"
-                    variant="tertiary"
-                    accessibilityLabel={`Move ${product.title} up`}
-                    disabled={index === 0}
-                    onClick={() => move(index, index - 1)}
-                  >
-                    ↑
-                  </Button>
-                  <Button
-                    size="micro"
-                    variant="tertiary"
-                    accessibilityLabel={`Move ${product.title} down`}
-                    disabled={index === products.length - 1}
-                    onClick={() => move(index, index + 1)}
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    size="micro"
-                    variant="tertiary"
-                    tone="critical"
-                    accessibilityLabel={`Remove ${product.title}`}
-                    onClick={() => onChange(products.filter((p) => p.id !== product.id))}
-                  >
-                    Remove
-                  </Button>
-                </InlineStack>
-              </Box>
-            ))}
-          </BlockStack>
-        )}
-      </BlockStack>
-
-      {picking ? (
-        <PickerModal
-          open={picking}
-          selected={products}
-          onClose={() => setPicking(false)}
-          onDone={(next) => {
-            onChange(next);
-            setPicking(false);
-          }}
-        />
-      ) : null}
-    </Card>
   );
 }
