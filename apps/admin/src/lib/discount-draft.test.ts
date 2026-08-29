@@ -137,6 +137,13 @@ describe('validate — the errors that used to be silent 400s or silent wrong sa
       validate({ ...valid, minimumKind: 'subtotal', minimumSubtotal: '49.99' }, 'USD'),
     ).toEqual({});
   });
+
+  it('catches a cleared start date before draftToInput throws a RangeError', () => {
+    expect(validate({ ...valid, startsAt: '' }, 'USD')).toHaveProperty('startsAt');
+    expect(validate({ ...valid, hasEndDate: true, endsAt: 'not-a-date' }, 'USD')).toHaveProperty(
+      'endsAt',
+    );
+  });
 });
 
 describe('serverFieldToDraftKey — dotted API paths land on the input that renders them', () => {

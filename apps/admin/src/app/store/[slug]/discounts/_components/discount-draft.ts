@@ -190,6 +190,15 @@ export function validate(draft: DiscountDraft, currencyCode = 'USD'): Record<str
   if (draft.hasEndDate && draft.endsAt !== '' && draft.endsAt < draft.startsAt) {
     errors.endsAt = 'The end date cannot be before the start date.';
   }
+  // A cleared date field otherwise reaches draftToInput, where
+  // `startOfDay('').toISOString()` throws a RangeError out of the submit
+  // handler instead of rendering a field error.
+  if (Number.isNaN(startOfDay(draft.startsAt).getTime())) {
+    errors.startsAt = 'Enter a start date.';
+  }
+  if (draft.hasEndDate && draft.endsAt !== '' && Number.isNaN(endOfDay(draft.endsAt).getTime())) {
+    errors.endsAt = 'Enter a valid end date.';
+  }
   return errors;
 }
 

@@ -11,7 +11,9 @@ import type { ThemeVersionSummary } from '@merchant/contracts/theme';
 import { Badge, BlockStack, Box, Button, InlineStack, Modal, Text } from '@shopify/polaris';
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  // en-US pinned — `undefined` renders the host's locale and the admin's other
+  // dates (Apps, orders) are en-US, so this list drifted on non-US machines.
+  return new Date(iso).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',

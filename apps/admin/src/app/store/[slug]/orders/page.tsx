@@ -33,6 +33,7 @@ import {
 } from '../../../../components/shell/index-chrome.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from './_components/order-badges.tsx';
+import { itemCountLabel } from './_components/status.ts';
 
 const PAGE_SIZE = 50;
 
@@ -90,16 +91,22 @@ function toChoices(labels: Record<string, string>) {
 const PAYMENT_STATUS_CHOICES = toChoices(PAYMENT_STATUS_LABELS);
 const FULFILLMENT_STATUS_CHOICES = toChoices(FULFILLMENT_STATUS_LABELS);
 
-/** "May 3 at 2:14 pm" — Shopify's order-row date format. */
+/**
+ * "May 3 at 2:14 pm" — Shopify's order-row date format. Locale is pinned:
+ * `undefined` renders the host's locale ("3 May at 14:14" on a en-GB machine)
+ * while the Apps pages pin en-US, so the two disagreed on one screen path.
+ */
 function orderDate(iso: string): string {
   return new Date(iso)
-    .toLocaleString(undefined, {
+    .toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     })
-    .replace(',', ' at');
+    .replace(',', ' at')
+    .replace(' AM', ' am')
+    .replace(' PM', ' pm');
 }
 
 /**
@@ -362,7 +369,9 @@ export default function OrdersPage() {
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text as="span" tone="subdued">
-                      {order.lineItems.reduce((sum, line) => sum + line.quantity, 0)} items
+                      {itemCountLabel(
+                        order.lineItems.reduce((sum, line) => sum + line.quantity, 0),
+                      )}
                     </Text>
                   </IndexTable.Cell>
                 </IndexTable.Row>

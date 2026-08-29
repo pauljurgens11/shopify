@@ -468,6 +468,7 @@ export function DiscountForm({
                         autoComplete="off"
                         value={draft.startsAt}
                         onChange={(value) => set('startsAt', value)}
+                        error={shown.startsAt}
                       />
                       {draft.hasEndDate && (
                         <TextField
