@@ -26,8 +26,11 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { PersonIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { LearnMore } from '../../../../components/shell/learn-more.tsx';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
@@ -108,23 +111,29 @@ export default function CustomersPage() {
 
   const resetPaging = () => setCursorStack([]);
 
+  const addCustomer = (
+    <Button variant="primary" url={`/store/${slug}/customers/new`}>
+      Add customer
+    </Button>
+  );
+
   if (customers.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   // A failed load must never read as "no customers yet" — that empty state
   // invites the merchant to re-add customers they already have.
   if (customers.isError) {
     return (
-      <Page
-        title="Customers"
-        primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
-      >
-        <Banner
-          tone="critical"
-          title="Customers could not be loaded"
-          action={{ content: 'Try again', onAction: () => customers.refetch() }}
-        >
-          <p>{customers.error.message}</p>
-        </Banner>
+      <Page>
+        <BlockStack gap="400">
+          <PageHeader icon={PersonIcon} title="Customers" actions={addCustomer} />
+          <Banner
+            tone="critical"
+            title="Customers could not be loaded"
+            action={{ content: 'Try again', onAction: () => customers.refetch() }}
+          >
+            <p>{customers.error.message}</p>
+          </Banner>
+        </BlockStack>
       </Page>
     );
   }
@@ -136,139 +145,143 @@ export default function CustomersPage() {
   const segmentEmpty = query.trim() === '' && segment ? SEGMENT_EMPTY[segment] : undefined;
 
   return (
-    <Page
-      fullWidth
-      title="Customers"
-      primaryAction={{ content: 'Add customer', url: `/store/${slug}/customers/new` }}
-    >
-      <Card padding="0">
-        {empty ? (
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Everything customers-related in one place
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Manage customer details, see their order history and group them into segments.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" url={`/store/${slug}/customers/new`}>
-                  Add customer
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
-        ) : (
-          <>
-            <IndexFilters
-              tabs={TABS.map((t, index) => ({
-                id: t.label,
-                content: t.label,
-                index,
-                onAction: () => {
+    <Page fullWidth>
+      <BlockStack gap="400">
+        {/* The real header also carries `Export` and `Import`; both are out of
+            scope, so they are absent rather than disabled (CLAUDE.md §8). */}
+        <PageHeader icon={PersonIcon} title="Customers" actions={addCustomer} />
+
+        <Card padding="0">
+          {empty ? (
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Everything customers-related in one place
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  Manage customer details, see their order history and group them into segments.
+                </Text>
+                <Box paddingBlockStart="300">
+                  <Button variant="primary" url={`/store/${slug}/customers/new`}>
+                    Add customer
+                  </Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          ) : (
+            <>
+              <IndexFilters
+                tabs={TABS.map((t, index) => ({
+                  id: t.label,
+                  content: t.label,
+                  index,
+                  onAction: () => {
+                    setTab(index);
+                    resetPaging();
+                  },
+                }))}
+                selected={tab}
+                onSelect={(index) => {
                   setTab(index);
                   resetPaging();
-                },
-              }))}
-              selected={tab}
-              onSelect={(index) => {
-                setTab(index);
-                resetPaging();
-              }}
-              queryValue={query}
-              queryPlaceholder="Searching in all"
-              onQueryChange={(value) => {
-                setQuery(value);
-                resetPaging();
-              }}
-              onQueryClear={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              filters={[]}
-              sortOptions={SORT_OPTIONS}
-              sortSelected={sort}
-              onSort={(value) => {
-                setSort(value);
-                resetPaging();
-              }}
-              onClearAll={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              mode={mode}
-              setMode={setMode}
-              cancelAction={{ onAction: () => setQuery('') }}
-              loading={customers.isFetching}
-              canCreateNewView={false}
-            />
+                }}
+                queryValue={query}
+                queryPlaceholder="Searching in all"
+                onQueryChange={(value) => {
+                  setQuery(value);
+                  resetPaging();
+                }}
+                onQueryClear={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                filters={[]}
+                sortOptions={SORT_OPTIONS}
+                sortSelected={sort}
+                onSort={(value) => {
+                  setSort(value);
+                  resetPaging();
+                }}
+                onClearAll={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                mode={mode}
+                setMode={setMode}
+                cancelAction={{ onAction: () => setQuery('') }}
+                loading={customers.isFetching}
+                canCreateNewView={false}
+              />
 
-            <IndexTable
-              resourceName={{ singular: 'customer', plural: 'customers' }}
-              itemCount={rows.length}
-              // Orders precedent (DECISIONS.md): no selection checkboxes here —
-              // the API has no bulk customer actions, and deleting a customer
-              // with orders is a 409 by design.
-              selectable={false}
-              headings={[
-                { title: 'Customer' },
-                { title: 'Email subscription' },
-                { title: 'Orders' },
-                { title: 'Amount spent' },
-              ]}
-              pagination={{
-                hasPrevious: cursorStack.length > 0,
-                hasNext: Boolean(customers.data?.nextCursor),
-                onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
-                onNext: () => {
-                  const next = customers.data?.nextCursor;
-                  if (next) setCursorStack((stack) => [...stack, next]);
-                },
-              }}
-              emptyState={
-                <Box padding="800">
-                  <BlockStack gap="200" inlineAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {segmentEmpty?.heading ?? 'No customers found'}
-                    </Text>
-                    <Text as="p" tone="subdued" alignment="center">
-                      {segmentEmpty?.body ?? 'Try changing the search or filters.'}
-                    </Text>
-                  </BlockStack>
-                </Box>
-              }
-            >
-              {rows.map((customer, index) => (
-                <IndexTable.Row
-                  id={customer.id}
-                  key={customer.id}
-                  position={index}
-                  onClick={() => router.push(`/store/${slug}/customers/${customer.id}`)}
-                >
-                  <IndexTable.Cell>
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">
-                      {customerName(customer)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    {customer.acceptsMarketing ? (
-                      <Badge tone="success">Subscribed</Badge>
-                    ) : (
-                      <Badge>Not subscribed</Badge>
-                    )}
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {customer.ordersCount === 1 ? '1 order' : `${customer.ordersCount} orders`}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>{format(customer.totalSpent)}</IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          </>
-        )}
-      </Card>
+              <IndexTable
+                resourceName={{ singular: 'customer', plural: 'customers' }}
+                itemCount={rows.length}
+                // Orders precedent (DECISIONS.md): no selection checkboxes here —
+                // the API has no bulk customer actions, and deleting a customer
+                // with orders is a 409 by design.
+                selectable={false}
+                headings={[
+                  { title: 'Customer' },
+                  { title: 'Email subscription' },
+                  { title: 'Orders' },
+                  { title: 'Amount spent' },
+                ]}
+                pagination={{
+                  hasPrevious: cursorStack.length > 0,
+                  hasNext: Boolean(customers.data?.nextCursor),
+                  onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
+                  onNext: () => {
+                    const next = customers.data?.nextCursor;
+                    if (next) setCursorStack((stack) => [...stack, next]);
+                  },
+                }}
+                emptyState={
+                  <Box padding="800">
+                    <BlockStack gap="200" inlineAlign="center">
+                      <Text as="h2" variant="headingMd">
+                        {segmentEmpty?.heading ?? 'No customers found'}
+                      </Text>
+                      <Text as="p" tone="subdued" alignment="center">
+                        {segmentEmpty?.body ?? 'Try changing the search or filters.'}
+                      </Text>
+                    </BlockStack>
+                  </Box>
+                }
+              >
+                {rows.map((customer, index) => (
+                  <IndexTable.Row
+                    id={customer.id}
+                    key={customer.id}
+                    position={index}
+                    onClick={() => router.push(`/store/${slug}/customers/${customer.id}`)}
+                  >
+                    <IndexTable.Cell>
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">
+                        {customerName(customer)}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      {customer.acceptsMarketing ? (
+                        <Badge tone="success">Subscribed</Badge>
+                      ) : (
+                        <Badge>Not subscribed</Badge>
+                      )}
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {customer.ordersCount === 1 ? '1 order' : `${customer.ordersCount} orders`}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>{format(customer.totalSpent)}</IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            </>
+          )}
+        </Card>
+
+        <LearnMore resource="customers" />
+      </BlockStack>
     </Page>
   );
 }

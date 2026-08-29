@@ -26,8 +26,11 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { DiscountIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { LearnMore } from '../../../../components/shell/learn-more.tsx';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 
@@ -135,137 +138,145 @@ export default function DiscountsPage() {
   );
 
   return (
-    <Page title="Discounts" primaryAction={createMenu} fullWidth>
-      <Card padding="0">
-        {empty ? (
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Manage discounts and promotions
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Create discount codes and automatic discounts that apply at checkout.
-              </Text>
-              <Box paddingBlockStart="300">{createMenu}</Box>
-            </BlockStack>
-          </Box>
-        ) : (
-          <>
-            <IndexFilters
-              tabs={TABS.map((t, index) => ({
-                id: t.label,
-                content: t.label,
-                index,
-                onAction: () => {
+    <Page fullWidth>
+      <BlockStack gap="400">
+        {/* The real header also carries a disabled `Export`; a control that can
+            never do anything is not rendered here (CLAUDE.md §8). */}
+        <PageHeader icon={DiscountIcon} title="Discounts" actions={createMenu} />
+
+        <Card padding="0">
+          {empty ? (
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Manage discounts and promotions
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  Create discount codes and automatic discounts that apply at checkout.
+                </Text>
+                <Box paddingBlockStart="300">{createMenu}</Box>
+              </BlockStack>
+            </Box>
+          ) : (
+            <>
+              <IndexFilters
+                tabs={TABS.map((t, index) => ({
+                  id: t.label,
+                  content: t.label,
+                  index,
+                  onAction: () => {
+                    setTab(index);
+                    resetPaging();
+                  },
+                }))}
+                selected={tab}
+                onSelect={(index) => {
                   setTab(index);
                   resetPaging();
-                },
-              }))}
-              selected={tab}
-              onSelect={(index) => {
-                setTab(index);
-                resetPaging();
-              }}
-              queryValue={query}
-              queryPlaceholder="Searching in all"
-              onQueryChange={(value) => {
-                setQuery(value);
-                resetPaging();
-              }}
-              onQueryClear={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              filters={[]}
-              onClearAll={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              mode={mode}
-              setMode={setMode}
-              cancelAction={{ onAction: () => setQuery('') }}
-              loading={discounts.isFetching}
-              canCreateNewView={false}
-            />
+                }}
+                queryValue={query}
+                queryPlaceholder="Searching in all"
+                onQueryChange={(value) => {
+                  setQuery(value);
+                  resetPaging();
+                }}
+                onQueryClear={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                filters={[]}
+                onClearAll={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                mode={mode}
+                setMode={setMode}
+                cancelAction={{ onAction: () => setQuery('') }}
+                loading={discounts.isFetching}
+                canCreateNewView={false}
+              />
 
-            <IndexTable
-              resourceName={{ singular: 'discount', plural: 'discounts' }}
-              itemCount={rows.length}
-              // Orders precedent (DECISIONS.md): no selection checkboxes —
-              // the API has no bulk discount actions.
-              selectable={false}
-              headings={[
-                { title: 'Title' },
-                { title: 'Status' },
-                { title: 'Method' },
-                { title: 'Type' },
-                { title: 'Used' },
-              ]}
-              pagination={{
-                hasPrevious: cursorStack.length > 0,
-                hasNext: Boolean(discounts.data?.nextCursor),
-                onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
-                onNext: () => {
-                  const next = discounts.data?.nextCursor;
-                  if (next) setCursorStack((stack) => [...stack, next]);
-                },
-              }}
-              emptyState={
-                <Box padding="800">
-                  <BlockStack gap="200" inlineAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {tabEmpty?.heading ?? 'No discounts found'}
-                    </Text>
-                    <Text as="p" tone="subdued" alignment="center">
-                      {tabEmpty?.body ?? 'Try changing the search or filters.'}
-                    </Text>
-                  </BlockStack>
-                </Box>
-              }
-            >
-              {rows.map((discount, index) => (
-                <IndexTable.Row
-                  id={discount.id}
-                  key={discount.id}
-                  position={index}
-                  onClick={() => router.push(`/store/${slug}/discounts/${discount.id}`)}
-                >
-                  <IndexTable.Cell>
-                    <BlockStack gap="050">
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {discount.code ?? discount.title}
+              <IndexTable
+                resourceName={{ singular: 'discount', plural: 'discounts' }}
+                itemCount={rows.length}
+                // Orders precedent (DECISIONS.md): no selection checkboxes —
+                // the API has no bulk discount actions.
+                selectable={false}
+                headings={[
+                  { title: 'Title' },
+                  { title: 'Status' },
+                  { title: 'Method' },
+                  { title: 'Type' },
+                  { title: 'Used' },
+                ]}
+                pagination={{
+                  hasPrevious: cursorStack.length > 0,
+                  hasNext: Boolean(discounts.data?.nextCursor),
+                  onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
+                  onNext: () => {
+                    const next = discounts.data?.nextCursor;
+                    if (next) setCursorStack((stack) => [...stack, next]);
+                  },
+                }}
+                emptyState={
+                  <Box padding="800">
+                    <BlockStack gap="200" inlineAlign="center">
+                      <Text as="h2" variant="headingMd">
+                        {tabEmpty?.heading ?? 'No discounts found'}
                       </Text>
-                      <Text as="span" tone="subdued" variant="bodySm">
-                        {discount.title}
+                      <Text as="p" tone="subdued" alignment="center">
+                        {tabEmpty?.body ?? 'Try changing the search or filters.'}
                       </Text>
                     </BlockStack>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <StatusBadge status={discount.status} />
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {discount.code ? 'Code' : 'Automatic'}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {TYPE_LABELS[discount.type]}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {discount.usageLimit
-                        ? `${discount.usedCount} of ${discount.usageLimit} used`
-                        : `${discount.usedCount} used`}
-                    </Text>
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          </>
-        )}
-      </Card>
+                  </Box>
+                }
+              >
+                {rows.map((discount, index) => (
+                  <IndexTable.Row
+                    id={discount.id}
+                    key={discount.id}
+                    position={index}
+                    onClick={() => router.push(`/store/${slug}/discounts/${discount.id}`)}
+                  >
+                    <IndexTable.Cell>
+                      <BlockStack gap="050">
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {discount.code ?? discount.title}
+                        </Text>
+                        <Text as="span" tone="subdued" variant="bodySm">
+                          {discount.title}
+                        </Text>
+                      </BlockStack>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <StatusBadge status={discount.status} />
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {discount.code ? 'Code' : 'Automatic'}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {TYPE_LABELS[discount.type]}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {discount.usageLimit
+                          ? `${discount.usedCount} of ${discount.usageLimit} used`
+                          : `${discount.usedCount} used`}
+                      </Text>
+                    </IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            </>
+          )}
+        </Card>
+
+        <LearnMore resource="discounts" />
+      </BlockStack>
     </Page>
   );
 }

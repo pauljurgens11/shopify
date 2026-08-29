@@ -21,6 +21,7 @@ import {
 } from '@shopify/polaris-icons';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 
 type IconSource = typeof StoreIcon;
 
@@ -85,36 +86,45 @@ export default function SettingsHubPage() {
   const { slug } = useParams<{ slug: string }>();
 
   return (
-    <Page title="Settings">
-      <Grid>
-        {CARDS.map((card) => (
-          <Grid.Cell key={card.href} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 6, xl: 6 }}>
-            {/* The whole card is the target, the way Shopify's settings grid works. */}
-            {/* `color: inherit` matters: a bare anchor paints its children
+    <Page>
+      <BlockStack gap="400">
+        <PageHeader icon={SettingsIcon} title="Settings" />
+
+        <Grid>
+          {CARDS.map((card) => (
+            <Grid.Cell key={card.href} columnSpan={{ xs: 6, sm: 6, md: 3, lg: 6, xl: 6 }}>
+              {/* The whole card is the target, the way Shopify's settings grid works. */}
+              {/* `color: inherit` matters: a bare anchor paints its children
                 link-blue, and Shopify's settings cards use normal heading text. */}
-            <Link
-              href={`/store/${slug}${card.href}`}
-              style={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%' }}
-            >
-              <Card>
-                <InlineStack gap="300" blockAlign="start" wrap={false}>
-                  <Box paddingBlockStart="050">
-                    <Icon source={card.icon} tone="base" />
-                  </Box>
-                  <BlockStack gap="100">
-                    <Text as="h2" variant="headingSm">
-                      {card.title}
-                    </Text>
-                    <Text as="p" tone="subdued">
-                      {card.description}
-                    </Text>
-                  </BlockStack>
-                </InlineStack>
-              </Card>
-            </Link>
-          </Grid.Cell>
-        ))}
-      </Grid>
+              <Link
+                href={`/store/${slug}${card.href}`}
+                style={{
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  display: 'block',
+                  height: '100%',
+                }}
+              >
+                <Card>
+                  <InlineStack gap="300" blockAlign="start" wrap={false}>
+                    <Box paddingBlockStart="050">
+                      <Icon source={card.icon} tone="base" />
+                    </Box>
+                    <BlockStack gap="100">
+                      <Text as="h2" variant="headingSm">
+                        {card.title}
+                      </Text>
+                      <Text as="p" tone="subdued">
+                        {card.description}
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
+                </Card>
+              </Link>
+            </Grid.Cell>
+          ))}
+        </Grid>
+      </BlockStack>
     </Page>
   );
 }

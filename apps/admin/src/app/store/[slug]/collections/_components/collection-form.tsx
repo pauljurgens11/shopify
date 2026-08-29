@@ -17,6 +17,8 @@ import type { Paginated } from '@merchant/contracts/common';
 import type { Product } from '@merchant/contracts/products';
 import {
   BlockStack,
+  Box,
+  Button,
   Card,
   ChoiceList,
   InlineStack,
@@ -27,9 +29,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { CollectionIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -223,15 +227,7 @@ export function CollectionForm({
   };
 
   return (
-    <Page
-      backAction={{ content: 'Collections', url: `/store/${slug}/collections` }}
-      title={collection ? collection.title : 'Create collection'}
-      secondaryActions={
-        collection
-          ? [{ content: 'Delete', destructive: true, onAction: () => setConfirmingDelete(true) }]
-          : undefined
-      }
-    >
+    <Page>
       <SaveBar
         dirty={dirty}
         saving={saving}
@@ -243,125 +239,140 @@ export function CollectionForm({
         }}
       />
 
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <TextField
-                  label="Title"
-                  name="title"
-                  autoComplete="off"
-                  placeholder="Summer collection"
-                  value={draft.title}
-                  error={submitted ? titleError : undefined}
-                  onChange={(title) => patch({ title })}
-                />
-                <TextField
-                  label="Description"
-                  autoComplete="off"
-                  multiline={5}
-                  value={draft.description}
-                  helpText={
-                    draft.descriptionIsRich
-                      ? 'This description uses formatting, so it is shown as HTML.'
-                      : undefined
-                  }
-                  onChange={(description) => patch({ description })}
-                />
-              </BlockStack>
-            </Card>
+      <PageHeader
+        icon={CollectionIcon}
+        parent={{ label: 'Collections', url: `/store/${slug}/collections` }}
+        title={collection ? collection.title : 'Create collection'}
+        actions={
+          collection ? (
+            <Button tone="critical" variant="tertiary" onClick={() => setConfirmingDelete(true)}>
+              Delete
+            </Button>
+          ) : undefined
+        }
+      />
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingSm">
-                  Collection type
-                </Text>
-                {collection ? (
-                  <Text as="p" tone="subdued">
-                    {collection.type === 'smart'
-                      ? 'Automated — products are selected by the conditions below.'
-                      : 'Manual — products are added one by one.'}
-                  </Text>
-                ) : (
-                  <ChoiceList
-                    title="Collection type"
-                    titleHidden
-                    choices={[
-                      {
-                        label: 'Manual',
-                        value: 'manual',
-                        helpText: 'Add products to this collection one by one.',
-                      },
-                      {
-                        label: 'Automated',
-                        value: 'smart',
-                        helpText:
-                          'Existing and future products that match the conditions are added automatically.',
-                      },
-                    ]}
-                    selected={[draft.type]}
-                    onChange={([type]) =>
-                      patch({
-                        type: type as Draft['type'],
-                        // A smart collection has no dragged positions; without
-                        // this the Select showed one order and saved another.
-                        ...(type === 'smart' && draft.sortOrder === 'manual'
-                          ? { sortOrder: 'created-desc' }
-                          : {}),
-                      })
-                    }
-                  />
-                )}
-              </BlockStack>
-            </Card>
-
-            {draft.type === 'smart' ? (
-              <RulesBuilder
-                ruleSet={draft.ruleSet}
-                currencyCode={currencyCode}
-                onChange={(ruleSet) => patch({ ruleSet })}
-              />
-            ) : (
-              <ProductPicker
-                products={draft.products}
-                onChange={(products) => patch({ products })}
-              />
-            )}
-          </BlockStack>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
-            <Card>
-              <Select
-                label="Sort products by"
-                options={
-                  // A smart collection has no dragged positions to honour.
-                  draft.type === 'smart'
-                    ? SORT_OPTIONS.filter((option) => option.value !== 'manual')
-                    : SORT_OPTIONS
-                }
-                value={draft.sortOrder}
-                onChange={(sortOrder) => patch({ sortOrder })}
-              />
-            </Card>
-
-            <CollectionImageCard
-              imageUrl={draft.imageUrl}
-              onChange={(imageUrl) => patch({ imageUrl })}
-            />
-
-            {serverError ? (
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
               <Card>
-                <Text as="p" tone="critical">
-                  {serverError}
-                </Text>
+                <BlockStack gap="300">
+                  <TextField
+                    label="Title"
+                    name="title"
+                    autoComplete="off"
+                    placeholder="Summer collection"
+                    value={draft.title}
+                    error={submitted ? titleError : undefined}
+                    onChange={(title) => patch({ title })}
+                  />
+                  <TextField
+                    label="Description"
+                    autoComplete="off"
+                    multiline={5}
+                    value={draft.description}
+                    helpText={
+                      draft.descriptionIsRich
+                        ? 'This description uses formatting, so it is shown as HTML.'
+                        : undefined
+                    }
+                    onChange={(description) => patch({ description })}
+                  />
+                </BlockStack>
               </Card>
-            ) : null}
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingSm">
+                    Collection type
+                  </Text>
+                  {collection ? (
+                    <Text as="p" tone="subdued">
+                      {collection.type === 'smart'
+                        ? 'Automated — products are selected by the conditions below.'
+                        : 'Manual — products are added one by one.'}
+                    </Text>
+                  ) : (
+                    <ChoiceList
+                      title="Collection type"
+                      titleHidden
+                      choices={[
+                        {
+                          label: 'Manual',
+                          value: 'manual',
+                          helpText: 'Add products to this collection one by one.',
+                        },
+                        {
+                          label: 'Automated',
+                          value: 'smart',
+                          helpText:
+                            'Existing and future products that match the conditions are added automatically.',
+                        },
+                      ]}
+                      selected={[draft.type]}
+                      onChange={([type]) =>
+                        patch({
+                          type: type as Draft['type'],
+                          // A smart collection has no dragged positions; without
+                          // this the Select showed one order and saved another.
+                          ...(type === 'smart' && draft.sortOrder === 'manual'
+                            ? { sortOrder: 'created-desc' }
+                            : {}),
+                        })
+                      }
+                    />
+                  )}
+                </BlockStack>
+              </Card>
+
+              {draft.type === 'smart' ? (
+                <RulesBuilder
+                  ruleSet={draft.ruleSet}
+                  currencyCode={currencyCode}
+                  onChange={(ruleSet) => patch({ ruleSet })}
+                />
+              ) : (
+                <ProductPicker
+                  products={draft.products}
+                  onChange={(products) => patch({ products })}
+                />
+              )}
+            </BlockStack>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <Select
+                  label="Sort products by"
+                  options={
+                    // A smart collection has no dragged positions to honour.
+                    draft.type === 'smart'
+                      ? SORT_OPTIONS.filter((option) => option.value !== 'manual')
+                      : SORT_OPTIONS
+                  }
+                  value={draft.sortOrder}
+                  onChange={(sortOrder) => patch({ sortOrder })}
+                />
+              </Card>
+
+              <CollectionImageCard
+                imageUrl={draft.imageUrl}
+                onChange={(imageUrl) => patch({ imageUrl })}
+              />
+
+              {serverError ? (
+                <Card>
+                  <Text as="p" tone="critical">
+                    {serverError}
+                  </Text>
+                </Card>
+              ) : null}
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </Box>
 
       <Modal
         open={confirmingDelete}

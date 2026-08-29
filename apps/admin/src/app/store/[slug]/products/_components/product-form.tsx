@@ -48,7 +48,6 @@ import {
 } from '@shopify/polaris';
 import {
   ChannelsIcon,
-  ChevronRightIcon,
   MenuHorizontalIcon,
   ProductIcon,
   SettingsIcon,
@@ -56,6 +55,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
@@ -110,40 +110,6 @@ function InlineIcon({ source }: { source: IconProps['source'] }) {
     <Box width="20px">
       <Icon source={source} tone="subdued" />
     </Box>
-  );
-}
-
-/**
- * The page header is a breadcrumb, not a back-button + title: a product icon, a
- * chevron, then the title (docs/parity/product-form.md). Polaris `Page`'s
- * `backAction` renders the older arrow-button look, so the header is built here
- * and `Page` is used only for its content width.
- */
-function Breadcrumb({
-  title,
-  productsUrl,
-  actions,
-}: {
-  title: string;
-  productsUrl: string;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <InlineStack align="space-between" blockAlign="center" gap="200">
-      <InlineStack gap="100" blockAlign="center">
-        <Button
-          variant="tertiary"
-          icon={ProductIcon}
-          url={productsUrl}
-          accessibilityLabel="Products"
-        />
-        <InlineIcon source={ChevronRightIcon} />
-        <Text as="h1" variant="headingLg" fontWeight="bold">
-          {title}
-        </Text>
-      </InlineStack>
-      {actions}
-    </InlineStack>
   );
 }
 
@@ -329,9 +295,10 @@ export function ProductForm({
       />
 
       <BlockStack gap="400">
-        <Breadcrumb
+        <PageHeader
+          icon={ProductIcon}
+          parent={{ label: 'Products', url: productsUrl }}
           title={product ? product.title : 'Add product'}
-          productsUrl={productsUrl}
           actions={
             product ? (
               <Popover

@@ -4,8 +4,10 @@
  * The frame every settings detail page sits in (PARITY.md: "narrow
  * single-column with section cards and the save bar"). Owner: WS-A.
  */
-import { Page } from '@shopify/polaris';
-import { useParams, useRouter } from 'next/navigation';
+import { BlockStack, Page } from '@shopify/polaris';
+import { SettingsIcon } from '@shopify/polaris-icons';
+import { useParams } from 'next/navigation';
+import { PageHeader } from '../shell/page-header.tsx';
 import { PageSkeleton } from '../shell/page-skeleton.tsx';
 import { SaveBar } from '../shell/save-bar.tsx';
 
@@ -21,17 +23,12 @@ export function SettingsPage({
   form?: { dirty: boolean; saving: boolean; save: () => void; discard: () => void };
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const { slug } = useParams<{ slug: string }>();
 
   if (loading) return <PageSkeleton />;
 
   return (
-    <Page
-      title={title}
-      backAction={{ content: 'Settings', onAction: () => router.push(`/store/${slug}/settings`) }}
-      narrowWidth
-    >
+    <Page narrowWidth>
       {form ? (
         <SaveBar
           dirty={form.dirty}
@@ -40,7 +37,14 @@ export function SettingsPage({
           onDiscard={form.discard}
         />
       ) : null}
-      {children}
+      <BlockStack gap="400">
+        <PageHeader
+          icon={SettingsIcon}
+          title={title}
+          parent={{ label: 'Settings', url: `/store/${slug}/settings` }}
+        />
+        {children}
+      </BlockStack>
     </Page>
   );
 }

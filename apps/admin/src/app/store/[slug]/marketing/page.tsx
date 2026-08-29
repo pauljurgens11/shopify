@@ -13,8 +13,10 @@
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
 import { BlockStack, Box, Button, Card, Grid, Page, Text } from '@shopify/polaris';
+import { MarketsIcon } from '@shopify/polaris-icons';
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { MetricCard } from '../analytics/metric-card.tsx';
@@ -36,8 +38,10 @@ export default function MarketingPage() {
   const currencyCode = summary?.totalSales.currencyCode ?? 'USD';
 
   return (
-    <Page title="Marketing">
+    <Page>
       <BlockStack gap="400">
+        <PageHeader icon={MarketsIcon} title="Marketing" />
+
         <Text as="h2" variant="headingMd">
           Last 30 days
         </Text>

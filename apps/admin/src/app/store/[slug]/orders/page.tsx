@@ -14,6 +14,7 @@ import { format } from '@merchant/config/money';
 import type { Paginated } from '@merchant/contracts/common';
 import type { OrderSummary } from '@merchant/contracts/orders';
 import {
+  BlockStack,
   Box,
   Card,
   ChoiceList,
@@ -24,8 +25,11 @@ import {
   Text,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
+import { OrderIcon } from '@shopify/polaris-icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { LearnMore } from '../../../../components/shell/learn-more.tsx';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from './_components/order-badges.tsx';
@@ -193,182 +197,190 @@ export default function OrdersPage() {
     cursorStack.length === 0;
 
   return (
-    <Page title="Orders" fullWidth>
-      <Card padding="0">
-        {rows.length === 0 && unfiltered ? (
-          // Hand-built rather than Polaris `EmptyState`, which needs an `image`
-          // — the only on-brand illustrations are Shopify's own CDN assets and
-          // PARITY.md forbids rendering those (same call B5 and A3 made).
-          <Box padding="800">
-            <div style={{ textAlign: 'center' }}>
-              <Text as="h2" variant="headingMd">
-                Your orders will show up here
-              </Text>
-              <Box paddingBlockStart="200">
-                <Text as="p" tone="subdued">
-                  Once a customer checks out, their order appears in this list.
+    <Page fullWidth>
+      <BlockStack gap="400">
+        {/* No header action: the real Orders index offers only `More actions`,
+            and every entry in it is out of scope (docs/parity/admin-shell.md). */}
+        <PageHeader icon={OrderIcon} title="Orders" />
+
+        <Card padding="0">
+          {rows.length === 0 && unfiltered ? (
+            // Hand-built rather than Polaris `EmptyState`, which needs an `image`
+            // — the only on-brand illustrations are Shopify's own CDN assets and
+            // PARITY.md forbids rendering those (same call B5 and A3 made).
+            <Box padding="800">
+              <div style={{ textAlign: 'center' }}>
+                <Text as="h2" variant="headingMd">
+                  Your orders will show up here
                 </Text>
-              </Box>
-            </div>
-          </Box>
-        ) : (
-          <>
-            <IndexFilters
-              tabs={TABS.map((t, index) => ({
-                id: t.label,
-                content: t.label,
-                index,
-                onAction: () => {
+                <Box paddingBlockStart="200">
+                  <Text as="p" tone="subdued">
+                    Once a customer checks out, their order appears in this list.
+                  </Text>
+                </Box>
+              </div>
+            </Box>
+          ) : (
+            <>
+              <IndexFilters
+                tabs={TABS.map((t, index) => ({
+                  id: t.label,
+                  content: t.label,
+                  index,
+                  onAction: () => {
+                    setTab(index);
+                    resetPaging();
+                  },
+                }))}
+                selected={tab}
+                onSelect={(index) => {
                   setTab(index);
                   resetPaging();
-                },
-              }))}
-              selected={tab}
-              onSelect={(index) => {
-                setTab(index);
-                resetPaging();
-              }}
-              queryValue={query}
-              queryPlaceholder="Searching in all"
-              onQueryChange={(value) => {
-                setQuery(value);
-                resetPaging();
-              }}
-              onQueryClear={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              sortOptions={SORT_OPTIONS}
-              sortSelected={sort}
-              onSort={(value) => {
-                setSort(value);
-                resetPaging();
-              }}
-              filters={[
-                {
-                  key: 'financialStatus',
-                  label: 'Payment status',
-                  // `pinned`, not `shortcut`: IndexFilters' FiltersBar only
-                  // reads `pinned` (Polaris 13.9.5 — `shortcut` is LegacyFilters'
-                  // prop), and an unpinned filter is buried behind "Add filter"
-                  // instead of sitting on the bar as Shopify's pill.
-                  pinned: true,
-                  filter: (
-                    <ChoiceList
-                      title="Payment status"
-                      titleHidden
-                      choices={PAYMENT_STATUS_CHOICES}
-                      selected={paymentStatus}
-                      onChange={(selected) => {
-                        setPaymentStatus(selected);
-                        resetPaging();
-                      }}
-                    />
-                  ),
-                },
-                {
-                  key: 'fulfillmentStatus',
-                  label: 'Fulfillment status',
-                  pinned: true,
-                  filter: (
-                    <ChoiceList
-                      title="Fulfillment status"
-                      titleHidden
-                      choices={FULFILLMENT_STATUS_CHOICES}
-                      selected={fulfillmentStatus}
-                      onChange={(selected) => {
-                        setFulfillmentStatus(selected);
-                        resetPaging();
-                      }}
-                    />
-                  ),
-                },
-              ]}
-              appliedFilters={appliedFilters}
-              onClearAll={clearFilters}
-              mode={mode}
-              setMode={setMode}
-              // Leaving filtering mode has to clear the filters, not just the
-              // search: Default mode renders no pills, so a kept filter would
-              // silently hold rows back with nothing on screen saying why.
-              cancelAction={{ onAction: clearFilters }}
-              loading={orders.isFetching}
-              canCreateNewView={false}
-            />
+                }}
+                queryValue={query}
+                queryPlaceholder="Searching in all"
+                onQueryChange={(value) => {
+                  setQuery(value);
+                  resetPaging();
+                }}
+                onQueryClear={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                sortOptions={SORT_OPTIONS}
+                sortSelected={sort}
+                onSort={(value) => {
+                  setSort(value);
+                  resetPaging();
+                }}
+                filters={[
+                  {
+                    key: 'financialStatus',
+                    label: 'Payment status',
+                    // `pinned`, not `shortcut`: IndexFilters' FiltersBar only
+                    // reads `pinned` (Polaris 13.9.5 — `shortcut` is LegacyFilters'
+                    // prop), and an unpinned filter is buried behind "Add filter"
+                    // instead of sitting on the bar as Shopify's pill.
+                    pinned: true,
+                    filter: (
+                      <ChoiceList
+                        title="Payment status"
+                        titleHidden
+                        choices={PAYMENT_STATUS_CHOICES}
+                        selected={paymentStatus}
+                        onChange={(selected) => {
+                          setPaymentStatus(selected);
+                          resetPaging();
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'fulfillmentStatus',
+                    label: 'Fulfillment status',
+                    pinned: true,
+                    filter: (
+                      <ChoiceList
+                        title="Fulfillment status"
+                        titleHidden
+                        choices={FULFILLMENT_STATUS_CHOICES}
+                        selected={fulfillmentStatus}
+                        onChange={(selected) => {
+                          setFulfillmentStatus(selected);
+                          resetPaging();
+                        }}
+                      />
+                    ),
+                  },
+                ]}
+                appliedFilters={appliedFilters}
+                onClearAll={clearFilters}
+                mode={mode}
+                setMode={setMode}
+                // Leaving filtering mode has to clear the filters, not just the
+                // search: Default mode renders no pills, so a kept filter would
+                // silently hold rows back with nothing on screen saying why.
+                cancelAction={{ onAction: clearFilters }}
+                loading={orders.isFetching}
+                canCreateNewView={false}
+              />
 
-            <IndexTable
-              resourceName={{ singular: 'order', plural: 'orders' }}
-              itemCount={rows.length}
-              selectable={false}
-              headings={[
-                { title: 'Order' },
-                { title: 'Date' },
-                { title: 'Customer' },
-                { title: 'Total', alignment: 'end' },
-                { title: 'Payment' },
-                { title: 'Fulfillment' },
-                { title: 'Items' },
-              ]}
-              pagination={{
-                hasPrevious: cursorStack.length > 0,
-                hasNext: Boolean(orders.data?.nextCursor),
-                onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
-                onNext: () => {
-                  const next = orders.data?.nextCursor;
-                  if (next) setCursorStack((stack) => [...stack, next]);
-                },
-              }}
-              emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
-                    No orders found. Try changing the search or filters.
-                  </Text>
-                </div>
-              }
-            >
-              {rows.map((order, index) => (
-                <IndexTable.Row
-                  id={order.id}
-                  key={order.id}
-                  position={index}
-                  onClick={() => router.push(`/store/${slug}/orders/${order.id}`)}
-                >
-                  <IndexTable.Cell>
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">
-                      #{order.orderNumber}
+              <IndexTable
+                resourceName={{ singular: 'order', plural: 'orders' }}
+                itemCount={rows.length}
+                selectable={false}
+                headings={[
+                  { title: 'Order' },
+                  { title: 'Date' },
+                  { title: 'Customer' },
+                  { title: 'Total', alignment: 'end' },
+                  { title: 'Payment' },
+                  { title: 'Fulfillment' },
+                  { title: 'Items' },
+                ]}
+                pagination={{
+                  hasPrevious: cursorStack.length > 0,
+                  hasNext: Boolean(orders.data?.nextCursor),
+                  onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
+                  onNext: () => {
+                    const next = orders.data?.nextCursor;
+                    if (next) setCursorStack((stack) => [...stack, next]);
+                  },
+                }}
+                emptyState={
+                  <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
+                    <Text as="p" tone="subdued">
+                      No orders found. Try changing the search or filters.
                     </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {orderDate(order.createdAt)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>{customerName(order)}</IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" alignment="end" numeric>
-                      {format(order.total)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <InlineStack gap="150">
-                      {order.cancelledAt ? <CancelledBadge /> : null}
-                      <FinancialBadge order={order} />
-                    </InlineStack>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <FulfillmentBadge order={order} />
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {order.lineItems.reduce((sum, line) => sum + line.quantity, 0)} items
-                    </Text>
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          </>
-        )}
-      </Card>
+                  </div>
+                }
+              >
+                {rows.map((order, index) => (
+                  <IndexTable.Row
+                    id={order.id}
+                    key={order.id}
+                    position={index}
+                    onClick={() => router.push(`/store/${slug}/orders/${order.id}`)}
+                  >
+                    <IndexTable.Cell>
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">
+                        #{order.orderNumber}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {orderDate(order.createdAt)}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>{customerName(order)}</IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" alignment="end" numeric>
+                        {format(order.total)}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <InlineStack gap="150">
+                        {order.cancelledAt ? <CancelledBadge /> : null}
+                        <FinancialBadge order={order} />
+                      </InlineStack>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <FulfillmentBadge order={order} />
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {order.lineItems.reduce((sum, line) => sum + line.quantity, 0)} items
+                      </Text>
+                    </IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            </>
+          )}
+        </Card>
+
+        <LearnMore resource="orders" />
+      </BlockStack>
     </Page>
   );
 }

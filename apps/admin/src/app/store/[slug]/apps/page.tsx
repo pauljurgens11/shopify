@@ -10,9 +10,12 @@
 import type { App } from '@merchant/contracts/apps';
 import type { Paginated } from '@merchant/contracts/common';
 import { BlockStack, Box, Button, Card, IndexTable, Page, Text } from '@shopify/polaris';
+import { AppsIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { LearnMore } from '../../../../components/shell/learn-more.tsx';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
@@ -47,93 +50,103 @@ export default function AppsPage() {
   const empty = rows.length === 0 && !paging.hasPrevious;
 
   return (
-    <Page
-      title="Apps"
-      primaryAction={{ content: 'Create app', onAction: () => setCreating(true) }}
-      fullWidth
-    >
-      <Card padding="0">
-        {empty ? (
-          // Hand-built rather than Polaris `EmptyState`, which requires an
-          // `image`: the only on-brand illustrations are Shopify's own CDN
-          // assets, and PARITY.md forbids rendering those (A3 hit the same wall).
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Connect your store to your own tools
-              </Text>
-              <Box maxWidth="52ch">
-                <Text as="p" tone="subdued" alignment="center">
-                  An app is an Admin API token with the access scopes you choose. Use one to sync
-                  products from a spreadsheet, push orders into your warehouse, or subscribe an
-                  endpoint to webhooks.
+    <Page fullWidth>
+      <BlockStack gap="400">
+        <PageHeader
+          icon={AppsIcon}
+          title="Apps"
+          actions={
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              Create app
+            </Button>
+          }
+        />
+
+        <Card padding="0">
+          {empty ? (
+            // Hand-built rather than Polaris `EmptyState`, which requires an
+            // `image`: the only on-brand illustrations are Shopify's own CDN
+            // assets, and PARITY.md forbids rendering those (A3 hit the same wall).
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Connect your store to your own tools
                 </Text>
-              </Box>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" onClick={() => setCreating(true)}>
-                  Create app
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
-        ) : (
-          <IndexTable
-            resourceName={{ singular: 'app', plural: 'apps' }}
-            itemCount={rows.length}
-            // Nothing here is a bulk operation — uninstalling a credential is a
-            // one-at-a-time, confirm-it decision on the detail page.
-            selectable={false}
-            loading={apps.isFetching}
-            headings={[
-              { title: 'App' },
-              { title: 'Access scopes' },
-              { title: 'API token' },
-              { title: 'Last used' },
-              { title: 'Date created' },
-            ]}
-            pagination={{
-              hasPrevious: paging.hasPrevious,
-              hasNext: Boolean(apps.data?.nextCursor),
-              onPrevious: paging.previous,
-              onNext: () => {
-                const next = apps.data?.nextCursor;
-                if (next) paging.next(next);
-              },
-            }}
-          >
-            {rows.map((app, index) => (
-              <IndexTable.Row
-                id={app.id}
-                key={app.id}
-                position={index}
-                onClick={() => router.push(`/store/${slug}/apps/${app.id}`)}
-              >
-                <IndexTable.Cell>
-                  <Text as="span" variant="bodyMd" fontWeight="semibold">
-                    {app.name}
+                <Box maxWidth="52ch">
+                  <Text as="p" tone="subdued" alignment="center">
+                    An app is an Admin API token with the access scopes you choose. Use one to sync
+                    products from a spreadsheet, push orders into your warehouse, or subscribe an
+                    endpoint to webhooks.
                   </Text>
-                </IndexTable.Cell>
-                <IndexTable.Cell>
-                  <Text as="span" tone="subdued">
-                    {scopeCountLabel(app.scopes)}
-                  </Text>
-                </IndexTable.Cell>
-                <IndexTable.Cell>
-                  <Text as="span" tone="subdued">
-                    {mask(app.tokenSuffix)}
-                  </Text>
-                </IndexTable.Cell>
-                <IndexTable.Cell>
-                  <Text as="span" tone="subdued">
-                    {app.lastUsedAt ? formatDateTime(app.lastUsedAt) : 'Never'}
-                  </Text>
-                </IndexTable.Cell>
-                <IndexTable.Cell>{formatDate(app.createdAt)}</IndexTable.Cell>
-              </IndexTable.Row>
-            ))}
-          </IndexTable>
-        )}
-      </Card>
+                </Box>
+                <Box paddingBlockStart="300">
+                  <Button variant="primary" onClick={() => setCreating(true)}>
+                    Create app
+                  </Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          ) : (
+            <IndexTable
+              resourceName={{ singular: 'app', plural: 'apps' }}
+              itemCount={rows.length}
+              // Nothing here is a bulk operation — uninstalling a credential is a
+              // one-at-a-time, confirm-it decision on the detail page.
+              selectable={false}
+              loading={apps.isFetching}
+              headings={[
+                { title: 'App' },
+                { title: 'Access scopes' },
+                { title: 'API token' },
+                { title: 'Last used' },
+                { title: 'Date created' },
+              ]}
+              pagination={{
+                hasPrevious: paging.hasPrevious,
+                hasNext: Boolean(apps.data?.nextCursor),
+                onPrevious: paging.previous,
+                onNext: () => {
+                  const next = apps.data?.nextCursor;
+                  if (next) paging.next(next);
+                },
+              }}
+            >
+              {rows.map((app, index) => (
+                <IndexTable.Row
+                  id={app.id}
+                  key={app.id}
+                  position={index}
+                  onClick={() => router.push(`/store/${slug}/apps/${app.id}`)}
+                >
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                      {app.name}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" tone="subdued">
+                      {scopeCountLabel(app.scopes)}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" tone="subdued">
+                      {mask(app.tokenSuffix)}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" tone="subdued">
+                      {app.lastUsedAt ? formatDateTime(app.lastUsedAt) : 'Never'}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>{formatDate(app.createdAt)}</IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          )}
+        </Card>
+
+        <LearnMore resource="apps" />
+      </BlockStack>
 
       <CreateAppModal
         open={creating}

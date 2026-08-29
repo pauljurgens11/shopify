@@ -34,9 +34,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { PersonIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
@@ -210,34 +212,41 @@ export default function CustomerDetailPage() {
   if (customer.isError || !loaded) {
     const missing = customer.error?.code === 'not_found';
     return (
-      <Page backAction={{ content: 'Customers', url: `/store/${slug}/customers` }} title="Customer">
-        {missing ? (
-          <Card>
-            {/* Hand-built rather than Polaris `EmptyState`, which requires an
+      <Page>
+        <BlockStack gap="400">
+          <PageHeader
+            icon={PersonIcon}
+            title="Customer"
+            parent={{ label: 'Customers', url: `/store/${slug}/customers` }}
+          />
+          {missing ? (
+            <Card>
+              {/* Hand-built rather than Polaris `EmptyState`, which requires an
                 `image` — "" renders a phantom <img> request (page-skeleton.tsx). */}
-            <Box padding="800">
-              <BlockStack gap="200" inlineAlign="center">
-                <Text as="h2" variant="headingMd">
-                  Customer not found
-                </Text>
-                <Text as="p" tone="subdued" alignment="center">
-                  This customer may have been deleted.
-                </Text>
-                <Box paddingBlockStart="300">
-                  <Button url={`/store/${slug}/customers`}>Back to customers</Button>
-                </Box>
-              </BlockStack>
-            </Box>
-          </Card>
-        ) : (
-          <Banner
-            tone="critical"
-            title="This customer could not be loaded"
-            action={{ content: 'Try again', onAction: () => customer.refetch() }}
-          >
-            <p>{customer.error?.message ?? 'Something went wrong. Please try again.'}</p>
-          </Banner>
-        )}
+              <Box padding="800">
+                <BlockStack gap="200" inlineAlign="center">
+                  <Text as="h2" variant="headingMd">
+                    Customer not found
+                  </Text>
+                  <Text as="p" tone="subdued" alignment="center">
+                    This customer may have been deleted.
+                  </Text>
+                  <Box paddingBlockStart="300">
+                    <Button url={`/store/${slug}/customers`}>Back to customers</Button>
+                  </Box>
+                </BlockStack>
+              </Box>
+            </Card>
+          ) : (
+            <Banner
+              tone="critical"
+              title="This customer could not be loaded"
+              action={{ content: 'Try again', onAction: () => customer.refetch() }}
+            >
+              <p>{customer.error?.message ?? 'Something went wrong. Please try again.'}</p>
+            </Banner>
+          )}
+        </BlockStack>
       </Page>
     );
   }
@@ -273,257 +282,264 @@ export default function CustomerDetailPage() {
     setAddresses((current) => current.map((a, i) => ({ ...a, isDefault: i === index })));
 
   return (
-    <Page
-      backAction={{ content: 'Customers', url: `/store/${slug}/customers` }}
-      title={fullName(loaded)}
-      subtitle={customerFor(loaded.createdAt)}
-    >
+    <Page>
       <SaveBar dirty={dirty} saving={saving} onSave={save} onDiscard={discard} />
 
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Last order placed
-                </Text>
-                {/* The orders query resolves after the customer's, so without
+      <PageHeader
+        icon={PersonIcon}
+        parent={{ label: 'Customers', url: `/store/${slug}/customers` }}
+        title={fullName(loaded)}
+        subtitle={customerFor(loaded.createdAt)}
+      />
+
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Last order placed
+                  </Text>
+                  {/* The orders query resolves after the customer's, so without
                     this the card flashes "hasn't placed an order yet" at a
                     customer who has (PARITY.md: skeleton, never a wrong state). */}
-                {orders.isPending ? (
-                  <SkeletonBodyText lines={2} />
-                ) : lastOrder ? (
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Link url={`/store/${slug}/orders/${lastOrder.id}`} removeUnderline>
-                        <Text as="span" fontWeight="semibold">
-                          #{lastOrder.orderNumber}
-                        </Text>
-                      </Link>
-                      <Text as="span">{format(lastOrder.total)}</Text>
-                    </InlineStack>
-                    <InlineStack gap="200" blockAlign="center">
-                      <Text as="span" tone="subdued">
-                        {shortDate(lastOrder.createdAt)}
-                      </Text>
-                      {lastOrderBadge && (
-                        <Badge tone={lastOrderBadge.tone} progress={lastOrderBadge.progress}>
-                          {lastOrderBadge.label}
-                        </Badge>
-                      )}
-                    </InlineStack>
-                  </BlockStack>
-                ) : (
-                  <Text as="p" tone="subdued">
-                    This customer hasn’t placed an order yet.
-                  </Text>
-                )}
-              </BlockStack>
-            </Card>
-
-            <Card padding="0">
-              <Box padding="400" paddingBlockEnd="200">
-                <Text as="h2" variant="headingMd">
-                  Order history
-                </Text>
-              </Box>
-              {orders.isPending ? (
-                <Box padding="400">
-                  <SkeletonBodyText lines={3} />
-                </Box>
-              ) : orderRows.length === 0 ? (
-                <Box padding="400">
-                  <Text as="p" tone="subdued">
-                    Orders this customer places will appear here.
-                  </Text>
-                </Box>
-              ) : (
-                <ResourceList
-                  resourceName={{ singular: 'order', plural: 'orders' }}
-                  items={orderRows}
-                  renderItem={(order) => (
-                    <ResourceItem
-                      key={order.id}
-                      id={order.id}
-                      onClick={() => router.push(`/store/${slug}/orders/${order.id}`)}
-                    >
+                  {orders.isPending ? (
+                    <SkeletonBodyText lines={2} />
+                  ) : lastOrder ? (
+                    <BlockStack gap="200">
                       <InlineStack align="space-between" blockAlign="center">
-                        <BlockStack gap="050">
+                        <Link url={`/store/${slug}/orders/${lastOrder.id}`} removeUnderline>
                           <Text as="span" fontWeight="semibold">
-                            #{order.orderNumber}
+                            #{lastOrder.orderNumber}
                           </Text>
-                          <Text as="span" tone="subdued" variant="bodySm">
-                            {shortDate(order.createdAt)}
-                          </Text>
-                        </BlockStack>
-                        <InlineStack gap="300" blockAlign="center">
-                          <Badge
-                            tone={order.fulfillmentStatus === 'fulfilled' ? undefined : 'attention'}
-                          >
-                            {order.fulfillmentStatus === 'fulfilled'
-                              ? 'Fulfilled'
-                              : order.fulfillmentStatus === 'partially_fulfilled'
-                                ? 'Partially fulfilled'
-                                : 'Unfulfilled'}
-                          </Badge>
-                          <Text as="span">{format(order.total)}</Text>
-                        </InlineStack>
+                        </Link>
+                        <Text as="span">{format(lastOrder.total)}</Text>
                       </InlineStack>
-                    </ResourceItem>
-                  )}
-                />
-              )}
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h2" variant="headingMd">
-                    Customer
-                  </Text>
-                  <Button
-                    variant="plain"
-                    onClick={() => {
-                      setContactEmailError(undefined);
-                      setContactOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                </InlineStack>
-                <BlockStack gap="100">
-                  <Text as="p" tone="subdued" variant="bodySm">
-                    {loaded.ordersCount === 1 ? '1 order' : `${loaded.ordersCount} orders`} ·{' '}
-                    {format(loaded.totalSpent)} spent
-                  </Text>
-                  <Link url={`mailto:${loaded.email}`} removeUnderline>
-                    {loaded.email}
-                  </Link>
-                  {loaded.phone && <Text as="p">{loaded.phone}</Text>}
-                </BlockStack>
-                <Checkbox
-                  label="Customer accepts email marketing"
-                  checked={acceptsMarketing}
-                  onChange={setAcceptsMarketing}
-                />
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="300">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h2" variant="headingMd">
-                    Addresses
-                  </Text>
-                  <Button
-                    variant="plain"
-                    onClick={() => {
-                      setEditingIndex(null);
-                      setAddressOpen(true);
-                    }}
-                  >
-                    Add address
-                  </Button>
-                </InlineStack>
-                {addresses.length === 0 ? (
-                  <Text as="p" tone="subdued">
-                    No address on file.
-                  </Text>
-                ) : (
-                  addresses.map((address, index) => (
-                    // The list is local state with no row ids; index is the key.
-                    // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id until saved
-                    <BlockStack key={index} gap="200">
-                      {index > 0 && <Divider />}
-                      {address.isDefault && (
-                        <InlineStack>
-                          <Badge>Default address</Badge>
-                        </InlineStack>
-                      )}
-                      <AddressLines address={address} />
-                      <InlineStack gap="300">
-                        <Button
-                          variant="plain"
-                          onClick={() => {
-                            setEditingIndex(index);
-                            setAddressOpen(true);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        {!address.isDefault && (
-                          <Button variant="plain" onClick={() => makeDefault(index)}>
-                            Set as default
-                          </Button>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="span" tone="subdued">
+                          {shortDate(lastOrder.createdAt)}
+                        </Text>
+                        {lastOrderBadge && (
+                          <Badge tone={lastOrderBadge.tone} progress={lastOrderBadge.progress}>
+                            {lastOrderBadge.label}
+                          </Badge>
                         )}
-                        <Button
-                          variant="plain"
-                          tone="critical"
-                          onClick={() => removeAddress(index)}
-                        >
-                          Delete
-                        </Button>
                       </InlineStack>
                     </BlockStack>
-                  ))
-                )}
-              </BlockStack>
-            </Card>
+                  ) : (
+                    <Text as="p" tone="subdued">
+                      This customer hasn’t placed an order yet.
+                    </Text>
+                  )}
+                </BlockStack>
+              </Card>
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Tags
-                </Text>
-                <TextField
-                  label="Tags"
-                  labelHidden
-                  autoComplete="off"
-                  placeholder="Add a tag"
-                  value={tagDraft}
-                  onChange={setTagDraft}
-                  onBlur={() => {
-                    const value = tagDraft.trim();
-                    if (value !== '' && !tags.includes(value)) setTags([...tags, value]);
-                    setTagDraft('');
-                  }}
-                />
-                {tags.length > 0 && (
-                  <InlineStack gap="200">
-                    {tags.map((tag) => (
-                      <Tag key={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))}>
-                        {tag}
-                      </Tag>
-                    ))}
+              <Card padding="0">
+                <Box padding="400" paddingBlockEnd="200">
+                  <Text as="h2" variant="headingMd">
+                    Order history
+                  </Text>
+                </Box>
+                {orders.isPending ? (
+                  <Box padding="400">
+                    <SkeletonBodyText lines={3} />
+                  </Box>
+                ) : orderRows.length === 0 ? (
+                  <Box padding="400">
+                    <Text as="p" tone="subdued">
+                      Orders this customer places will appear here.
+                    </Text>
+                  </Box>
+                ) : (
+                  <ResourceList
+                    resourceName={{ singular: 'order', plural: 'orders' }}
+                    items={orderRows}
+                    renderItem={(order) => (
+                      <ResourceItem
+                        key={order.id}
+                        id={order.id}
+                        onClick={() => router.push(`/store/${slug}/orders/${order.id}`)}
+                      >
+                        <InlineStack align="space-between" blockAlign="center">
+                          <BlockStack gap="050">
+                            <Text as="span" fontWeight="semibold">
+                              #{order.orderNumber}
+                            </Text>
+                            <Text as="span" tone="subdued" variant="bodySm">
+                              {shortDate(order.createdAt)}
+                            </Text>
+                          </BlockStack>
+                          <InlineStack gap="300" blockAlign="center">
+                            <Badge
+                              tone={
+                                order.fulfillmentStatus === 'fulfilled' ? undefined : 'attention'
+                              }
+                            >
+                              {order.fulfillmentStatus === 'fulfilled'
+                                ? 'Fulfilled'
+                                : order.fulfillmentStatus === 'partially_fulfilled'
+                                  ? 'Partially fulfilled'
+                                  : 'Unfulfilled'}
+                            </Badge>
+                            <Text as="span">{format(order.total)}</Text>
+                          </InlineStack>
+                        </InlineStack>
+                      </ResourceItem>
+                    )}
+                  />
+                )}
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h2" variant="headingMd">
+                      Customer
+                    </Text>
+                    <Button
+                      variant="plain"
+                      onClick={() => {
+                        setContactEmailError(undefined);
+                        setContactOpen(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
                   </InlineStack>
-                )}
-              </BlockStack>
-            </Card>
+                  <BlockStack gap="100">
+                    <Text as="p" tone="subdued" variant="bodySm">
+                      {loaded.ordersCount === 1 ? '1 order' : `${loaded.ordersCount} orders`} ·{' '}
+                      {format(loaded.totalSpent)} spent
+                    </Text>
+                    <Link url={`mailto:${loaded.email}`} removeUnderline>
+                      {loaded.email}
+                    </Link>
+                    {loaded.phone && <Text as="p">{loaded.phone}</Text>}
+                  </BlockStack>
+                  <Checkbox
+                    label="Customer accepts email marketing"
+                    checked={acceptsMarketing}
+                    onChange={setAcceptsMarketing}
+                  />
+                </BlockStack>
+              </Card>
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Notes
-                </Text>
-                <TextField
-                  label="Notes"
-                  labelHidden
-                  autoComplete="off"
-                  multiline={3}
-                  placeholder="Notes are private and won’t be shared with the customer."
-                  value={note}
-                  onChange={setNote}
-                />
-              </BlockStack>
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h2" variant="headingMd">
+                      Addresses
+                    </Text>
+                    <Button
+                      variant="plain"
+                      onClick={() => {
+                        setEditingIndex(null);
+                        setAddressOpen(true);
+                      }}
+                    >
+                      Add address
+                    </Button>
+                  </InlineStack>
+                  {addresses.length === 0 ? (
+                    <Text as="p" tone="subdued">
+                      No address on file.
+                    </Text>
+                  ) : (
+                    addresses.map((address, index) => (
+                      // The list is local state with no row ids; index is the key.
+                      // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id until saved
+                      <BlockStack key={index} gap="200">
+                        {index > 0 && <Divider />}
+                        {address.isDefault && (
+                          <InlineStack>
+                            <Badge>Default address</Badge>
+                          </InlineStack>
+                        )}
+                        <AddressLines address={address} />
+                        <InlineStack gap="300">
+                          <Button
+                            variant="plain"
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setAddressOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          {!address.isDefault && (
+                            <Button variant="plain" onClick={() => makeDefault(index)}>
+                              Set as default
+                            </Button>
+                          )}
+                          <Button
+                            variant="plain"
+                            tone="critical"
+                            onClick={() => removeAddress(index)}
+                          >
+                            Delete
+                          </Button>
+                        </InlineStack>
+                      </BlockStack>
+                    ))
+                  )}
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Tags
+                  </Text>
+                  <TextField
+                    label="Tags"
+                    labelHidden
+                    autoComplete="off"
+                    placeholder="Add a tag"
+                    value={tagDraft}
+                    onChange={setTagDraft}
+                    onBlur={() => {
+                      const value = tagDraft.trim();
+                      if (value !== '' && !tags.includes(value)) setTags([...tags, value]);
+                      setTagDraft('');
+                    }}
+                  />
+                  {tags.length > 0 && (
+                    <InlineStack gap="200">
+                      {tags.map((tag) => (
+                        <Tag key={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))}>
+                          {tag}
+                        </Tag>
+                      ))}
+                    </InlineStack>
+                  )}
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Notes
+                  </Text>
+                  <TextField
+                    label="Notes"
+                    labelHidden
+                    autoComplete="off"
+                    multiline={3}
+                    placeholder="Notes are private and won’t be shared with the customer."
+                    value={note}
+                    onChange={setNote}
+                  />
+                </BlockStack>
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </Box>
 
       <AddressModal
         open={addressOpen}

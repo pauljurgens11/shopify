@@ -15,6 +15,7 @@ import { format, fromDecimal } from '@merchant/config/money';
 import type { Discount } from '@merchant/contracts/discounts';
 import {
   BlockStack,
+  Box,
   Button,
   ButtonGroup,
   Card,
@@ -30,9 +31,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { DiscountIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
@@ -217,22 +220,7 @@ export function DiscountForm({
   };
 
   return (
-    <Page
-      backAction={{ content: 'Discounts', url: `/store/${slug}/discounts` }}
-      title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
-      subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
-      secondaryActions={
-        discountId
-          ? [
-              {
-                content: 'Delete',
-                destructive: true,
-                onAction: () => setConfirmingDelete(true),
-              },
-            ]
-          : undefined
-      }
-    >
+    <Page>
       <SaveBar
         dirty={dirty}
         saving={saving}
@@ -243,288 +231,304 @@ export function DiscountForm({
         }}
       />
 
-      <Form onSubmit={save}>
-        <Layout>
-          <Layout.Section>
-            <BlockStack gap="400">
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    {TYPE_TITLES[draft.type]}
-                  </Text>
-                  <ChoiceList
-                    title="Method"
-                    choices={[
-                      { label: 'Discount code', value: 'code' },
-                      { label: 'Automatic discount', value: 'automatic' },
-                    ]}
-                    selected={[draft.method]}
-                    onChange={([value]) => set('method', value as DiscountDraft['method'])}
-                  />
-                  {draft.method === 'code' ? (
-                    <FormLayout>
-                      <TextField
-                        label="Discount code"
-                        autoComplete="off"
-                        value={draft.code}
-                        onChange={(value) => set('code', value.toUpperCase())}
-                        error={shown.code}
-                        // Shopify puts Generate on the label row as a link, not
-                        // as a button welded to the field (PARITY.md → C6).
-                        labelAction={{
-                          content: 'Generate',
-                          onAction: () => set('code', generateCode()),
-                        }}
-                        helpText="Customers enter this code at checkout."
-                      />
-                    </FormLayout>
-                  ) : (
-                    <TextField
-                      label="Title"
-                      autoComplete="off"
-                      value={draft.title}
-                      onChange={(value) => set('title', value)}
-                      error={shown.title}
-                      helpText="Customers see this in their cart and at checkout."
-                    />
-                  )}
-                  {draft.method === 'code' && (
-                    <TextField
-                      label="Title"
-                      autoComplete="off"
-                      value={draft.title}
-                      onChange={(value) => set('title', value)}
-                      error={shown.title}
-                      helpText="Only you see this. It is how you find the discount later."
-                    />
-                  )}
-                </BlockStack>
-              </Card>
+      <PageHeader
+        icon={DiscountIcon}
+        parent={{ label: 'Discounts', url: `/store/${slug}/discounts` }}
+        title={discountId ? draft.title || 'Discount' : TYPE_TITLES[draft.type]}
+        subtitle={discountId ? TYPE_TITLES[draft.type] : undefined}
+        actions={
+          discountId ? (
+            <Button tone="critical" variant="tertiary" onClick={() => setConfirmingDelete(true)}>
+              Delete
+            </Button>
+          ) : undefined
+        }
+      />
 
-              {draft.type !== 'free_shipping' && (
+      <Box paddingBlockStart="400">
+        <Form onSubmit={save}>
+          <Layout>
+            <Layout.Section>
+              <BlockStack gap="400">
                 <Card>
                   <BlockStack gap="300">
                     <Text as="h2" variant="headingMd">
-                      Value
-                    </Text>
-                    {/* Segmented control + field on one row, which is how
-                        Shopify's value picker reads (PARITY.md → C6). Aligned
-                        to the start so a validation message growing under the
-                        field does not drag the buttons down with it. */}
-                    <InlineStack gap="300" blockAlign="start" wrap={false}>
-                      <ButtonGroup variant="segmented">
-                        <Button
-                          pressed={draft.valueType === 'percentage'}
-                          onClick={() => set('valueType', 'percentage')}
-                        >
-                          Percentage
-                        </Button>
-                        <Button
-                          pressed={draft.valueType === 'fixed'}
-                          onClick={() => set('valueType', 'fixed')}
-                        >
-                          Fixed amount
-                        </Button>
-                      </ButtonGroup>
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label="Value"
-                          labelHidden
-                          type="number"
-                          autoComplete="off"
-                          value={draft.value}
-                          onChange={(value) => set('value', value)}
-                          error={shown.value}
-                          prefix={draft.valueType === 'fixed' ? symbol : undefined}
-                          suffix={draft.valueType === 'percentage' ? '%' : undefined}
-                        />
-                      </div>
-                    </InlineStack>
-                  </BlockStack>
-                </Card>
-              )}
-
-              {draft.type === 'amount_off_products' && (
-                <Card>
-                  <BlockStack gap="300">
-                    <Text as="h2" variant="headingMd">
-                      Applies to
+                      {TYPE_TITLES[draft.type]}
                     </Text>
                     <ChoiceList
-                      title="Applies to"
-                      titleHidden
+                      title="Method"
                       choices={[
-                        { label: 'All products', value: 'all' },
-                        { label: 'Specific collections', value: 'collections' },
-                        { label: 'Specific products', value: 'products' },
+                        { label: 'Discount code', value: 'code' },
+                        { label: 'Automatic discount', value: 'automatic' },
                       ]}
-                      selected={[draft.appliesToScope]}
-                      onChange={([value]) =>
-                        set('appliesToScope', value as DiscountDraft['appliesToScope'])
-                      }
+                      selected={[draft.method]}
+                      onChange={([value]) => set('method', value as DiscountDraft['method'])}
                     />
-                    {draft.appliesToScope !== 'all' && (
-                      <BlockStack gap="200">
-                        <InlineStack gap="300" blockAlign="center">
-                          <Button onClick={() => setPicker(draft.appliesToScope as 'products')}>
-                            Browse
-                          </Button>
-                          <Text as="span" tone="subdued">
-                            {draft.appliesToScope === 'collections'
-                              ? `${draft.collectionIds.length} selected`
-                              : `${draft.productIds.length} selected`}
-                          </Text>
-                        </InlineStack>
-                        {shown.appliesTo && (
-                          <InlineError message={shown.appliesTo} fieldID="appliesTo" />
-                        )}
-                      </BlockStack>
+                    {draft.method === 'code' ? (
+                      <FormLayout>
+                        <TextField
+                          label="Discount code"
+                          autoComplete="off"
+                          value={draft.code}
+                          onChange={(value) => set('code', value.toUpperCase())}
+                          error={shown.code}
+                          // Shopify puts Generate on the label row as a link, not
+                          // as a button welded to the field (PARITY.md → C6).
+                          labelAction={{
+                            content: 'Generate',
+                            onAction: () => set('code', generateCode()),
+                          }}
+                          helpText="Customers enter this code at checkout."
+                        />
+                      </FormLayout>
+                    ) : (
+                      <TextField
+                        label="Title"
+                        autoComplete="off"
+                        value={draft.title}
+                        onChange={(value) => set('title', value)}
+                        error={shown.title}
+                        helpText="Customers see this in their cart and at checkout."
+                      />
+                    )}
+                    {draft.method === 'code' && (
+                      <TextField
+                        label="Title"
+                        autoComplete="off"
+                        value={draft.title}
+                        onChange={(value) => set('title', value)}
+                        error={shown.title}
+                        helpText="Only you see this. It is how you find the discount later."
+                      />
                     )}
                   </BlockStack>
                 </Card>
-              )}
 
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Minimum purchase requirements
-                  </Text>
-                  <ChoiceList
-                    title="Minimum requirements"
-                    titleHidden
-                    choices={[
-                      { label: 'No minimum requirements', value: 'none' },
-                      { label: 'Minimum purchase amount', value: 'subtotal' },
-                      { label: 'Minimum quantity of items', value: 'quantity' },
-                    ]}
-                    selected={[draft.minimumKind]}
-                    onChange={([value]) =>
-                      set('minimumKind', value as DiscountDraft['minimumKind'])
-                    }
-                  />
-                  {draft.minimumKind === 'subtotal' && (
-                    <TextField
-                      label="Minimum amount"
-                      type="number"
-                      autoComplete="off"
-                      prefix={symbol}
-                      value={draft.minimumSubtotal}
-                      onChange={(value) => set('minimumSubtotal', value)}
-                      error={shown.minimumSubtotal}
-                    />
-                  )}
-                  {draft.minimumKind === 'quantity' && (
-                    <TextField
-                      label="Minimum quantity"
-                      type="number"
-                      autoComplete="off"
-                      value={draft.minimumQuantity}
-                      onChange={(value) => set('minimumQuantity', value)}
-                      error={shown.minimumQuantity}
-                    />
-                  )}
-                </BlockStack>
-              </Card>
+                {draft.type !== 'free_shipping' && (
+                  <Card>
+                    <BlockStack gap="300">
+                      <Text as="h2" variant="headingMd">
+                        Value
+                      </Text>
+                      {/* Segmented control + field on one row, which is how
+                        Shopify's value picker reads (PARITY.md → C6). Aligned
+                        to the start so a validation message growing under the
+                        field does not drag the buttons down with it. */}
+                      <InlineStack gap="300" blockAlign="start" wrap={false}>
+                        <ButtonGroup variant="segmented">
+                          <Button
+                            pressed={draft.valueType === 'percentage'}
+                            onClick={() => set('valueType', 'percentage')}
+                          >
+                            Percentage
+                          </Button>
+                          <Button
+                            pressed={draft.valueType === 'fixed'}
+                            onClick={() => set('valueType', 'fixed')}
+                          >
+                            Fixed amount
+                          </Button>
+                        </ButtonGroup>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Value"
+                            labelHidden
+                            type="number"
+                            autoComplete="off"
+                            value={draft.value}
+                            onChange={(value) => set('value', value)}
+                            error={shown.value}
+                            prefix={draft.valueType === 'fixed' ? symbol : undefined}
+                            suffix={draft.valueType === 'percentage' ? '%' : undefined}
+                          />
+                        </div>
+                      </InlineStack>
+                    </BlockStack>
+                  </Card>
+                )}
 
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Maximum discount uses
-                  </Text>
-                  <Checkbox
-                    label="Limit number of times this discount can be used in total"
-                    checked={draft.hasUsageLimit}
-                    onChange={(value) => set('hasUsageLimit', value)}
-                  />
-                  {draft.hasUsageLimit && (
-                    <TextField
-                      label="Total uses"
-                      labelHidden
-                      type="number"
-                      autoComplete="off"
-                      value={draft.usageLimit}
-                      onChange={(value) => set('usageLimit', value)}
-                      error={shown.usageLimit}
-                    />
-                  )}
-                  <Checkbox
-                    label="Limit to one use per customer"
-                    checked={draft.oncePerCustomer}
-                    onChange={(value) => set('oncePerCustomer', value)}
-                  />
-                </BlockStack>
-              </Card>
-
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Active dates
-                  </Text>
-                  <FormLayout>
-                    <FormLayout.Group>
-                      <TextField
-                        label="Start date"
-                        type="date"
-                        autoComplete="off"
-                        value={draft.startsAt}
-                        onChange={(value) => set('startsAt', value)}
+                {draft.type === 'amount_off_products' && (
+                  <Card>
+                    <BlockStack gap="300">
+                      <Text as="h2" variant="headingMd">
+                        Applies to
+                      </Text>
+                      <ChoiceList
+                        title="Applies to"
+                        titleHidden
+                        choices={[
+                          { label: 'All products', value: 'all' },
+                          { label: 'Specific collections', value: 'collections' },
+                          { label: 'Specific products', value: 'products' },
+                        ]}
+                        selected={[draft.appliesToScope]}
+                        onChange={([value]) =>
+                          set('appliesToScope', value as DiscountDraft['appliesToScope'])
+                        }
                       />
-                      {draft.hasEndDate && (
+                      {draft.appliesToScope !== 'all' && (
+                        <BlockStack gap="200">
+                          <InlineStack gap="300" blockAlign="center">
+                            <Button onClick={() => setPicker(draft.appliesToScope as 'products')}>
+                              Browse
+                            </Button>
+                            <Text as="span" tone="subdued">
+                              {draft.appliesToScope === 'collections'
+                                ? `${draft.collectionIds.length} selected`
+                                : `${draft.productIds.length} selected`}
+                            </Text>
+                          </InlineStack>
+                          {shown.appliesTo && (
+                            <InlineError message={shown.appliesTo} fieldID="appliesTo" />
+                          )}
+                        </BlockStack>
+                      )}
+                    </BlockStack>
+                  </Card>
+                )}
+
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Minimum purchase requirements
+                    </Text>
+                    <ChoiceList
+                      title="Minimum requirements"
+                      titleHidden
+                      choices={[
+                        { label: 'No minimum requirements', value: 'none' },
+                        { label: 'Minimum purchase amount', value: 'subtotal' },
+                        { label: 'Minimum quantity of items', value: 'quantity' },
+                      ]}
+                      selected={[draft.minimumKind]}
+                      onChange={([value]) =>
+                        set('minimumKind', value as DiscountDraft['minimumKind'])
+                      }
+                    />
+                    {draft.minimumKind === 'subtotal' && (
+                      <TextField
+                        label="Minimum amount"
+                        type="number"
+                        autoComplete="off"
+                        prefix={symbol}
+                        value={draft.minimumSubtotal}
+                        onChange={(value) => set('minimumSubtotal', value)}
+                        error={shown.minimumSubtotal}
+                      />
+                    )}
+                    {draft.minimumKind === 'quantity' && (
+                      <TextField
+                        label="Minimum quantity"
+                        type="number"
+                        autoComplete="off"
+                        value={draft.minimumQuantity}
+                        onChange={(value) => set('minimumQuantity', value)}
+                        error={shown.minimumQuantity}
+                      />
+                    )}
+                  </BlockStack>
+                </Card>
+
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Maximum discount uses
+                    </Text>
+                    <Checkbox
+                      label="Limit number of times this discount can be used in total"
+                      checked={draft.hasUsageLimit}
+                      onChange={(value) => set('hasUsageLimit', value)}
+                    />
+                    {draft.hasUsageLimit && (
+                      <TextField
+                        label="Total uses"
+                        labelHidden
+                        type="number"
+                        autoComplete="off"
+                        value={draft.usageLimit}
+                        onChange={(value) => set('usageLimit', value)}
+                        error={shown.usageLimit}
+                      />
+                    )}
+                    <Checkbox
+                      label="Limit to one use per customer"
+                      checked={draft.oncePerCustomer}
+                      onChange={(value) => set('oncePerCustomer', value)}
+                    />
+                  </BlockStack>
+                </Card>
+
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Active dates
+                    </Text>
+                    <FormLayout>
+                      <FormLayout.Group>
                         <TextField
-                          label="End date"
+                          label="Start date"
                           type="date"
                           autoComplete="off"
-                          value={draft.endsAt}
-                          onChange={(value) => set('endsAt', value)}
-                          error={shown.endsAt}
+                          value={draft.startsAt}
+                          onChange={(value) => set('startsAt', value)}
                         />
-                      )}
-                    </FormLayout.Group>
-                    <Checkbox
-                      label="Set an end date"
-                      checked={draft.hasEndDate}
-                      onChange={(value) => set('hasEndDate', value)}
-                    />
-                  </FormLayout>
+                        {draft.hasEndDate && (
+                          <TextField
+                            label="End date"
+                            type="date"
+                            autoComplete="off"
+                            value={draft.endsAt}
+                            onChange={(value) => set('endsAt', value)}
+                            error={shown.endsAt}
+                          />
+                        )}
+                      </FormLayout.Group>
+                      <Checkbox
+                        label="Set an end date"
+                        checked={draft.hasEndDate}
+                        onChange={(value) => set('hasEndDate', value)}
+                      />
+                    </FormLayout>
+                  </BlockStack>
+                </Card>
+              </BlockStack>
+            </Layout.Section>
+
+            <Layout.Section variant="oneThird">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Summary
+                  </Text>
+                  {draft.title.trim() === '' && draft.code.trim() === '' ? (
+                    <Text as="p" tone="subdued">
+                      No discount name yet.
+                    </Text>
+                  ) : (
+                    <Text as="p" fontWeight="semibold">
+                      {draft.method === 'code' ? draft.code : draft.title}
+                    </Text>
+                  )}
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingSm">
+                      Details
+                    </Text>
+                    <ul style={{ margin: 0, paddingInlineStart: 'var(--p-space-500)' }}>
+                      {lines.map((line) => (
+                        <li key={line}>
+                          <Text as="span" tone="subdued">
+                            {line}
+                          </Text>
+                        </li>
+                      ))}
+                    </ul>
+                  </BlockStack>
                 </BlockStack>
               </Card>
-            </BlockStack>
-          </Layout.Section>
-
-          <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Summary
-                </Text>
-                {draft.title.trim() === '' && draft.code.trim() === '' ? (
-                  <Text as="p" tone="subdued">
-                    No discount name yet.
-                  </Text>
-                ) : (
-                  <Text as="p" fontWeight="semibold">
-                    {draft.method === 'code' ? draft.code : draft.title}
-                  </Text>
-                )}
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">
-                    Details
-                  </Text>
-                  <ul style={{ margin: 0, paddingInlineStart: 'var(--p-space-500)' }}>
-                    {lines.map((line) => (
-                      <li key={line}>
-                        <Text as="span" tone="subdued">
-                          {line}
-                        </Text>
-                      </li>
-                    ))}
-                  </ul>
-                </BlockStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </Form>
+            </Layout.Section>
+          </Layout>
+        </Form>
+      </Box>
 
       <ResourcePickerModal
         open={picker !== null}

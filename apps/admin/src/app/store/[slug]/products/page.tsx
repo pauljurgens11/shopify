@@ -30,10 +30,12 @@ import {
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
+import { ImageIcon, ProductIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { LearnMore } from '../../../../components/shell/learn-more.tsx';
+import { PageHeader } from '../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
@@ -158,187 +160,197 @@ export default function ProductsPage() {
     cursorStack.length === 0;
 
   return (
-    <Page
-      fullWidth
-      title="Products"
-      primaryAction={{ content: 'Add product', url: `/store/${slug}/products/new` }}
-    >
-      <Card padding="0">
-        {empty ? (
-          // Hand-built rather than Polaris `EmptyState`, which requires an
-          // `image`: the only on-brand illustrations are Shopify's own CDN
-          // assets, and PARITY.md forbids rendering those.
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Add your first product
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Add products to sell them on your online store.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" url={`/store/${slug}/products/new`}>
-                  Add product
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
-        ) : (
-          <>
-            <IndexFilters
-              tabs={TABS.map((t, index) => ({
-                id: t.label,
-                content: t.label,
-                index,
-                onAction: () => {
+    <Page fullWidth>
+      <BlockStack gap="400">
+        <PageHeader
+          icon={ProductIcon}
+          title="Products"
+          actions={
+            <Button variant="primary" url={`/store/${slug}/products/new`}>
+              Add product
+            </Button>
+          }
+        />
+
+        <Card padding="0">
+          {empty ? (
+            // Hand-built rather than Polaris `EmptyState`, which requires an
+            // `image`: the only on-brand illustrations are Shopify's own CDN
+            // assets, and PARITY.md forbids rendering those.
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Add your first product
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  Add products to sell them on your online store.
+                </Text>
+                <Box paddingBlockStart="300">
+                  <Button variant="primary" url={`/store/${slug}/products/new`}>
+                    Add product
+                  </Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          ) : (
+            <>
+              <IndexFilters
+                tabs={TABS.map((t, index) => ({
+                  id: t.label,
+                  content: t.label,
+                  index,
+                  onAction: () => {
+                    setTab(index);
+                    resetPaging();
+                  },
+                }))}
+                selected={tab}
+                onSelect={(index) => {
                   setTab(index);
                   resetPaging();
-                },
-              }))}
-              selected={tab}
-              onSelect={(index) => {
-                setTab(index);
-                resetPaging();
-              }}
-              queryValue={query}
-              queryPlaceholder="Searching in all"
-              onQueryChange={(value) => {
-                setQuery(value);
-                resetPaging();
-              }}
-              onQueryClear={() => {
-                setQuery('');
-                resetPaging();
-              }}
-              sortOptions={[...SORT_OPTIONS]}
-              sortSelected={sortSelected}
-              onSort={(selected) => {
-                setSortSelected(selected);
-                resetPaging();
-              }}
-              filters={[
-                {
-                  key: 'vendor',
-                  label: 'Vendor',
-                  // `pinned`, not `shortcut`: IndexFilters' FiltersBar reads only
-                  // `pinned` (Polaris 13.9.5 — `shortcut` belongs to
-                  // LegacyFilters), so this filter rendered nowhere at all: the
-                  // bar showed a bare "Add filter" and the vendor query the API
-                  // has always supported was unreachable.
-                  pinned: true,
-                  filter: (
-                    <TextField
-                      label="Vendor"
-                      labelHidden
-                      autoComplete="off"
-                      value={vendor}
-                      onChange={(value) => {
-                        setVendor(value);
-                        resetPaging();
-                      }}
-                    />
-                  ),
-                },
-              ]}
-              appliedFilters={
-                vendor.trim() === ''
-                  ? []
-                  : [
-                      {
-                        key: 'vendor',
-                        label: `Vendor: ${vendor.trim()}`,
-                        onRemove: () => {
-                          setVendor('');
+                }}
+                queryValue={query}
+                queryPlaceholder="Searching in all"
+                onQueryChange={(value) => {
+                  setQuery(value);
+                  resetPaging();
+                }}
+                onQueryClear={() => {
+                  setQuery('');
+                  resetPaging();
+                }}
+                sortOptions={[...SORT_OPTIONS]}
+                sortSelected={sortSelected}
+                onSort={(selected) => {
+                  setSortSelected(selected);
+                  resetPaging();
+                }}
+                filters={[
+                  {
+                    key: 'vendor',
+                    label: 'Vendor',
+                    // `pinned`, not `shortcut`: IndexFilters' FiltersBar reads only
+                    // `pinned` (Polaris 13.9.5 — `shortcut` belongs to
+                    // LegacyFilters), so this filter rendered nowhere at all: the
+                    // bar showed a bare "Add filter" and the vendor query the API
+                    // has always supported was unreachable.
+                    pinned: true,
+                    filter: (
+                      <TextField
+                        label="Vendor"
+                        labelHidden
+                        autoComplete="off"
+                        value={vendor}
+                        onChange={(value) => {
+                          setVendor(value);
                           resetPaging();
-                        },
-                      },
-                    ]
-              }
-              onClearAll={clearFilters}
-              mode={mode}
-              setMode={setMode}
-              // Leaving filtering mode has to clear the vendor filter, not just
-              // the search: Default mode renders no pills, so a kept filter left
-              // the index showing 3 of 32 products with nothing on screen saying
-              // why, and no control to undo it.
-              cancelAction={{ onAction: clearFilters }}
-              loading={products.isFetching}
-              canCreateNewView={false}
-            />
-
-            <IndexTable
-              resourceName={{ singular: 'product', plural: 'products' }}
-              itemCount={rows.length}
-              selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
-              onSelectionChange={handleSelectionChange}
-              headings={[
-                { title: 'Product' },
-                { title: 'Status' },
-                { title: 'Inventory' },
-                { title: 'Price' },
-                { title: 'Vendor' },
-              ]}
-              promotedBulkActions={[
-                { content: 'Set as active', onAction: () => setStatus('active') },
-                { content: 'Set as draft', onAction: () => setStatus('draft') },
-              ]}
-              bulkActions={[
-                { content: 'Archive', onAction: () => setStatus('archived') },
-                { content: 'Delete', onAction: () => setConfirmingDelete(true) },
-              ]}
-              pagination={{
-                hasPrevious: cursorStack.length > 0,
-                hasNext: Boolean(products.data?.nextCursor),
-                onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
-                onNext: () => {
-                  const next = products.data?.nextCursor;
-                  if (next) setCursorStack((stack) => [...stack, next]);
-                },
-              }}
-              emptyState={
-                <Box padding="800">
-                  <Text as="p" tone="subdued" alignment="center">
-                    No products found. Try changing the search or filters.
-                  </Text>
-                </Box>
-              }
-            >
-              {rows.map((product, index) => (
-                <IndexTable.Row
-                  id={product.id}
-                  key={product.id}
-                  position={index}
-                  selected={selectedResources.includes(product.id)}
-                  onClick={() => router.push(`/store/${slug}/products/${product.id}`)}
-                >
-                  <IndexTable.Cell>
-                    <InlineStack gap="300" blockAlign="center" wrap={false}>
-                      <Thumbnail
-                        source={product.images[0]?.url ?? ImageIcon}
-                        alt={product.images[0]?.altText ?? ''}
-                        size="small"
+                        }}
                       />
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {product.title}
-                      </Text>
-                    </InlineStack>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <StatusBadge status={product.status} />
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued">
-                      {inventorySummary(product)}
+                    ),
+                  },
+                ]}
+                appliedFilters={
+                  vendor.trim() === ''
+                    ? []
+                    : [
+                        {
+                          key: 'vendor',
+                          label: `Vendor: ${vendor.trim()}`,
+                          onRemove: () => {
+                            setVendor('');
+                            resetPaging();
+                          },
+                        },
+                      ]
+                }
+                onClearAll={clearFilters}
+                mode={mode}
+                setMode={setMode}
+                // Leaving filtering mode has to clear the vendor filter, not just
+                // the search: Default mode renders no pills, so a kept filter left
+                // the index showing 3 of 32 products with nothing on screen saying
+                // why, and no control to undo it.
+                cancelAction={{ onAction: clearFilters }}
+                loading={products.isFetching}
+                canCreateNewView={false}
+              />
+
+              <IndexTable
+                resourceName={{ singular: 'product', plural: 'products' }}
+                itemCount={rows.length}
+                selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
+                onSelectionChange={handleSelectionChange}
+                headings={[
+                  { title: 'Product' },
+                  { title: 'Status' },
+                  { title: 'Inventory' },
+                  { title: 'Price' },
+                  { title: 'Vendor' },
+                ]}
+                promotedBulkActions={[
+                  { content: 'Set as active', onAction: () => setStatus('active') },
+                  { content: 'Set as draft', onAction: () => setStatus('draft') },
+                ]}
+                bulkActions={[
+                  { content: 'Archive', onAction: () => setStatus('archived') },
+                  { content: 'Delete', onAction: () => setConfirmingDelete(true) },
+                ]}
+                pagination={{
+                  hasPrevious: cursorStack.length > 0,
+                  hasNext: Boolean(products.data?.nextCursor),
+                  onPrevious: () => setCursorStack((stack) => stack.slice(0, -1)),
+                  onNext: () => {
+                    const next = products.data?.nextCursor;
+                    if (next) setCursorStack((stack) => [...stack, next]);
+                  },
+                }}
+                emptyState={
+                  <Box padding="800">
+                    <Text as="p" tone="subdued" alignment="center">
+                      No products found. Try changing the search or filters.
                     </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>{priceRange(product)}</IndexTable.Cell>
-                  <IndexTable.Cell>{product.vendor ?? '—'}</IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          </>
-        )}
-      </Card>
+                  </Box>
+                }
+              >
+                {rows.map((product, index) => (
+                  <IndexTable.Row
+                    id={product.id}
+                    key={product.id}
+                    position={index}
+                    selected={selectedResources.includes(product.id)}
+                    onClick={() => router.push(`/store/${slug}/products/${product.id}`)}
+                  >
+                    <IndexTable.Cell>
+                      <InlineStack gap="300" blockAlign="center" wrap={false}>
+                        <Thumbnail
+                          source={product.images[0]?.url ?? ImageIcon}
+                          alt={product.images[0]?.altText ?? ''}
+                          size="small"
+                        />
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {product.title}
+                        </Text>
+                      </InlineStack>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <StatusBadge status={product.status} />
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span" tone="subdued">
+                        {inventorySummary(product)}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>{priceRange(product)}</IndexTable.Cell>
+                    <IndexTable.Cell>{product.vendor ?? '—'}</IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            </>
+          )}
+        </Card>
+
+        <LearnMore resource="products" />
+      </BlockStack>
 
       <Modal
         open={confirmingDelete}

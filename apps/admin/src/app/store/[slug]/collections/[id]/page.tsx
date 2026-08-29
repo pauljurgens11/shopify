@@ -2,8 +2,10 @@
 
 /** `/store/{slug}/collections/{id}`. Owner: WS-B (B6). */
 import type { Collection } from '@merchant/contracts/collections';
-import { Banner, Page } from '@shopify/polaris';
+import { Banner, BlockStack, Page } from '@shopify/polaris';
+import { CollectionIcon } from '@shopify/polaris-icons';
 import { useParams } from 'next/navigation';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx';
 import { useApiQuery } from '../../../../../lib/api.ts';
 import { useSession } from '../../../../../lib/session.ts';
@@ -18,13 +20,17 @@ export default function EditCollectionPage() {
 
   if (collection.error || !collection.data || !session.data) {
     return (
-      <Page
-        backAction={{ content: 'Collections', url: `/store/${slug}/collections` }}
-        title="Collection"
-      >
-        <Banner tone="critical" title="This collection could not be loaded">
-          <p>{collection.error?.message ?? 'It may have been deleted.'}</p>
-        </Banner>
+      <Page>
+        <BlockStack gap="400">
+          <PageHeader
+            icon={CollectionIcon}
+            title="Collection"
+            parent={{ label: 'Collections', url: `/store/${slug}/collections` }}
+          />
+          <Banner tone="critical" title="This collection could not be loaded">
+            <p>{collection.error?.message ?? 'It may have been deleted.'}</p>
+          </Banner>
+        </BlockStack>
       </Page>
     );
   }

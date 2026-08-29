@@ -9,6 +9,7 @@
  */
 import {
   BlockStack,
+  Box,
   Button,
   Card,
   Checkbox,
@@ -19,9 +20,11 @@ import {
   Text,
   TextField,
 } from '@shopify/polaris';
+import { PersonIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { PageHeader } from '../../../../../components/shell/page-header.tsx';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
@@ -79,95 +82,100 @@ export default function NewCustomerPage() {
   };
 
   return (
-    <Page
-      backAction={{ content: 'Customers', url: `/store/${slug}/customers` }}
-      title="New customer"
-      narrowWidth
-    >
+    <Page narrowWidth>
       <SaveBar
         dirty={dirty}
         saving={saving}
         onSave={save}
         onDiscard={() => router.push(`/store/${slug}/customers`)}
       />
-      <Layout>
-        <Layout.Section>
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Customer overview
-                </Text>
-                <FormLayout>
-                  <FormLayout.Group>
-                    <TextField
-                      label="First name"
-                      autoComplete="given-name"
-                      value={firstName}
-                      onChange={setFirstName}
-                    />
-                    <TextField
-                      label="Last name"
-                      autoComplete="family-name"
-                      value={lastName}
-                      onChange={setLastName}
-                    />
-                  </FormLayout.Group>
-                  <TextField
-                    label="Email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(value) => {
-                      setEmail(value);
-                      setEmailError(undefined);
-                    }}
-                    error={emailError}
-                  />
-                  <TextField
-                    label="Phone number"
-                    type="tel"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={setPhone}
-                  />
-                  <Checkbox
-                    label="Customer accepts email marketing"
-                    checked={acceptsMarketing}
-                    onChange={setAcceptsMarketing}
-                  />
-                </FormLayout>
-              </BlockStack>
-            </Card>
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Default address
-                </Text>
-                {address ? (
-                  <BlockStack gap="100">
-                    <Text as="p">{address.address1}</Text>
-                    <Text as="p">
-                      {[address.city, address.province, address.zip].filter(Boolean).join(' ')}
-                    </Text>
-                    <Text as="p">{address.country}</Text>
-                  </BlockStack>
-                ) : (
-                  <Text as="p" tone="subdued">
-                    No address yet.
+      <PageHeader
+        icon={PersonIcon}
+        title="New customer"
+        parent={{ label: 'Customers', url: `/store/${slug}/customers` }}
+      />
+
+      <Box paddingBlockStart="400">
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Customer overview
                   </Text>
-                )}
-                <InlineStack>
-                  <Button variant="plain" onClick={() => setAddressOpen(true)}>
-                    {address ? 'Edit address' : 'Add address'}
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+                  <FormLayout>
+                    <FormLayout.Group>
+                      <TextField
+                        label="First name"
+                        autoComplete="given-name"
+                        value={firstName}
+                        onChange={setFirstName}
+                      />
+                      <TextField
+                        label="Last name"
+                        autoComplete="family-name"
+                        value={lastName}
+                        onChange={setLastName}
+                      />
+                    </FormLayout.Group>
+                    <TextField
+                      label="Email"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(value) => {
+                        setEmail(value);
+                        setEmailError(undefined);
+                      }}
+                      error={emailError}
+                    />
+                    <TextField
+                      label="Phone number"
+                      type="tel"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={setPhone}
+                    />
+                    <Checkbox
+                      label="Customer accepts email marketing"
+                      checked={acceptsMarketing}
+                      onChange={setAcceptsMarketing}
+                    />
+                  </FormLayout>
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Default address
+                  </Text>
+                  {address ? (
+                    <BlockStack gap="100">
+                      <Text as="p">{address.address1}</Text>
+                      <Text as="p">
+                        {[address.city, address.province, address.zip].filter(Boolean).join(' ')}
+                      </Text>
+                      <Text as="p">{address.country}</Text>
+                    </BlockStack>
+                  ) : (
+                    <Text as="p" tone="subdued">
+                      No address yet.
+                    </Text>
+                  )}
+                  <InlineStack>
+                    <Button variant="plain" onClick={() => setAddressOpen(true)}>
+                      {address ? 'Edit address' : 'Add address'}
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </Box>
 
       <AddressModal
         open={addressOpen}
