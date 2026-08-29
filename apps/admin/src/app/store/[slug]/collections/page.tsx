@@ -94,7 +94,7 @@ export default function CollectionsPage() {
     }
   };
 
-  if (collections.isPending) return <PageSkeleton fullWidth />;
+  if (collections.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   const empty = rows.length === 0 && query.trim() === '' && !type && cursorStack.length === 0;
 

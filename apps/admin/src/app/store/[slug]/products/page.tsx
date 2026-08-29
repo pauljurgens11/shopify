@@ -122,6 +122,12 @@ export default function ProductsPage() {
   /** Reset paging whenever the result set itself changes shape. */
   const resetPaging = () => setCursorStack([]);
 
+  const clearFilters = () => {
+    setQuery('');
+    setVendor('');
+    resetPaging();
+  };
+
   const applyToSelection = async (label: string, run: (id: string) => Promise<unknown>) => {
     setBulkBusy(true);
     try {
@@ -142,7 +148,7 @@ export default function ProductsPage() {
       apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
     );
 
-  if (products.isPending) return <PageSkeleton fullWidth />;
+  if (products.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   const empty =
     rows.length === 0 &&
@@ -214,7 +220,12 @@ export default function ProductsPage() {
                 {
                   key: 'vendor',
                   label: 'Vendor',
-                  shortcut: true,
+                  // `pinned`, not `shortcut`: IndexFilters' FiltersBar reads only
+                  // `pinned` (Polaris 13.9.5 — `shortcut` belongs to
+                  // LegacyFilters), so this filter rendered nowhere at all: the
+                  // bar showed a bare "Add filter" and the vendor query the API
+                  // has always supported was unreachable.
+                  pinned: true,
                   filter: (
                     <TextField
                       label="Vendor"
@@ -243,14 +254,14 @@ export default function ProductsPage() {
                       },
                     ]
               }
-              onClearAll={() => {
-                setQuery('');
-                setVendor('');
-                resetPaging();
-              }}
+              onClearAll={clearFilters}
               mode={mode}
               setMode={setMode}
-              cancelAction={{ onAction: () => setQuery('') }}
+              // Leaving filtering mode has to clear the vendor filter, not just
+              // the search: Default mode renders no pills, so a kept filter left
+              // the index showing 3 of 32 products with nothing on screen saying
+              // why, and no control to undo it.
+              cancelAction={{ onAction: clearFilters }}
               loading={products.isFetching}
               canCreateNewView={false}
             />
