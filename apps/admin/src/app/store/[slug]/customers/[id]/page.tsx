@@ -23,6 +23,7 @@ import {
   Card,
   Checkbox,
   Divider,
+  Form,
   InlineStack,
   Layout,
   Link,
@@ -46,6 +47,7 @@ import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts'
 import { financialBadge } from '../../orders/_components/status.ts';
 import { type AddressDraft, AddressModal } from '../_components/address-modal.tsx';
 import { type ContactDraft, ContactModal } from '../_components/contact-modal.tsx';
+import { EditableCard } from '../_components/editable-card.tsx';
 
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -131,20 +133,36 @@ export default function CustomerDetailPage() {
     );
   }, [loaded, addresses]);
 
+  /**
+   * Tags including whatever is still sitting in the input. Clicking Save blurs
+   * the field and fires `save` in the same tick, so the committed state has not
+   * landed yet — without this the last tag typed is silently dropped.
+   */
+  const allTags = useMemo(() => {
+    const value = tagDraft.trim();
+    return value === '' || tags.includes(value) ? tags : [...tags, value];
+  }, [tags, tagDraft]);
+
+  const commitTag = () => {
+    setTags(allTags);
+    setTagDraft('');
+  };
+
   const dirty = useMemo(() => {
     if (!loaded) return false;
     return (
       note !== (loaded.note ?? '') ||
       acceptsMarketing !== loaded.acceptsMarketing ||
-      JSON.stringify(tags) !== JSON.stringify(loaded.tags) ||
+      JSON.stringify(allTags) !== JSON.stringify(loaded.tags) ||
       addressesDirty
     );
-  }, [loaded, note, tags, acceptsMarketing, addressesDirty]);
+  }, [loaded, note, allTags, acceptsMarketing, addressesDirty]);
 
   const discard = () => {
     if (!loaded) return;
     setNote(loaded.note ?? '');
     setTags(loaded.tags);
+    setTagDraft('');
     setAcceptsMarketing(loaded.acceptsMarketing);
     setAddresses(loaded.addresses.map(({ id: _id, ...rest }) => rest));
   };
@@ -156,7 +174,7 @@ export default function CustomerDetailPage() {
         method: 'PUT',
         body: {
           note: note.trim() === '' ? null : note,
-          tags,
+          tags: allTags,
           acceptsMarketing,
           ...(addressesDirty ? { addresses } : {}),
         },
@@ -475,24 +493,38 @@ export default function CustomerDetailPage() {
               </BlockStack>
             </Card>
 
-            <Card>
+            <EditableCard
+              title="Tags"
+              startEditing={loaded.tags.length === 0}
+              summary={
+                tags.length === 0 ? (
+                  <Text as="p" tone="subdued">
+                    No tags
+                  </Text>
+                ) : (
+                  <InlineStack gap="200">
+                    {tags.map((tag) => (
+                      <Tag key={tag}>{tag}</Tag>
+                    ))}
+                  </InlineStack>
+                )
+              }
+            >
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Tags
-                </Text>
-                <TextField
-                  label="Tags"
-                  labelHidden
-                  autoComplete="off"
-                  placeholder="Add a tag"
-                  value={tagDraft}
-                  onChange={setTagDraft}
-                  onBlur={() => {
-                    const value = tagDraft.trim();
-                    if (value !== '' && !tags.includes(value)) setTags([...tags, value]);
-                    setTagDraft('');
-                  }}
-                />
+                {/* Polaris `Form` so Enter commits the tag: `TextField` exposes
+                    no `onKeyDown`, and `Form` ships the hidden submit button
+                    that makes implicit submission actually fire. */}
+                <Form onSubmit={commitTag}>
+                  <TextField
+                    label="Tags"
+                    labelHidden
+                    autoComplete="off"
+                    placeholder="Add a tag"
+                    value={tagDraft}
+                    onChange={setTagDraft}
+                    onBlur={commitTag}
+                  />
+                </Form>
                 {tags.length > 0 && (
                   <InlineStack gap="200">
                     {tags.map((tag) => (
@@ -503,24 +535,30 @@ export default function CustomerDetailPage() {
                   </InlineStack>
                 )}
               </BlockStack>
-            </Card>
+            </EditableCard>
 
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Notes
-                </Text>
-                <TextField
-                  label="Notes"
-                  labelHidden
-                  autoComplete="off"
-                  multiline={3}
-                  placeholder="Notes are private and won’t be shared with the customer."
-                  value={note}
-                  onChange={setNote}
-                />
-              </BlockStack>
-            </Card>
+            <EditableCard
+              title="Notes"
+              summary={
+                note.trim() === '' ? (
+                  <Text as="p" tone="subdued">
+                    Notes are private and won’t be shared with the customer.
+                  </Text>
+                ) : (
+                  <Text as="p">{note}</Text>
+                )
+              }
+            >
+              <TextField
+                label="Notes"
+                labelHidden
+                autoComplete="off"
+                multiline={3}
+                placeholder="Notes are private and won’t be shared with the customer."
+                value={note}
+                onChange={setNote}
+              />
+            </EditableCard>
           </BlockStack>
         </Layout.Section>
       </Layout>

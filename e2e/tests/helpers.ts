@@ -38,6 +38,20 @@ export async function adminApi(
   });
 }
 
+/**
+ * Click the contextual save bar's Save, not a form's own one.
+ *
+ * The product form pins a second `Save` below its last card, the way Shopify
+ * does, so a bare `getByRole('button', { name: 'Save' })` is ambiguous there.
+ * The save bar is the control every form page shares, so flows drive that.
+ */
+export async function saveViaSaveBar(page: Page): Promise<void> {
+  await page
+    .locator('.Polaris-Frame-ContextualSaveBar')
+    .getByRole('button', { name: 'Save' })
+    .click();
+}
+
 /** Per-flow unique data so a retry never collides with an earlier run's rows. */
 export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

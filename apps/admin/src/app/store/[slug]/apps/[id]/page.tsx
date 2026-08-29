@@ -77,7 +77,7 @@ export default function AppDetailPage() {
   const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [deliveryNonce, setDeliveryNonce] = useState(0);
 
-  if (app.isPending) return <PageSkeleton />;
+  if (app.isPending) return <PageSkeleton primaryAction />;
 
   if (app.error || !app.data) {
     return (

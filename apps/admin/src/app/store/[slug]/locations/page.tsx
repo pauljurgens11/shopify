@@ -276,7 +276,7 @@ export default function LocationsSettingsPage() {
     }
   };
 
-  if (locations.isPending) return <PageSkeleton />;
+  if (locations.isPending) return <PageSkeleton primaryAction />;
 
   /** The two rules the API enforces, mirrored so the button explains itself. */
   const blockedReason = (location: Location): string | null => {

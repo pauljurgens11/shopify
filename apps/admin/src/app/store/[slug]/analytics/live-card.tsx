@@ -6,6 +6,7 @@
  */
 import { BlockStack, Card, InlineStack, Text } from '@shopify/polaris';
 import { useApiQuery } from '../../../../lib/api.ts';
+import { MetricLabel } from './metric-card.tsx';
 
 type LiveView = { visitors: number; ordersToday: number };
 
@@ -17,9 +18,12 @@ export function LiveCard() {
   return (
     <Card>
       <BlockStack gap="400">
-        <Text as="h3" variant="headingMd">
+        <MetricLabel
+          variant="headingSm"
+          help="Visitors in the last 30 minutes and orders placed so far today. Refreshes every 30 seconds."
+        >
           Live view
-        </Text>
+        </MetricLabel>
         <InlineStack gap="800">
           <BlockStack gap="100">
             <Text as="span" variant="headingLg">

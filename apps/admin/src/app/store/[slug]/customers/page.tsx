@@ -108,7 +108,7 @@ export default function CustomersPage() {
 
   const resetPaging = () => setCursorStack([]);
 
-  if (customers.isPending) return <PageSkeleton fullWidth />;
+  if (customers.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   // A failed load must never read as "no customers yet" — that empty state
   // invites the merchant to re-add customers they already have.

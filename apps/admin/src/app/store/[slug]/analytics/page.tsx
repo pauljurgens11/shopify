@@ -1,104 +1,66 @@
 'use client';
 
 /**
- * Analytics dashboard (SPEC §9, §13; PARITY.md §Home & Analytics). Owner: WS-G.
+ * Analytics dashboard (SPEC §9, §13; docs/parity/dashboard.md). Owner: WS-G.
  *
  * One request feeds every card — G2 returns the whole dashboard in a single
  * `analyticsDashboardResponse`, so the page has one loading state rather than
  * six racing spinners. `Live view` is the exception: it polls on its own.
  *
- * The controls sit at the TOP LEFT of the content, not in the page header:
- * Shopify's analytics puts the range button and the compare toggle above the
- * cards they filter, and a range control in `primaryAction` reads as a save
- * button (PARITY.md).
+ * Layout follows the parity capture: a row of filter PILLS above the content
+ * and outside any card (range, comparison period, currency), then four equal
+ * metric tiles, then a wide chart card beside a narrow breakdown list, then a
+ * three-column row of smaller cards.
  */
 import { format } from '@merchant/config/money';
 import type { AnalyticsDashboard } from '@merchant/contracts/analytics';
 import {
-  ActionList,
   BlockStack,
   Box,
-  Button,
   Card,
   Grid,
   InlineStack,
   Layout,
   Page,
-  Popover,
   SkeletonBodyText,
   SkeletonDisplayText,
   Text,
 } from '@shopify/polaris';
-import { CalendarIcon } from '@shopify/polaris-icons';
-import { useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useApiQuery } from '../../../../lib/api.ts';
+import { SalesBreakdownCard } from './breakdown-card.tsx';
+import { DashboardFilterRow, NoDataForRange, useDashboardFilters } from './dashboard-filters.tsx';
 import { FunnelCard } from './funnel-card.tsx';
 import { LiveCard } from './live-card.tsx';
-import { MetricCard } from './metric-card.tsx';
-import {
-  averageOrderValueOf,
-  deltaPercent,
-  RANGE_OPTIONS,
-  type RangePreset,
-  rangeQueryString,
-} from './range.ts';
+import { METRIC_HELP, MetricCard, MetricLabel } from './metric-card.tsx';
+import { averageOrderValueOf, deltaPercent } from './range.ts';
 import { SalesChart } from './sales-chart.tsx';
 import { TopProductsCard } from './top-products-card.tsx';
 
 export default function AnalyticsPage() {
-  const [preset, setPreset] = useState<RangePreset>('30d');
-  const [rangeOpen, setRangeOpen] = useState(false);
-  const [compare, setCompare] = useState(true);
-
-  // Pinned per preset so the range does not slide under the user mid-session,
-  // and so the query key stays stable across re-renders.
-  const query = useMemo(() => rangeQueryString(preset, new Date()), [preset]);
+  const slug = String(useParams().slug ?? '');
+  const filters = useDashboardFilters('30d');
 
   // keepPreviousData: switching the range keeps the previous period's cards on
   // screen while the new one loads, instead of flashing back to the skeleton.
   const { data, isLoading, error } = useApiQuery<AnalyticsDashboard>(
-    ['analytics', 'dashboard', preset],
-    `/admin/api/analytics?${query}`,
+    ['analytics', 'dashboard', filters.query],
+    `/admin/api/analytics?${filters.query}`,
     { keepPreviousData: true },
   );
 
-  const rangeLabel = RANGE_OPTIONS.find((option) => option.value === preset)?.label ?? 'Today';
-
+  // The pills render before the data does — they need none of it, and
+  // unmounting them would remount the range popover mid-transition.
   const controls = (
-    <InlineStack gap="200" blockAlign="center">
-      <Popover
-        active={rangeOpen}
-        onClose={() => setRangeOpen(false)}
-        preferredAlignment="left"
-        activator={
-          <Button icon={CalendarIcon} disclosure onClick={() => setRangeOpen((open) => !open)}>
-            {rangeLabel}
-          </Button>
-        }
-      >
-        <ActionList
-          actionRole="menuitem"
-          items={RANGE_OPTIONS.map((option) => ({
-            content: option.label,
-            active: option.value === preset,
-            onAction: () => {
-              setPreset(option.value);
-              setRangeOpen(false);
-            },
-          }))}
-        />
-      </Popover>
-      <Button pressed={compare} onClick={() => setCompare((on) => !on)}>
-        Compare to previous period
-      </Button>
-    </InlineStack>
+    <DashboardFilterRow
+      filters={filters}
+      currencyCode={data?.summary.totalSales.currencyCode ?? 'USD'}
+    />
   );
 
-  // First-load skeleton mirrors the loaded layout — controls row, 4-up metric
-  // grid, chart card with its exact 280px reservation, then the two-column
-  // tail — so content lands with zero layout shift (PARITY.md §Motion). The
-  // real controls render immediately: they need no data, and unmounting them
-  // would remount the range Popover mid-transition.
+  // First-load skeleton mirrors the loaded layout — pill row, 4-up metric grid,
+  // chart card with its exact 280px reservation, then the two-column tail — so
+  // content lands with zero layout shift (PARITY.md §Motion).
   if (isLoading) {
     return (
       <Page title="Analytics">
@@ -116,25 +78,22 @@ export default function AnalyticsPage() {
               </Grid.Cell>
             ))}
           </Grid>
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <SkeletonBodyText lines={1} />
-                <SkeletonDisplayText size="small" />
-              </BlockStack>
-              {/* Matches SalesChart's fixed plot height so nothing jumps. */}
-              <div style={{ height: 280, width: '100%' }} />
-            </BlockStack>
-          </Card>
           <Layout>
-            <Layout.Section variant="oneHalf">
+            <Layout.Section>
               <Card>
-                <SkeletonBodyText lines={6} />
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <SkeletonBodyText lines={1} />
+                    <SkeletonDisplayText size="small" />
+                  </BlockStack>
+                  {/* Matches SalesChart's fixed plot height so nothing jumps. */}
+                  <div style={{ height: 280, width: '100%' }} />
+                </BlockStack>
               </Card>
             </Layout.Section>
-            <Layout.Section variant="oneHalf">
+            <Layout.Section variant="oneThird">
               <Card>
-                <SkeletonBodyText lines={6} />
+                <SkeletonBodyText lines={7} />
               </Card>
             </Layout.Section>
           </Layout>
@@ -167,7 +126,10 @@ export default function AnalyticsPage() {
 
   const { summary, funnel } = data;
   const currencyCode = summary.totalSales.currencyCode;
-  const comparison = compare ? summary.comparison : null;
+  const comparison = filters.compare ? summary.comparison : null;
+  const salesDelta = comparison
+    ? deltaPercent(summary.totalSales.amount, comparison.totalSales.amount)
+    : null;
 
   return (
     <Page title="Analytics">
@@ -178,17 +140,15 @@ export default function AnalyticsPage() {
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
               label="Total sales"
+              help={METRIC_HELP.totalSales}
               value={format(summary.totalSales)}
-              delta={
-                comparison
-                  ? deltaPercent(summary.totalSales.amount, comparison.totalSales.amount)
-                  : null
-              }
+              delta={salesDelta}
             />
           </Grid.Cell>
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
               label="Orders"
+              help={METRIC_HELP.orders}
               value={summary.orderCount.toLocaleString('en-US')}
               delta={comparison ? deltaPercent(summary.orderCount, comparison.orderCount) : null}
             />
@@ -196,6 +156,7 @@ export default function AnalyticsPage() {
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
               label="Sessions"
+              help={METRIC_HELP.sessions}
               value={summary.sessionCount.toLocaleString('en-US')}
               delta={
                 comparison ? deltaPercent(summary.sessionCount, comparison.sessionCount) : null
@@ -205,6 +166,7 @@ export default function AnalyticsPage() {
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <MetricCard
               label="Average order value"
+              help={METRIC_HELP.averageOrderValue}
               value={format(summary.averageOrderValue)}
               delta={
                 comparison
@@ -218,32 +180,43 @@ export default function AnalyticsPage() {
           </Grid.Cell>
         </Grid>
 
-        <SalesChart
-          points={data.salesOverTime}
-          currencyCode={currencyCode}
-          total={summary.totalSales.amount}
-        />
-
         <Layout>
-          <Layout.Section variant="oneHalf">
+          <Layout.Section>
+            <SalesChart
+              points={data.salesOverTime}
+              comparisonPoints={filters.compare ? data.comparisonSalesOverTime : []}
+              currencyCode={currencyCode}
+              total={summary.totalSales.amount}
+              delta={salesDelta}
+              range={filters.selection.range}
+              comparisonRange={filters.compare ? filters.comparison : null}
+            />
+          </Layout.Section>
+          <Layout.Section variant="oneThird">
             <BlockStack gap="400">
-              <TopProductsCard products={data.topProducts} />
+              <SalesBreakdownCard
+                breakdown={data.salesBreakdown}
+                comparison={filters.compare ? data.comparisonSalesBreakdown : null}
+                slug={slug}
+              />
               <Card>
                 <BlockStack gap="400">
-                  <Text as="h3" variant="headingMd">
-                    Sales by channel
-                  </Text>
-                  {data.salesByChannel.length === 0 ? (
-                    <Text as="p" tone="subdued">
-                      No sales in this period yet.
-                    </Text>
+                  <MetricLabel
+                    variant="headingSm"
+                    help="Total sales split by the channel the order came through."
+                  >
+                    Total sales by sales channel
+                  </MetricLabel>
+                  {data.salesByChannel.length === 0 ||
+                  data.salesByChannel.every((channel) => channel.revenue.amount === 0) ? (
+                    <NoDataForRange />
                   ) : (
                     data.salesByChannel.map((channel) => (
                       <InlineStack key={channel.channel} align="space-between">
                         <Text as="span" variant="bodyMd">
                           {channel.channel}
                         </Text>
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                        <Text as="span" variant="bodyMd" fontWeight="semibold" numeric>
                           {format(channel.revenue)}
                         </Text>
                       </InlineStack>
@@ -253,13 +226,19 @@ export default function AnalyticsPage() {
               </Card>
             </BlockStack>
           </Layout.Section>
-          <Layout.Section variant="oneHalf">
-            <BlockStack gap="400">
-              <FunnelCard funnel={funnel} conversionRate={summary.conversionRate} />
-              <LiveCard />
-            </BlockStack>
-          </Layout.Section>
         </Layout>
+
+        <Grid>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 2, lg: 4, xl: 4 }}>
+            <TopProductsCard products={data.topProducts} />
+          </Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 2, lg: 4, xl: 4 }}>
+            <FunnelCard funnel={funnel} conversionRate={summary.conversionRate} />
+          </Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 2, lg: 4, xl: 4 }}>
+            <LiveCard />
+          </Grid.Cell>
+        </Grid>
       </BlockStack>
     </Page>
   );

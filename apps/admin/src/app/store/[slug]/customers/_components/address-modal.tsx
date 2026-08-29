@@ -10,21 +10,9 @@
 import type { CustomerAddress } from '@merchant/contracts/customers';
 import { Checkbox, FormLayout, Modal, Select, TextField } from '@shopify/polaris';
 import { useEffect, useState } from 'react';
+import { COUNTRY_NAMES, COUNTRY_OPTIONS } from './countries.ts';
 
 export type AddressDraft = Omit<CustomerAddress, 'id'>;
-
-/** Enough countries for the demo; the storefront ships to these. */
-const COUNTRIES = [
-  { label: 'United States', value: 'US' },
-  { label: 'Canada', value: 'CA' },
-  { label: 'United Kingdom', value: 'GB' },
-  { label: 'Germany', value: 'DE' },
-  { label: 'Australia', value: 'AU' },
-];
-
-const NAMES: Record<string, string> = Object.fromEntries(
-  COUNTRIES.map((country) => [country.value, country.label]),
-);
 
 export const emptyAddress = (): AddressDraft => ({
   firstName: null,
@@ -48,12 +36,18 @@ export function AddressModal({
   onClose,
   onSave,
   saving = false,
+  showDefaultToggle = true,
 }: {
   open: boolean;
   address: AddressDraft | null;
   onClose: () => void;
   onSave: (address: AddressDraft) => void;
   saving?: boolean;
+  /**
+   * Off where the caller owns the answer — the new-customer form's card is
+   * titled "Default address", so a toggle there could only ever be checked.
+   */
+  showDefaultToggle?: boolean;
 }) {
   const [draft, setDraft] = useState<AddressDraft>(emptyAddress());
 
@@ -129,13 +123,13 @@ export function AddressModal({
           <FormLayout.Group>
             <Select
               label="Country/region"
-              options={COUNTRIES}
+              options={COUNTRY_OPTIONS}
               value={draft.countryCode}
               onChange={(value) =>
                 setDraft((current) => ({
                   ...current,
                   countryCode: value,
-                  country: NAMES[value] ?? value,
+                  country: COUNTRY_NAMES[value] ?? value,
                 }))
               }
             />
@@ -153,11 +147,13 @@ export function AddressModal({
             value={draft.phone ?? ''}
             onChange={(value) => set('phone', value || null)}
           />
-          <Checkbox
-            label="Set as default address"
-            checked={draft.isDefault}
-            onChange={(value) => set('isDefault', value)}
-          />
+          {showDefaultToggle && (
+            <Checkbox
+              label="Set as default address"
+              checked={draft.isDefault}
+              onChange={(value) => set('isDefault', value)}
+            />
+          )}
         </FormLayout>
       </Modal.Section>
     </Modal>

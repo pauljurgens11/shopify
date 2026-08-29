@@ -16,11 +16,18 @@ import { ContextualSaveBar } from '@shopify/polaris';
 export function SaveBar({
   dirty,
   saving = false,
+  message = 'Unsaved changes',
   onSave,
   onDiscard,
 }: {
   dirty: boolean;
   saving?: boolean;
+  /**
+   * Shopify says "Unsaved changes" on a record that exists and names the thing
+   * being created otherwise — "Unsaved product" on `/products/new`
+   * (docs/parity/product-form.md).
+   */
+  message?: string;
   onSave: () => void;
   onDiscard: () => void;
 }) {
@@ -28,7 +35,7 @@ export function SaveBar({
 
   return (
     <ContextualSaveBar
-      message="Unsaved changes"
+      message={message}
       saveAction={{ onAction: onSave, loading: saving, disabled: saving }}
       discardAction={{ onAction: onDiscard, disabled: saving }}
     />

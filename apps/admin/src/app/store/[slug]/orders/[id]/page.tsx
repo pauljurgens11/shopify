@@ -100,7 +100,7 @@ export default function OrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['open-orders-count'] }),
     ]);
 
-  if (query.isPending) return <PageSkeleton layout="detail" />;
+  if (query.isPending) return <PageSkeleton layout="detail" primaryAction />;
   if (!order) {
     return (
       <Page title="Order" backAction={{ content: 'Orders', url: `/store/${slug}/orders` }}>

@@ -42,7 +42,7 @@ export default function AppsPage() {
   const apps = useApiQuery<Paginated<App>>(['apps', path], path, { keepPreviousData: true });
   const rows = apps.data?.data ?? [];
 
-  if (apps.isPending) return <PageSkeleton fullWidth />;
+  if (apps.isPending) return <PageSkeleton fullWidth primaryAction />;
 
   const empty = rows.length === 0 && !paging.hasPrevious;
 

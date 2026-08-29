@@ -96,8 +96,10 @@ export const inventoryRowSchema = z.object({
 });
 export type InventoryRow = z.infer<typeof inventoryRowSchema>;
 
-export const listInventoryQuery = paginationQuery
-  .merge(searchQuery)
-  .extend({ locationId: idSchema.optional() });
+export const listInventoryQuery = paginationQuery.merge(searchQuery).extend({
+  locationId: idSchema.optional(),
+  /** One product's variants — the product form's Inventory card reads this. */
+  productId: idSchema.optional(),
+});
 
 export const inventoryListResponse = paginated(inventoryRowSchema);

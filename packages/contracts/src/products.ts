@@ -71,6 +71,14 @@ export const productSchema = z
     options: z.array(productOptionSchema).default([]),
     variants: z.array(productVariantSchema).default([]),
     images: z.array(productImageSchema).default([]),
+    /**
+     * MANUAL collection membership, in no particular order.
+     *
+     * Smart collections are resolved on read from their rule set and store no
+     * join rows (DECISIONS, WS-B/WS-E), so they can never appear here and
+     * sending one is `invalid_request` rather than a row nothing would read.
+     */
+    collectionIds: z.array(idSchema).default([]),
     metadata: metadataSchema,
   })
   .merge(timestampsSchema);

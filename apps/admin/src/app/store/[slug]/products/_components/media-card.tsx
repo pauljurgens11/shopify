@@ -154,9 +154,13 @@ export function MediaCard({
         ) : null}
 
         <DropZone accept={ACCEPTED.join(',')} type="image" onDrop={accept} allowMultiple>
+          {/* Shopify's empty state offers "Upload new" and "Select existing"
+              over "Accepts images, videos, or 3D models". There is no media
+              library to select from and the bucket only takes images, so the
+              copy says what is true rather than what is on the real page. */}
           <DropZone.FileUpload
-            actionTitle={uploading ? 'Uploading…' : 'Add files'}
-            actionHint="or drop files to upload"
+            actionTitle={uploading ? 'Uploading…' : 'Upload new'}
+            actionHint="Accepts images"
           />
         </DropZone>
 
