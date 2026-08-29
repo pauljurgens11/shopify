@@ -76,7 +76,12 @@ isolate() {
   local wt=$1 migrate=$2 db slot
   wt=$(cd "$wt" && pwd)
   local label; label=$(basename "$wt")
-  [ "$wt" = "$MAIN" ] && { db=merchant_main; slot=0; label="main"; } || { db=$(db_for "$wt"); slot=$(slot_of "$wt"); [ -n "$slot" ] || slot=$(next_slot "$wt"); }
+  # next_slot's die() runs in a subshell, so its failure must be re-checked here -
+  # otherwise an empty slot writes a bare REDIS_URL (db 0) and the worktree
+  # silently shares main's session keyspace (seen live: two review sessions
+  # clobbering each other's admin sessions).
+  [ "$wt" = "$MAIN" ] && { db=merchant_main; slot=0; label="main"; } || { db=$(db_for "$wt"); slot=$(slot_of "$wt"); [ -n "$slot" ] || slot=$(next_slot "$wt") || exit 1; }
+  [ -n "$slot" ] || die "no Redis slot for $label — refusing to write a shared REDIS_URL"
 
   step "$label"
   [ -f "$wt/.env" ] || { cp "$MAIN/.env.example" "$wt/.env" && ok "created .env from .env.example"; }

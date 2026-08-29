@@ -53,6 +53,9 @@ eight interpretations. Read your page's section before writing JSX.
 | [H2](H2-e2e-smoke.md) | Playwright smoke: the 5 mandatory flows | H | M | B5, C5, E4, F4, H1 |
 | [H3](H3-polish-readme-demo.md) | Polish sweep, README, demo script | H | M | H2 |
 | [H4](H4-ux-motion-parity.md) | UX/motion parity audit: animations & interaction polish | H | M | H3 |
+| [C7](C7-orders-index-filters.md) | Orders index: wire payment/fulfillment filters | C | S | C5 |
+| [E6](E6-checkout-save-card.md) | Checkout: implement (or delete) saveCard | E | M | E4, D3, C4 |
+| [H5](H5-demo-seed-gaps.md) | Seed: jane's orders, a demo app, abandoned checkouts | H | S | H1 |
 
 Deferred hardening (explicitly NOT issues — do not build unless promoted via
 `DECISIONS.md`): per-app env sub-schemas so each app parses only its own vars

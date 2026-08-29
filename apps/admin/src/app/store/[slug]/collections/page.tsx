@@ -38,7 +38,7 @@ const PAGE_SIZE = 50;
 const TABS = [
   { label: 'All', type: undefined },
   { label: 'Manual', type: 'manual' },
-  { label: 'Smart', type: 'smart' },
+  { label: 'Automated', type: 'smart' },
 ] as const;
 
 export default function CollectionsPage() {

@@ -14,6 +14,7 @@
  * The card is the one thing this component does not hold — `CardFields` keeps
  * it and hands back a vault token (SPEC §11).
  */
+import { format } from '@merchant/config/money';
 import type { Checkout } from '@merchant/contracts/checkout';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
@@ -22,8 +23,7 @@ import { randomId } from '../../lib/random-id.ts';
 import { CardFields, type CardFieldsHandle } from './card-fields.tsx';
 import { OrderSummary } from './order-summary.tsx';
 
-const money = (amount: number, currency: string) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / 100);
+const money = (amount: number, currency: string) => format({ amount, currencyCode: currency });
 
 interface AddressFields {
   countryCode: string;
