@@ -65,8 +65,9 @@ last 60 days, with analytics events and daily rollups behind them.
 1. **Log in** at http://admin.lvh.me:3000 as `owner@demo.dev` / `password123`.
    You land on Home: a dashboard over the last 30 days — four metric tiles, a
    two-series sales chart against the previous period, and a sales breakdown.
-   (No setup guide: its four checks all pass on the seeded store, so the card
-   hides itself. A fresh store shows it — see "A brand-new store" below.)
+   (No onboarding: Shopify serves a setup page to a store that has never taken
+   an order and this dashboard to one that has, and we switch on the same
+   signal. A fresh store gets the other page — see "A brand-new store" below.)
 2. **Tour the admin.** Products (index with tabs, search and bulk actions; open
    one for the two-column form), Orders (#1001–#1040, mixed fulfillment and
    financial states), Customers, Discounts (`WELCOME10` is Active), Inventory
@@ -105,12 +106,13 @@ nothing about it is prepared.
    password. The slug is derived from the store name and de-duplicated
    server-side, exactly the way a real store URL is assigned. Signing up logs
    you in; the next screen is your admin.
-2. **Onboard.** The Home setup guide has four real checks — add a product,
-   customize the storefront, connect a payment processor, place a test order —
-   each of which reads actual state rather than a stored flag, and the card
-   disappears once all four pass (which is why the seeded store's Home has
-   none). The store already has a published theme: signup installs the default
-   preset so a new shop opens on a real storefront instead of a blank page.
+2. **Onboard.** A store with no orders gets Shopify's onboarding Home instead of
+   the dashboard — "Welcome to Shopify! Where do you want to start?", an
+   assistant prompt that hands your words to the storefront builder, and a grid
+   of setup cards you can dismiss one at a time. Each card's state is read from
+   real data rather than a stored flag, so `Choose your store design` already
+   says **Done**: signup installs the default preset, and a new shop opens on a
+   real storefront instead of a blank page.
 3. **Make it sellable.** Settings → Payments → connect **Mock Gateway** (one
    click, no credentials). Settings → Shipping and delivery → **Add rate** — a
    new shop starts with no rates, and checkout needs one to complete.
