@@ -64,6 +64,7 @@
       "includes": [
         "packages/db/**",
         "apps/api/src/plugins/tenancy.ts",
+        "apps/api/src/lib/custom-domains.ts",
         "apps/api/src/routes/auth/**",
         "apps/api/src/routes/vault/**",
         "apps/worker/scripts/**",
