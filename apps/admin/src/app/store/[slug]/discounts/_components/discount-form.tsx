@@ -36,10 +36,32 @@ import { useMemo, useState } from 'react';
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch } from '../../../../../lib/api.ts';
-import { type DiscountDraft, draftToInput, generateCode, validate } from './discount-draft.ts';
+import {
+  type DiscountDraft,
+  draftToInput,
+  generateCode,
+  serverFieldToDraftKey,
+  validate,
+} from './discount-draft.ts';
 import { ResourcePickerModal } from './resource-picker.tsx';
 
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
+
+/**
+ * The draft keys whose inputs actually render an `error=` prop. A server field
+ * error that does not land on one of these must fall back to a toast, or Save
+ * fails silently (the merchant sees nothing at all).
+ */
+const RENDERED_ERROR_KEYS = new Set([
+  'title',
+  'code',
+  'value',
+  'appliesTo',
+  'minimumSubtotal',
+  'minimumQuantity',
+  'usageLimit',
+  'endsAt',
+]);
 
 const TYPE_TITLES: Record<Discount['type'], string> = {
   amount_off_order: 'Amount off order',
@@ -133,7 +155,7 @@ export function DiscountForm({
     setServerErrors({});
   };
 
-  const errors = validate(draft);
+  const errors = validate(draft, currencyCode);
   const shown = submitted ? { ...errors, ...serverErrors } : serverErrors;
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const symbol = CURRENCY_SYMBOLS[currencyCode] ?? currencyCode;
@@ -152,12 +174,24 @@ export function DiscountForm({
         { method: discountId ? 'PUT' : 'POST', body },
       );
       await queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      // Without this, reopening within staleTime shows (and can re-save) the
+      // pre-edit values.
+      if (discountId) {
+        await queryClient.invalidateQueries({ queryKey: ['discount', discountId] });
+      }
       setBaseline(draft);
       toast.show(discountId ? 'Discount saved' : 'Discount created');
       if (!discountId) router.push(`/store/${slug}/discounts/${saved.id}`);
     } catch (cause) {
       const error = cause as ApiError;
-      if (error.field) setServerErrors({ [error.field]: error.message });
+      // Place each server field error on the input that renders it; anything
+      // the form has no input for becomes a toast — never a silent no-op.
+      const placed: Record<string, string> = {};
+      for (const [field, message] of Object.entries(error.fieldErrors ?? {})) {
+        const key = serverFieldToDraftKey(field, draft);
+        if (RENDERED_ERROR_KEYS.has(key)) placed[key] = message;
+      }
+      if (Object.keys(placed).length > 0) setServerErrors(placed);
       else toast.error(error.message);
     } finally {
       setSaving(false);
@@ -171,7 +205,10 @@ export function DiscountForm({
       await apiFetch(`/admin/api/discounts/${discountId}`, { method: 'DELETE' });
       await queryClient.invalidateQueries({ queryKey: ['discounts'] });
       toast.show('Discount deleted');
+      setConfirmingDelete(false);
       router.push(`/store/${slug}/discounts`);
+      // Drop the cached row so a back-navigation cannot resurrect it.
+      queryClient.removeQueries({ queryKey: ['discount', discountId] });
     } catch (cause) {
       toast.error((cause as ApiError).message);
       setDeleting(false);
@@ -373,6 +410,7 @@ export function DiscountForm({
                       prefix={symbol}
                       value={draft.minimumSubtotal}
                       onChange={(value) => set('minimumSubtotal', value)}
+                      error={shown.minimumSubtotal}
                     />
                   )}
                   {draft.minimumKind === 'quantity' && (
@@ -382,6 +420,7 @@ export function DiscountForm({
                       autoComplete="off"
                       value={draft.minimumQuantity}
                       onChange={(value) => set('minimumQuantity', value)}
+                      error={shown.minimumQuantity}
                     />
                   )}
                 </BlockStack>
@@ -405,6 +444,7 @@ export function DiscountForm({
                       autoComplete="off"
                       value={draft.usageLimit}
                       onChange={(value) => set('usageLimit', value)}
+                      error={shown.usageLimit}
                     />
                   )}
                   <Checkbox

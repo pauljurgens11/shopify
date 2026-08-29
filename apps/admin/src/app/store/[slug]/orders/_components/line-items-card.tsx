@@ -21,7 +21,7 @@ import {
   Thumbnail,
 } from '@shopify/polaris';
 import { ImageIcon } from '@shopify/polaris-icons';
-import { remainingToFulfil } from './status.ts';
+import { fulfillmentRowBadge, remainingToFulfil } from './status.ts';
 
 function LineRow({ line, quantity }: { line: OrderLineItem; quantity: number }) {
   return (
@@ -99,38 +99,43 @@ export function LineItemsCards({ order, fulfilHref }: { order: OrderDetail; fulf
         </Card>
       ) : null}
 
-      {shipped.map((fulfillment: Fulfillment) => (
-        <Card key={fulfillment.id}>
-          <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
-              {/* Neutral, not green: PARITY.md's badge table makes `Fulfilled`
-                  the default subdued tone, same as `status.ts` renders it in
-                  the header and on the index row. */}
-              <Badge progress="complete">Fulfilled</Badge>
-              {fulfillment.trackingNumber ? (
-                <Text as="span" variant="bodySm" tone="subdued">
-                  Tracking:{' '}
-                  {fulfillment.trackingUrl ? (
-                    <Link url={fulfillment.trackingUrl} target="_blank">
-                      {fulfillment.trackingNumber}
-                    </Link>
-                  ) : (
-                    fulfillment.trackingNumber
-                  )}
-                </Text>
-              ) : null}
-            </InlineStack>
+      {shipped.map((fulfillment: Fulfillment) => {
+        // Same mapping as the header badge — a pending fulfillment is not
+        // "Fulfilled", and the hardcoded green disagreed with the subdued
+        // order-level badge for the same state.
+        const badge = fulfillmentRowBadge(fulfillment.status);
+        return (
+          <Card key={fulfillment.id}>
             <BlockStack gap="400">
-              {fulfillment.lineItems.map((entry) => {
-                const line = byId.get(entry.lineItemId);
-                return line ? (
-                  <LineRow key={entry.lineItemId} line={line} quantity={entry.quantity} />
-                ) : null;
-              })}
+              <InlineStack align="space-between" blockAlign="center">
+                <Badge tone={badge.tone} progress={badge.progress}>
+                  {badge.label}
+                </Badge>
+                {fulfillment.trackingNumber ? (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Tracking:{' '}
+                    {fulfillment.trackingUrl ? (
+                      <Link url={fulfillment.trackingUrl} target="_blank">
+                        {fulfillment.trackingNumber}
+                      </Link>
+                    ) : (
+                      fulfillment.trackingNumber
+                    )}
+                  </Text>
+                ) : null}
+              </InlineStack>
+              <BlockStack gap="400">
+                {fulfillment.lineItems.map((entry) => {
+                  const line = byId.get(entry.lineItemId);
+                  return line ? (
+                    <LineRow key={entry.lineItemId} line={line} quantity={entry.quantity} />
+                  ) : null;
+                })}
+              </BlockStack>
             </BlockStack>
-          </BlockStack>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
 
       {unfulfilled.length === 0 && shipped.length === 0 ? (
         <Card>

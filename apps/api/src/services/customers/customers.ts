@@ -199,12 +199,27 @@ export async function listCustomers(
 
   const search = query.query?.trim();
   if (search) {
-    where.OR = [
+    const or: Prisma.CustomerWhereInput[] = [
       { firstName: { contains: search, mode: 'insensitive' } },
       { lastName: { contains: search, mode: 'insensitive' } },
       { email: { contains: search, mode: 'insensitive' } },
       { phone: { contains: search, mode: 'insensitive' } },
     ];
+    // The index renders "Jane Doe", but no single column contains that string,
+    // so a multi-word query also matches when every token hits first-or-last
+    // name — still plain parameterized `contains`, order-insensitive.
+    const tokens = search.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+      or.push({
+        AND: tokens.map((token) => ({
+          OR: [
+            { firstName: { contains: token, mode: 'insensitive' } },
+            { lastName: { contains: token, mode: 'insensitive' } },
+          ],
+        })),
+      });
+    }
+    where.OR = or;
   }
   if (query.acceptsMarketing !== undefined) where.acceptsMarketing = query.acceptsMarketing;
   if (query.tag) where.tags = { has: query.tag };
@@ -359,6 +374,16 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(db: TenantClient, id: string): Promise<void> {
+  const existing = await db.customer.findFirst({ where: { id }, select: { id: true } });
+  if (!existing) throw notFound('Customer');
+
+  // Shopify refuses this too: the FK is ON DELETE SET NULL, so deleting would
+  // strand the order history as anonymous rows the merchant can never reattach.
+  const orders = await db.order.count({ where: { customerId: id } });
+  if (orders > 0) {
+    throw conflict("Customers who have placed orders can't be deleted.", 'id');
+  }
+
   const { count } = await db.customer.deleteMany({ where: { id } });
   if (count === 0) throw notFound('Customer');
 }

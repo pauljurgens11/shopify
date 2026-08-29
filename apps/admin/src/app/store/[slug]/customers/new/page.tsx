@@ -44,7 +44,12 @@ export default function NewCustomerPage() {
   const [emailError, setEmailError] = useState<string | undefined>();
 
   const dirty =
-    email !== '' || firstName !== '' || lastName !== '' || phone !== '' || address !== null;
+    email !== '' ||
+    firstName !== '' ||
+    lastName !== '' ||
+    phone !== '' ||
+    acceptsMarketing ||
+    address !== null;
 
   const save = async () => {
     setSaving(true);

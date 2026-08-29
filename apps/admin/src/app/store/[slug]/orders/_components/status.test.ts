@@ -5,6 +5,7 @@ import {
   capturedTotal,
   financialBadge,
   fulfillmentBadge,
+  fulfillmentRowBadge,
   remainingToFulfil,
   remainingToRefund,
 } from './status.ts';
@@ -42,6 +43,17 @@ describe('order badges', () => {
       tone: 'attention',
     });
     expect(financialBadge('partially_refunded').label).toBe('Partially refunded');
+  });
+
+  /**
+   * The fulfillment-card badge must agree with the order-level badge: a
+   * shipped card is the subdued `Fulfilled` (not green), and a pending
+   * fulfillment must not be labelled `Fulfilled` at all.
+   */
+  it('labels a fulfillment card by its own status, matching the header badge', () => {
+    expect(fulfillmentRowBadge('success')).toEqual(fulfillmentBadge('fulfilled'));
+    expect(fulfillmentRowBadge('pending').label).not.toBe('Fulfilled');
+    expect(fulfillmentRowBadge('cancelled').label).toBe('Cancelled');
   });
 });
 

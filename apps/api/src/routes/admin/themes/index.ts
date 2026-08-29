@@ -7,17 +7,20 @@
  * that can never succeed.
  */
 import { hasAnthropicKey } from '@merchant/config/env';
+import { idSchema } from '@merchant/contracts/common';
 import {
   applyPresetInput,
   builderConversationResponse,
   previewTokenResponse,
   sendBuilderMessageInput,
+  sendBuilderMessageResponse,
   THEME_PRESETS,
   type ThemePreset,
   themeVersionListResponse,
 } from '@merchant/contracts/theme';
 import { presetThemeDoc } from '@merchant/theme-engine/presets';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { badRequest } from '../../../lib/errors.ts';
 import { requirePermission } from '../../../lib/permissions.ts';
 import {
@@ -26,6 +29,7 @@ import {
   makeMessage,
   parseMessages,
   replaceMessage,
+  sweepStalePending,
 } from '../../../services/themes/conversation.ts';
 import { enqueueThemeGeneration } from '../../../services/themes/generation.ts';
 import {
@@ -46,14 +50,32 @@ const NO_KEY_REPLY =
   'configured yet. You can still restyle the storefront right now: apply one of the built-in ' +
   'presets (Aurora, Monochrome or Bloom) and publish it.';
 
+/** Cursor pagination (CLAUDE.md §5): `?limit=50&cursor=…` → `{ data, nextCursor }`. */
+const listVersionsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(250).default(50),
+  cursor: idSchema.optional(),
+});
+
+const previewTokenQuery = z.object({ versionId: idSchema });
+
 export default async function routes(app: FastifyInstance) {
   const builder = { preHandler: requirePermission('builder') };
 
   /* --------------------------------------------------------------- versions */
 
   app.get('/versions', builder, async (request) => {
-    const rows = await request.db.themeVersion.findMany({ orderBy: { createdAt: 'desc' } });
-    return themeVersionListResponse.parse({ data: rows.map(toSummary) });
+    const query = listVersionsQuery.parse(request.query ?? {});
+    // take one extra row: its presence is what says there is a next page.
+    const rows = await request.db.themeVersion.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    });
+    const page = rows.slice(0, query.limit);
+    return themeVersionListResponse.parse({
+      data: page.map(toSummary),
+      nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
+    });
   });
 
   app.get<{ Params: { id: string } }>('/versions/:id', builder, async (request) => {
@@ -93,9 +115,10 @@ export default async function routes(app: FastifyInstance) {
 
   /* ---------------------------------------------------------- preview token */
 
-  app.get<{ Querystring: { versionId?: string } }>('/preview-token', builder, async (request) => {
-    const versionId = request.query.versionId;
-    if (!versionId) throw badRequest('versionId is required.', 'versionId');
+  app.get('/preview-token', builder, async (request) => {
+    // Zod, not a hand-rolled check: a repeated ?versionId= arrives as an array,
+    // which must 400 as invalid_request rather than 500 inside Prisma.
+    const { versionId } = previewTokenQuery.parse(request.query ?? {});
     // Prove it exists AND belongs to this shop before signing anything.
     await getVersion(request.db, versionId);
     return previewTokenResponse.parse({
@@ -108,10 +131,14 @@ export default async function routes(app: FastifyInstance) {
 
   app.get('/conversation', builder, async (request) => {
     const conversation = await getOrCreateConversation(request.db, request.shopId as string);
-    return builderConversationResponse.parse({
-      id: conversation.id,
-      messages: parseMessages(conversation.messages),
-    });
+    // The admin polls this endpoint, which makes it the right place to resolve
+    // a pending bubble whose job died past its last retry (see conversation.ts).
+    const messages = await sweepStalePending(
+      request.db,
+      conversation.id,
+      parseMessages(conversation.messages),
+    );
+    return builderConversationResponse.parse({ id: conversation.id, messages });
   });
 
   app.post('/conversation', builder, async (request, reply) => {
@@ -122,7 +149,9 @@ export default async function routes(app: FastifyInstance) {
     if (!hasAnthropicKey()) {
       const assistant = makeMessage('assistant', NO_KEY_REPLY);
       await appendMessages(request.db, conversation.id, [userMessage, assistant]);
-      return reply.status(202).send({ jobId: null, message: assistant });
+      return reply
+        .status(202)
+        .send(sendBuilderMessageResponse.parse({ jobId: null, message: assistant }));
     }
 
     const pending = makeMessage('assistant', '', { status: 'pending' });
@@ -135,7 +164,7 @@ export default async function routes(app: FastifyInstance) {
         messageId: pending.id,
         prompt: input.message,
       });
-      return reply.status(202).send({ jobId, message: pending });
+      return reply.status(202).send(sendBuilderMessageResponse.parse({ jobId, message: pending }));
     } catch (error) {
       // Redis is down. Resolve the bubble now — a pending message that never
       // completes leaves the builder spinning forever.
@@ -146,7 +175,9 @@ export default async function routes(app: FastifyInstance) {
         { status: 'failed' },
       );
       await replaceMessage(request.db, conversation.id, pending.id, failed);
-      return reply.status(202).send({ jobId: null, message: failed });
+      return reply
+        .status(202)
+        .send(sendBuilderMessageResponse.parse({ jobId: null, message: failed }));
     }
   });
 }

@@ -22,6 +22,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Divider,
   InlineStack,
   Layout,
   Link,
@@ -40,7 +41,11 @@ import { PageSkeleton } from '../../../../../components/shell/page-skeleton.tsx'
 import { SaveBar } from '../../../../../components/shell/save-bar.tsx';
 import { useToast } from '../../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../../lib/api.ts';
+// Read-only import from WS-C's own orders pages: the PARITY badge wording lives
+// there once, and the customer page must not invent a second mapping.
+import { financialBadge } from '../../orders/_components/status.ts';
 import { type AddressDraft, AddressModal } from '../_components/address-modal.tsx';
+import { type ContactDraft, ContactModal } from '../_components/contact-modal.tsx';
 
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -95,9 +100,14 @@ export default function CustomerDetailPage() {
   const [tagDraft, setTagDraft] = useState('');
   const [acceptsMarketing, setAcceptsMarketing] = useState(false);
   const [addresses, setAddresses] = useState<AddressDraft[]>([]);
-  const [editingAddress, setEditingAddress] = useState<AddressDraft | null>(null);
+  // The list is local page state, so an index identifies a row unambiguously;
+  // null means the modal opens empty to add a new address.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactEmailError, setContactEmailError] = useState<string | undefined>();
 
   // Seed the editable state once the customer arrives, and again after a save.
   useEffect(() => {
@@ -111,16 +121,25 @@ export default function CustomerDetailPage() {
 
   const loaded = customer.data;
 
+  // Tracked separately from the rest: the PUT replaces address rows wholesale,
+  // so a note-only save must not send `addresses` and recreate every row.
+  const addressesDirty = useMemo(() => {
+    if (!loaded) return false;
+    return (
+      JSON.stringify(addresses) !==
+      JSON.stringify(loaded.addresses.map(({ id: _id, ...rest }) => rest))
+    );
+  }, [loaded, addresses]);
+
   const dirty = useMemo(() => {
     if (!loaded) return false;
     return (
       note !== (loaded.note ?? '') ||
       acceptsMarketing !== loaded.acceptsMarketing ||
       JSON.stringify(tags) !== JSON.stringify(loaded.tags) ||
-      JSON.stringify(addresses) !==
-        JSON.stringify(loaded.addresses.map(({ id: _id, ...rest }) => rest))
+      addressesDirty
     );
-  }, [loaded, note, tags, acceptsMarketing, addresses]);
+  }, [loaded, note, tags, acceptsMarketing, addressesDirty]);
 
   const discard = () => {
     if (!loaded) return;
@@ -135,9 +154,18 @@ export default function CustomerDetailPage() {
     try {
       await apiFetch(`/admin/api/customers/${id}`, {
         method: 'PUT',
-        body: { note: note.trim() === '' ? null : note, tags, acceptsMarketing, addresses },
+        body: {
+          note: note.trim() === '' ? null : note,
+          tags,
+          acceptsMarketing,
+          ...(addressesDirty ? { addresses } : {}),
+        },
       });
-      await queryClient.invalidateQueries({ queryKey: ['customer', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['customer', id] }),
+        // The index shows the marketing badge, so it must not stay stale.
+        queryClient.invalidateQueries({ queryKey: ['customers'] }),
+      ]);
       toast.show('Customer saved');
     } catch (cause) {
       toast.error((cause as ApiError).message);
@@ -146,33 +174,103 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const saveContact = async (draft: ContactDraft) => {
+    setContactSaving(true);
+    setContactEmailError(undefined);
+    try {
+      await apiFetch(`/admin/api/customers/${id}`, {
+        method: 'PUT',
+        body: {
+          firstName: draft.firstName.trim() || null,
+          lastName: draft.lastName.trim() || null,
+          email: draft.email.trim(),
+          phone: draft.phone.trim() || null,
+        },
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['customer', id] }),
+        queryClient.invalidateQueries({ queryKey: ['customers'] }),
+      ]);
+      toast.show('Customer saved');
+      setContactOpen(false);
+    } catch (cause) {
+      const error = cause as ApiError;
+      // A duplicate email belongs on the field, inside the still-open modal.
+      if (error.field === 'email') setContactEmailError(error.message);
+      else toast.error(error.message);
+    } finally {
+      setContactSaving(false);
+    }
+  };
+
   if (customer.isPending) return <PageSkeleton layout="detail" />;
 
-  // A deleted or mistyped id must not sit on a skeleton forever (B5's pattern).
-  if (!loaded) {
+  // A skeleton that never resolves reads as "the admin is broken". A deleted
+  // customer gets a real not-found state; anything else gets the error.
+  if (customer.isError || !loaded) {
+    const missing = customer.error?.code === 'not_found';
     return (
       <Page backAction={{ content: 'Customers', url: `/store/${slug}/customers` }} title="Customer">
-        <Banner tone="critical" title="This customer could not be loaded">
-          <p>{customer.error?.message ?? 'They may have been deleted.'}</p>
-        </Banner>
+        {missing ? (
+          <Card>
+            {/* Hand-built rather than Polaris `EmptyState`, which requires an
+                `image` — "" renders a phantom <img> request (page-skeleton.tsx). */}
+            <Box padding="800">
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Customer not found
+                </Text>
+                <Text as="p" tone="subdued" alignment="center">
+                  This customer may have been deleted.
+                </Text>
+                <Box paddingBlockStart="300">
+                  <Button url={`/store/${slug}/customers`}>Back to customers</Button>
+                </Box>
+              </BlockStack>
+            </Box>
+          </Card>
+        ) : (
+          <Banner
+            tone="critical"
+            title="This customer could not be loaded"
+            action={{ content: 'Try again', onAction: () => customer.refetch() }}
+          >
+            <p>{customer.error?.message ?? 'Something went wrong. Please try again.'}</p>
+          </Banner>
+        )}
       </Page>
     );
   }
 
   const orderRows = orders.data?.data ?? [];
   const lastOrder = orderRows[0];
-  const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
+  const lastOrderBadge = lastOrder ? financialBadge(lastOrder.financialStatus) : null;
+
+  /** Exactly one default, restored here so the card never shows zero or two. */
+  const normalizeDefault = (list: AddressDraft[]): AddressDraft[] =>
+    list.length > 0 && !list.some((a) => a.isDefault)
+      ? list.map((a, i) => ({ ...a, isDefault: i === 0 }))
+      : list;
 
   const saveAddress = (draft: AddressDraft) => {
     setAddresses((current) => {
-      const next = editingAddress
-        ? current.map((a) => (a === editingAddress ? draft : a))
-        : [...current, draft];
-      // One default, decided here so the card cannot show two before saving.
-      return draft.isDefault ? next.map((a) => ({ ...a, isDefault: a === draft })) : next;
+      const next =
+        editingIndex === null
+          ? [...current, draft]
+          : current.map((a, i) => (i === editingIndex ? draft : a));
+      const draftIndex = editingIndex ?? next.length - 1;
+      return draft.isDefault
+        ? next.map((a, i) => ({ ...a, isDefault: i === draftIndex }))
+        : normalizeDefault(next);
     });
     setAddressOpen(false);
   };
+
+  const removeAddress = (index: number) =>
+    setAddresses((current) => normalizeDefault(current.filter((_, i) => i !== index)));
+
+  const makeDefault = (index: number) =>
+    setAddresses((current) => current.map((a, i) => ({ ...a, isDefault: i === index })));
 
   return (
     <Page
@@ -209,9 +307,11 @@ export default function CustomerDetailPage() {
                       <Text as="span" tone="subdued">
                         {shortDate(lastOrder.createdAt)}
                       </Text>
-                      <Badge tone={lastOrder.financialStatus === 'paid' ? undefined : 'attention'}>
-                        {lastOrder.financialStatus === 'paid' ? 'Paid' : 'Payment pending'}
-                      </Badge>
+                      {lastOrderBadge && (
+                        <Badge tone={lastOrderBadge.tone} progress={lastOrderBadge.progress}>
+                          {lastOrderBadge.label}
+                        </Badge>
+                      )}
                     </InlineStack>
                   </BlockStack>
                 ) : (
@@ -282,18 +382,19 @@ export default function CustomerDetailPage() {
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="300">
-                {/* PARITY.md → Customer detail: the Customer card carries the
-                    email and the marketing badge. The badge reads the draft, so
-                    it agrees with the checkbox below it before a save lands. */}
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h2" variant="headingMd">
                     Customer
                   </Text>
-                  {acceptsMarketing ? (
-                    <Badge tone="success">Subscribed</Badge>
-                  ) : (
-                    <Badge>Not subscribed</Badge>
-                  )}
+                  <Button
+                    variant="plain"
+                    onClick={() => {
+                      setContactEmailError(undefined);
+                      setContactOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
                 </InlineStack>
                 <BlockStack gap="100">
                   <Text as="p" tone="subdued" variant="bodySm">
@@ -317,24 +418,59 @@ export default function CustomerDetailPage() {
               <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h2" variant="headingMd">
-                    Default address
+                    Addresses
                   </Text>
                   <Button
                     variant="plain"
                     onClick={() => {
-                      setEditingAddress(defaultAddress ?? null);
+                      setEditingIndex(null);
                       setAddressOpen(true);
                     }}
                   >
-                    {defaultAddress ? 'Manage' : 'Add'}
+                    Add address
                   </Button>
                 </InlineStack>
-                {defaultAddress ? (
-                  <AddressLines address={defaultAddress} />
-                ) : (
+                {addresses.length === 0 ? (
                   <Text as="p" tone="subdued">
                     No address on file.
                   </Text>
+                ) : (
+                  addresses.map((address, index) => (
+                    // The list is local state with no row ids; index is the key.
+                    // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id until saved
+                    <BlockStack key={index} gap="200">
+                      {index > 0 && <Divider />}
+                      {address.isDefault && (
+                        <InlineStack>
+                          <Badge>Default address</Badge>
+                        </InlineStack>
+                      )}
+                      <AddressLines address={address} />
+                      <InlineStack gap="300">
+                        <Button
+                          variant="plain"
+                          onClick={() => {
+                            setEditingIndex(index);
+                            setAddressOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        {!address.isDefault && (
+                          <Button variant="plain" onClick={() => makeDefault(index)}>
+                            Set as default
+                          </Button>
+                        )}
+                        <Button
+                          variant="plain"
+                          tone="critical"
+                          onClick={() => removeAddress(index)}
+                        >
+                          Delete
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                  ))
                 )}
               </BlockStack>
             </Card>
@@ -391,9 +527,19 @@ export default function CustomerDetailPage() {
 
       <AddressModal
         open={addressOpen}
-        address={editingAddress}
+        address={editingIndex === null ? null : (addresses[editingIndex] ?? null)}
         onClose={() => setAddressOpen(false)}
         onSave={saveAddress}
+      />
+
+      <ContactModal
+        open={contactOpen}
+        customer={loaded}
+        saving={contactSaving}
+        emailError={contactEmailError}
+        onEmailEdit={() => setContactEmailError(undefined)}
+        onClose={() => setContactOpen(false)}
+        onSave={saveContact}
       />
     </Page>
   );

@@ -30,10 +30,20 @@ export function ProductGrid({ settings, data }: SectionProps<'product-grid'>) {
 
   const shown = products.slice(0, limit);
 
+  // Nothing to show is two different states: stale handles or a context still
+  // loading keep the skeleton (DECISIONS: the grid holds its shape), but a
+  // supplied-and-empty `newestProducts` means the catalogue is genuinely empty.
+  const resolvedEmpty =
+    shown.length === 0 && productHandles.length === 0 && data.newestProducts !== undefined;
+
   return (
     <SectionShell type="product-grid" width="wide" padding="lg">
       {heading ? <h2 className="font-heading text-2xl text-text sm:text-3xl">{heading}</h2> : null}
-      {shown.length === 0 ? (
+      {resolvedEmpty ? (
+        <p className="py-16 text-center text-sm text-text/60">
+          No products here yet. Check back soon.
+        </p>
+      ) : shown.length === 0 ? (
         <ProductSkeletonGrid columns={columns} count={Math.min(limit, columns)} />
       ) : (
         <div className={`mt-8 grid gap-x-5 gap-y-10 ${productGridClass(columns)}`}>

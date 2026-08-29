@@ -21,17 +21,22 @@ import {
   type OrderDetail,
   type RefundCalculation,
 } from '@merchant/contracts/orders';
-import type {
-  OrderLineItem as LineRow,
-  Order as OrderRow,
-  Refund as RefundRow,
+import {
+  type OrderLineItem as LineRow,
+  type Order as OrderRow,
+  Prisma,
+  type Refund as RefundRow,
 } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { PaymentError, refundPayment } from '@merchant/pay/router';
 import { ApiError, badRequest, conflict, notFound } from '../../lib/errors.ts';
 import { adjustMany } from '../inventory/adjust.ts';
 import { loadOrderDetail } from './detail.ts';
+import { fulfillmentStatusFor } from './fulfill.ts';
 import { notifyOrder } from './notify.ts';
+
+const isUniqueViolation = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
 type OrderWithLines = OrderRow & { lineItems: LineRow[]; refunds: RefundRow[] };
 
@@ -157,6 +162,21 @@ export async function refundOrder(
   const data = createRefundInput.parse(input);
   const order = await loadRefundable(db, orderId);
 
+  // This function owns refund idempotency end-to-end. The Pay router replays a
+  // processor refund by key on its own, so without this check a replayed
+  // request would still mint a SECOND Refund row and double-count the totals.
+  if (data.idempotencyKey) {
+    const replayed = await db.refund.findFirst({
+      where: { orderId, idempotencyKey: data.idempotencyKey },
+      select: { id: true },
+    });
+    if (replayed) return loadOrderDetail(db, orderId);
+  }
+
+  if (data.shippingAmount && data.shippingAmount.currencyCode !== order.currencyCode) {
+    throw badRequest('Shipping refund currency must match the order.', 'shippingAmount');
+  }
+
   const calculation = calculateRefund(order, {
     lineItems: data.lineItems,
     shippingAmount: data.shippingAmount?.amount,
@@ -179,7 +199,11 @@ export async function refundOrder(
   });
   if (!payment) throw conflict('This order has no captured payment to refund.');
 
-  const idempotencyKey = data.idempotencyKey ?? newId('event');
+  const refundId = newId('refund');
+  // One key covers the processor call AND the Refund row. When the client sent
+  // none, the refund's own id is the key — correctly prefixed, unique, and
+  // stable for this attempt only (a retry without a key is a new refund).
+  const idempotencyKey = data.idempotencyKey ?? refundId;
   try {
     await refundPayment(db, shopId, payment.id, {
       amount: calculation.total,
@@ -193,84 +217,116 @@ export async function refundOrder(
   }
 
   const paymentRefund = await db.paymentRefund.findFirst({ where: { idempotencyKey } });
-  const refundId = newId('refund');
 
-  await db.$transaction(async (tx) => {
-    await tx.refund.create({
-      data: {
-        id: refundId,
-        shopId,
-        orderId,
-        amount,
-        shippingAmount: calculation.shippingAmount.amount,
-        reason: data.reason ?? null,
-        note: data.note ?? null,
-        lineItems: calculation.lineItems.map((l) => ({
-          lineItemId: l.lineItemId,
-          quantity: l.quantity,
-        })),
-        restock: data.restock ?? true,
-        paymentRefundId: paymentRefund?.id ?? null,
-      },
-    });
-
-    for (const line of calculation.lineItems) {
-      await tx.orderLineItem.update({
-        where: { id: line.lineItemId },
-        data: { refundedQuantity: { increment: line.quantity } },
-      });
-    }
-
-    const refundedTotal = order.refundedTotal + amount;
-    await tx.order.update({
-      where: { id: orderId },
-      data: {
-        refundedTotal,
-        financialStatus: refundedTotal >= order.total ? 'refunded' : 'partially_refunded',
-        events: {
-          create: [
-            {
-              id: newId('event'),
-              shopId,
-              type: 'refund_created',
-              message: `Refunded ${format(money(amount, order.currencyCode))}.`,
-              actor,
-              payload: { refundId, restock: data.restock ?? true },
-            },
-          ],
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.refund.create({
+        data: {
+          id: refundId,
+          shopId,
+          orderId,
+          amount,
+          shippingAmount: calculation.shippingAmount.amount,
+          reason: data.reason ?? null,
+          note: data.note ?? null,
+          lineItems: calculation.lineItems.map((l) => ({
+            lineItemId: l.lineItemId,
+            quantity: l.quantity,
+          })),
+          restock: data.restock ?? true,
+          paymentRefundId: paymentRefund?.id ?? null,
+          idempotencyKey,
         },
-      },
+      });
+
+      for (const line of calculation.lineItems) {
+        await tx.orderLineItem.update({
+          where: { id: line.lineItemId },
+          data: { refundedQuantity: { increment: line.quantity } },
+        });
+      }
+
+      // `increment`, not read-modify-write: `order` was read before the
+      // processor round-trip, and a concurrent refund would lose its update.
+      // The statuses are then derived from the POST-increment rows.
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          refundedTotal: { increment: amount },
+          events: {
+            create: [
+              {
+                id: newId('event'),
+                shopId,
+                type: 'refund_created',
+                message: `Refunded ${format(money(amount, order.currencyCode))}.`,
+                actor,
+                payload: { refundId, restock: data.restock ?? true },
+              },
+            ],
+          },
+        },
+      });
+      const lines = await tx.orderLineItem.findMany({ where: { orderId } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          financialStatus:
+            updated.refundedTotal >= updated.total ? 'refunded' : 'partially_refunded',
+          // Refunded units no longer need shipping: refunding the unshipped
+          // remainder of a partially fulfilled order completes it.
+          fulfillmentStatus: fulfillmentStatusFor(lines),
+        },
+      });
     });
-  });
+  } catch (error) {
+    // Two requests raced on one idempotency key past the check above; the
+    // winner's row IS this refund (the processor replayed the same money), so
+    // the loser reports the same outcome rather than double-recording it.
+    if (isUniqueViolation(error)) return loadOrderDetail(db, orderId);
+    throw error;
+  }
 
   // Restocking is a checkbox, not a consequence: refunded is not returned.
+  // The money has already moved, so a restock failure must degrade (log and
+  // carry on, like notify) rather than 500 a refund that succeeded.
   if (data.restock ?? true) {
-    const byId = new Map(order.lineItems.map((l) => [l.id, l]));
-    const moves = calculation.lineItems
-      .map((l) => ({ line: byId.get(l.lineItemId), quantity: l.quantity }))
-      .filter((m): m is { line: LineRow; quantity: number } => Boolean(m.line?.variantId));
+    try {
+      const byId = new Map(order.lineItems.map((l) => [l.id, l]));
+      const moves = calculation.lineItems
+        .map((l) => ({ line: byId.get(l.lineItemId), quantity: l.quantity }))
+        .filter((m): m is { line: LineRow; quantity: number } => Boolean(m.line?.variantId));
 
-    const levels = await db.inventoryLevel.findMany({
-      where: { variantId: { in: moves.map((m) => m.line.variantId as string) } },
-      orderBy: [{ variantId: 'asc' }, { locationId: 'asc' }],
-    });
-    const locationFor = new Map<string, string>();
-    for (const level of levels) {
-      if (!locationFor.has(level.variantId)) locationFor.set(level.variantId, level.locationId);
+      const levels = await db.inventoryLevel.findMany({
+        where: { variantId: { in: moves.map((m) => m.line.variantId as string) } },
+        orderBy: [{ variantId: 'asc' }, { locationId: 'asc' }],
+      });
+      const locationFor = new Map<string, string>();
+      for (const level of levels) {
+        if (!locationFor.has(level.variantId)) locationFor.set(level.variantId, level.locationId);
+      }
+
+      const adjustments = moves
+        .map((m) => ({ m, locationId: locationFor.get(m.line.variantId as string) }))
+        .filter((pair): pair is { m: typeof pair.m; locationId: string } =>
+          Boolean(pair.locationId),
+        )
+        .map(({ m, locationId }) => ({
+          variantId: m.line.variantId as string,
+          locationId,
+          delta: m.quantity,
+          reason: 'restock' as const,
+          referenceId: refundId,
+          actor,
+        }));
+      if (adjustments.length > 0) await adjustMany(db, adjustments);
+    } catch (error) {
+      console.warn(
+        `refund: restock for ${refundId} failed — ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
-
-    const adjustments = moves
-      .map((m) => ({ m, locationId: locationFor.get(m.line.variantId as string) }))
-      .filter((pair): pair is { m: typeof pair.m; locationId: string } => Boolean(pair.locationId))
-      .map(({ m, locationId }) => ({
-        variantId: m.line.variantId as string,
-        locationId,
-        delta: m.quantity,
-        reason: 'restock' as const,
-        referenceId: refundId,
-        actor,
-      }));
-    if (adjustments.length > 0) await adjustMany(db, adjustments);
   }
 
   await notifyOrder({

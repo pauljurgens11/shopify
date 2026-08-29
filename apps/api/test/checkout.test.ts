@@ -511,6 +511,53 @@ describe('complete', () => {
     expect(orders).toHaveLength(2);
   });
 
+  it('refuses a oncePerCustomer code the same email already redeemed', async () => {
+    await dbAdmin.discount.create({
+      data: {
+        id: newId('discount'),
+        shopId: shop.shopId,
+        title: 'One per customer',
+        code: 'ONCE15',
+        type: 'amount_off_order',
+        valueType: 'percentage',
+        value: 15,
+        appliesTo: { scope: 'all' },
+        minimumRequirement: { type: 'none' },
+        oncePerCustomer: true,
+        status: 'active',
+        startsAt: new Date(Date.now() - 86_400_000),
+      },
+    });
+
+    const first = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    const priced = await readyToPay(first.checkout.token, {
+      email: 'loyal@example.com',
+      discountCode: 'ONCE15',
+    });
+    expect(priced.appliedDiscounts[0]?.code).toBe('ONCE15');
+    const paid = await pay(first.checkout.token, tok.approved);
+    expect(paid.statusCode, paid.body).toBe(200);
+
+    // The same shopper again — case-folded, like the customer identity is. The
+    // code is rejected inline, not applied and silently unwound later.
+    const second = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    const rejected = await readyToPay(second.checkout.token, {
+      email: 'LOYAL@example.com',
+      discountCode: 'ONCE15',
+    });
+    expect(rejected.rejectedDiscount).toEqual({ code: 'ONCE15', reason: 'usage_limit' });
+    expect(rejected.appliedDiscounts).toEqual([]);
+    expect(rejected.totals.discountTotal.amount).toBe(0);
+
+    // A different customer — and a guest-shaped brand-new email — still gets it.
+    const other = await openCheckout([{ variantId: v.socks, quantity: 1 }]);
+    const applied = await readyToPay(other.checkout.token, {
+      email: 'first-timer@example.com',
+      discountCode: 'ONCE15',
+    });
+    expect(applied.appliedDiscounts[0]?.code).toBe('ONCE15');
+  });
+
   it('leaves the checkout payable after a decline, with no order and no stock movement', async () => {
     const { checkout } = await openCheckout([{ variantId: v.alpine, quantity: 1 }]);
     // Its own email, so the "no order" assertion cannot see another test's.

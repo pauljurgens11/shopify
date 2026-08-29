@@ -12,6 +12,8 @@ import {
   draftFromDiscount,
   draftToInput,
   emptyDraft,
+  serverFieldToDraftKey,
+  validate,
 } from '../app/store/[slug]/discounts/_components/discount-draft.ts';
 
 describe('discount draft → API input', () => {
@@ -63,5 +65,95 @@ describe('discount draft → API input', () => {
 
     // Reopening the discount and saving it again must not change it.
     expect(draftToInput(draftFromDiscount(saved, 'USD'), 'USD')).toEqual(input);
+  });
+
+  it('round-trips a free shipping discount', () => {
+    const draft = { ...emptyDraft('free_shipping'), title: 'Free shipping', code: 'SHIPFREE' };
+    const input = draftToInput(draft, 'USD');
+    expect(input.value).toBe(100);
+
+    const saved = discountSchema.parse({
+      ...createDiscountInput.parse(input),
+      id: 'dis_01J8ZC00000000000000000003',
+      usedCount: 0,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    expect(draftToInput(draftFromDiscount(saved, 'USD'), 'USD')).toEqual(input);
+  });
+});
+
+describe('validate — the errors that used to be silent 400s or silent wrong saves', () => {
+  const valid = {
+    ...emptyDraft('amount_off_order'),
+    title: 'Ten off',
+    code: 'TENOFF',
+    valueType: 'fixed' as const,
+    value: '10.00',
+  };
+
+  it('accepts a well-formed draft', () => {
+    expect(validate(valid, 'USD')).toEqual({});
+  });
+
+  it('requires a usage limit when the checkbox is on — empty must not save unlimited', () => {
+    expect(validate({ ...valid, hasUsageLimit: true, usageLimit: '' }, 'USD')).toHaveProperty(
+      'usageLimit',
+    );
+  });
+
+  it('rejects a non-positive-integer usage limit the API would 400 on', () => {
+    for (const usageLimit of ['0', '2.5', '-1', '1e3']) {
+      expect(validate({ ...valid, hasUsageLimit: true, usageLimit }, 'USD')).toHaveProperty(
+        'usageLimit',
+      );
+    }
+    expect(validate({ ...valid, hasUsageLimit: true, usageLimit: '100' }, 'USD')).toEqual({});
+  });
+
+  it('requires a positive integer minimum quantity', () => {
+    for (const minimumQuantity of ['', '0', '2.5', '1e2']) {
+      expect(
+        validate({ ...valid, minimumKind: 'quantity', minimumQuantity }, 'USD'),
+      ).toHaveProperty('minimumQuantity');
+    }
+    expect(validate({ ...valid, minimumKind: 'quantity', minimumQuantity: '3' }, 'USD')).toEqual(
+      {},
+    );
+  });
+
+  it('catches an unparseable fixed value before save throws "Not a decimal amount"', () => {
+    expect(validate({ ...valid, value: '1e5' }, 'USD')).toHaveProperty('value');
+    // A trailing dot is something fromDecimal accepts, so validate must too.
+    expect(validate({ ...valid, value: '10.' }, 'USD')).toEqual({});
+  });
+
+  it('catches an unparseable minimum subtotal', () => {
+    expect(
+      validate({ ...valid, minimumKind: 'subtotal', minimumSubtotal: '1e5' }, 'USD'),
+    ).toHaveProperty('minimumSubtotal');
+    expect(
+      validate({ ...valid, minimumKind: 'subtotal', minimumSubtotal: '49.99' }, 'USD'),
+    ).toEqual({});
+  });
+});
+
+describe('serverFieldToDraftKey — dotted API paths land on the input that renders them', () => {
+  const base = emptyDraft('amount_off_order');
+
+  it('maps minimumRequirement.value by the selected minimum kind', () => {
+    expect(
+      serverFieldToDraftKey('minimumRequirement.value', { ...base, minimumKind: 'quantity' }),
+    ).toBe('minimumQuantity');
+    expect(
+      serverFieldToDraftKey('minimumRequirement.value', { ...base, minimumKind: 'subtotal' }),
+    ).toBe('minimumSubtotal');
+  });
+
+  it('maps appliesTo subpaths onto the picker error and passes flat fields through', () => {
+    expect(serverFieldToDraftKey('appliesTo.productIds', base)).toBe('appliesTo');
+    expect(serverFieldToDraftKey('usageLimit', base)).toBe('usageLimit');
+    expect(serverFieldToDraftKey('code', base)).toBe('code');
   });
 });

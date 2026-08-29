@@ -17,13 +17,19 @@ export function PublishModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  // Mid-publish the modal must not close under the merchant — the X and the
+  // backdrop go inert, matching the already-disabled Cancel.
+  const close = () => {
+    if (!publishing) onClose();
+  };
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Publish this theme?"
       primaryAction={{ content: 'Publish', onAction: onConfirm, loading: publishing }}
-      secondaryActions={[{ content: 'Cancel', onAction: onClose, disabled: publishing }]}
+      secondaryActions={[{ content: 'Cancel', onAction: close, disabled: publishing }]}
     >
       <Modal.Section>
         <Text as="p">
