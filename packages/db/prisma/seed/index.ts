@@ -24,7 +24,9 @@
 import { pathToFileURL } from 'node:url';
 import { dbAdmin } from '../../src/client.ts';
 import { createAnalytics } from './analytics.ts';
+import { createDemoApp } from './apps.ts';
 import { createCatalog } from './catalog.ts';
+import { createAbandonedCheckouts } from './checkouts.ts';
 import { createCollections } from './collections.ts';
 import type { SeedContext } from './context.ts';
 import { createCustomers } from './customers.ts';
@@ -97,6 +99,11 @@ export async function seedDemo(): Promise<SeedSummary> {
   // After orders: the saved cards go to customers who demonstrably buy, so the
   // order pages a reviewer opens actually show D4's "charge saved card" block.
   await createSavedCards(dbAdmin, ctx, { customers, orders });
+
+  // Demo dead-ends closed (H5): an installed app with a delivery log, and two
+  // abandoned checkouts so C4's segment tab has something to list.
+  await createDemoApp(dbAdmin, ctx, { customers, orders });
+  await createAbandonedCheckouts(dbAdmin, ctx, { products, customers });
 
   // A handful of genuinely sold-out variants: two everywhere (storefront
   // sold-out badge) and four more only in the store (the per-location split B6
