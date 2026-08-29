@@ -53,7 +53,11 @@ export function newId<K extends IdKind>(kind: K): PrefixedId<K> {
 
 /** Cheap shape check — use at API boundaries so a bad id 404s instead of 500s. */
 export function isId<K extends IdKind>(kind: K, value: unknown): value is PrefixedId<K> {
-  return typeof value === 'string' && value.startsWith(`${ID_PREFIXES[kind]}_`);
+  if (typeof value !== 'string') return false;
+  const prefix = `${ID_PREFIXES[kind]}_`;
+  // The remainder after the prefix is a bare ULID, so it never contains an
+  // underscore — this is what stops `inv_` from claiming an `inv_adj_…` id.
+  return value.startsWith(prefix) && !value.slice(prefix.length).includes('_');
 }
 
 export function assertId<K extends IdKind>(kind: K, value: unknown): PrefixedId<K> {

@@ -162,6 +162,39 @@ describe('POST /auth/signup', () => {
     });
   });
 
+  it('rejects a reserved slug the platform could never serve', async () => {
+    // `www` never resolves a storefront (lib/host.ts) and prod Caddy owns
+    // `admin.*`/`api.*` — signing one up would create a shop with no web address.
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: {
+        shopName: 'World Wide Widgets',
+        shopSlug: 'www',
+        email: `www@${uniqueSlug()}.test`,
+        password: 'a-good-password',
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors[0]).toMatchObject({ code: 'invalid_request', field: 'shopSlug' });
+  });
+
+  it('never derives a reserved slug from the shop name', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: { shopName: 'API', email: `api@${uniqueSlug()}.test`, password: 'a-good-password' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    createdShopIds.push(body.shop.id);
+    // slugify falls back to a random slug rather than handing out `api`.
+    expect(body.shop.slug).not.toBe('api');
+    expect(body.shop.slug).toMatch(/^store-/);
+  });
+
   it('rejects a short password with the SPEC error shape', async () => {
     const res = await app.inject({
       method: 'POST',
@@ -180,6 +213,29 @@ describe('POST /auth/signup', () => {
 });
 
 describe('POST /auth/login', () => {
+  it('matches email case-insensitively, signup through login', async () => {
+    // Mobile keyboards auto-capitalize; with no password-reset flow, an exact
+    // Postgres compare would lock this merchant out of their store forever.
+    const slug = uniqueSlug('case');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: {
+        shopName: 'Case Fold Co.',
+        shopSlug: slug,
+        email: `Owner@${slug.toUpperCase()}.TEST`,
+        password: TEST_PASSWORD,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    createdShopIds.push(res.json().shop.id);
+    // Stored case-folded — the same rule customer email already follows.
+    expect(res.json().user.email).toBe(`owner@${slug}.test`);
+
+    const { res: loginRes } = await login(`owner@${slug}.test`);
+    expect(loginRes.statusCode).toBe(200);
+  });
+
   it('rejects a wrong password with 401 and the SPEC error shape', async () => {
     const { res } = await login(shop.ownerEmail, 'not-the-password');
     expect(res.statusCode).toBe(401);
