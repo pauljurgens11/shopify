@@ -302,7 +302,7 @@ export async function completeCheckout(
             title: selectedRate.title,
             // Net of a free-shipping discount, matching `totals.shippingTotal`.
             price: totals.shippingTotal,
-            shippingRateId: null,
+            shippingRateId: selectedRate.id,
           }
         : null,
       discountCodes: priced.pricing.appliedDiscounts,
