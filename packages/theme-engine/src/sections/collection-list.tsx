@@ -37,11 +37,15 @@ export function CollectionList({ settings, data }: SectionProps<'collection-list
               data-collection-handle={collection.handle}
               className="group flex flex-col gap-3"
             >
-              <ThemeImage
-                src={collection.imageUrl}
-                alt={collection.title}
-                className="aspect-[4/3] w-full overflow-hidden rounded-theme transition-transform duration-500 group-hover:scale-[1.02]"
-              />
+              {/* overflow-hidden must live on a wrapper — on the img itself it
+                  clips nothing, so the hover zoom bled outside the cell. */}
+              <div className="aspect-[4/3] w-full overflow-hidden rounded-theme">
+                <ThemeImage
+                  src={collection.imageUrl}
+                  alt={collection.title}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+              </div>
               <div>
                 <h3 className="font-medium text-sm text-text">{collection.title}</h3>
                 <p className="text-text/60 text-xs">

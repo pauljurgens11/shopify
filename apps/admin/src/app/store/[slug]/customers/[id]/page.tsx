@@ -203,7 +203,7 @@ export default function CustomerDetailPage() {
     }
   };
 
-  if (customer.isPending) return <PageSkeleton />;
+  if (customer.isPending) return <PageSkeleton layout="detail" />;
 
   // A skeleton that never resolves reads as "the admin is broken". A deleted
   // customer gets a real not-found state; anything else gets the error.

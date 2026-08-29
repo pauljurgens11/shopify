@@ -8,7 +8,7 @@
  * still drawn with `--p-*` tokens so it sits inside the admin rather than on
  * top of it (CLAUDE.md §7).
  */
-import { Badge, Banner, BlockStack, Box, Button, Text, TextField } from '@shopify/polaris';
+import { Badge, Banner, BlockStack, Box, Button, Spinner, Text, TextField } from '@shopify/polaris';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiError } from '../../../../lib/api.ts';
 import { PresetPicker } from './preset-picker.tsx';
@@ -70,23 +70,14 @@ function Bubble({
   );
 }
 
-/** Three dots, staggered. Pure CSS so no timer runs while the job does. */
+/**
+ * Polaris Spinner, not hand-rolled dots: PARITY.md §Motion bans off-token
+ * durations/easings, and Spinner already honors `prefers-reduced-motion`.
+ */
 function ThinkingDots() {
   return (
-    <div style={{ display: 'flex', gap: 'var(--p-space-100)', paddingBlock: '2px' }}>
-      <style>{`@keyframes builder-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}`}</style>
-      {[0, 1, 2].map((index) => (
-        <span
-          key={index}
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: 'var(--p-color-text-secondary)',
-            animation: `builder-dot 1.2s ${index * 0.16}s infinite ease-in-out`,
-          }}
-        />
-      ))}
+    <div style={{ display: 'flex', paddingBlock: '2px' }}>
+      <Spinner size="small" accessibilityLabel="Generating a response" />
     </div>
   );
 }
@@ -116,7 +107,13 @@ export function ChatPanel({
   // Follow the conversation as it grows, including while a job resolves.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the message list is the trigger, not an input — the effect only touches the ref
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
+    // Browsers do not apply prefers-reduced-motion to programmatic smooth
+    // scrolling, so honor it ourselves (PARITY.md §Motion).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scroller.current?.scrollTo({
+      top: scroller.current.scrollHeight,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
   }, [messages]);
 
   const busy = sending || messages.some((message) => message.status === 'pending');

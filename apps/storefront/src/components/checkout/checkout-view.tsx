@@ -304,7 +304,7 @@ export function CheckoutView({
           type="button"
           onClick={pay}
           disabled={!canPay || paying || saving}
-          className="mt-6 w-full rounded bg-neutral-900 py-4 font-medium text-base text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-6 w-full rounded bg-neutral-900 py-4 font-medium text-base text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {paying ? 'Processing…' : 'Pay now'}
         </button>

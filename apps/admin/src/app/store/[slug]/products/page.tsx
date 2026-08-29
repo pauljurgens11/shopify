@@ -111,7 +111,9 @@ export default function ProductsPage() {
     return `/admin/api/products?${search.toString()}`;
   }, [status, query, vendor, sortSelected, cursor]);
 
-  const products = useApiQuery<Paginated<Product>>(['products', path], path);
+  const products = useApiQuery<Paginated<Product>>(['products', path], path, {
+    keepPreviousData: true,
+  });
   const rows = products.data?.data ?? [];
 
   const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =

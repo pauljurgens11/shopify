@@ -109,7 +109,9 @@ export default function CustomersPage() {
     return `/admin/api/customers?${search.toString()}`;
   }, [segment, query, sort, cursor]);
 
-  const customers = useApiQuery<Paginated<Customer>>(['customers', path], path);
+  const customers = useApiQuery<Paginated<Customer>>(['customers', path], path, {
+    keepPreviousData: true,
+  });
   const rows = customers.data?.data ?? [];
 
   const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =

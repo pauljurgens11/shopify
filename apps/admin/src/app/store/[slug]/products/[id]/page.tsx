@@ -19,7 +19,7 @@ export default function EditProductPage() {
   const session = useSession();
   const product = useApiQuery<Product>(['product', id], `/admin/api/products/${id}`);
 
-  if (product.isPending || session.isPending) return <PageSkeleton />;
+  if (product.isPending || session.isPending) return <PageSkeleton layout="detail" />;
 
   if (product.error || !product.data || !session.data) {
     return (

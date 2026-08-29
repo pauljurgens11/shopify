@@ -12,6 +12,7 @@
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from '@merchant/config/constants';
 import { ERROR_CODES, type ErrorCode } from '@merchant/contracts/common';
 import {
+  keepPreviousData,
   type QueryKey,
   type UseMutationResult,
   type UseQueryResult,
@@ -158,14 +159,22 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
 export function useApiQuery<T>(
   key: QueryKey,
   path: string,
-  /** `refetchInterval` is for genuinely live cards only (G3's "Right now"). */
-  options: { enabled?: boolean; refetchInterval?: number } = {},
+  /**
+   * `refetchInterval` is for genuinely live cards only (G3's "Right now").
+   * `keepPreviousData` is for index pages whose query key changes with a
+   * tab/filter/sort/cursor: it keeps the previous page's rows on screen while
+   * the next page loads (`isPending` stays false), so a tab change updates the
+   * table in place instead of flashing the whole page back to its skeleton —
+   * Shopify's admin never re-skeletons an index it has already painted (H4).
+   */
+  options: { enabled?: boolean; refetchInterval?: number; keepPreviousData?: boolean } = {},
 ): UseQueryResult<T, ApiError> {
   return useQuery<T, ApiError>({
     queryKey: key,
     queryFn: ({ signal }) => apiFetch<T>(path, { signal }),
     enabled: options.enabled,
     refetchInterval: options.refetchInterval,
+    ...(options.keepPreviousData ? { placeholderData: keepPreviousData } : {}),
     // Re-authenticating is the shell's job; retrying a 401 just delays it.
     retry: (count, error) => error.status >= 500 && count < 1,
   });

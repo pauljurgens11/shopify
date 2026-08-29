@@ -150,7 +150,9 @@ export function PreviewPane({
         }}
       >
         {/* Three states, all visible: a broken token gets a banner with a
-            retry, a loading one a spinner — never an empty grey rectangle. */}
+            retry, a loading one a spinner — never an empty grey rectangle.
+            The iframe has no key={device}: toggling Desktop/Mobile only
+            resizes it — remounting would reload the storefront (white flash). */}
         {tokenError ? (
           <div style={{ width: '100%', padding: 'var(--p-space-400)', alignSelf: 'start' }}>
             <Banner
@@ -167,7 +169,6 @@ export function PreviewPane({
           </div>
         ) : (
           <iframe
-            key={device}
             title="Storefront preview"
             src={src}
             style={{

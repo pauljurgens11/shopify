@@ -65,7 +65,9 @@ export default function CollectionsPage() {
     return `/admin/api/collections?${search.toString()}`;
   }, [type, query, cursor]);
 
-  const collections = useApiQuery<Paginated<Collection>>(['collections', path], path);
+  const collections = useApiQuery<Paginated<Collection>>(['collections', path], path, {
+    keepPreviousData: true,
+  });
   const rows = collections.data?.data ?? [];
 
   const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =

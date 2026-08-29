@@ -130,7 +130,7 @@ export default function RefundPage() {
     };
   }, [detail, id, lineItems, shippingAmount, restock, shippingError]);
 
-  if (order.isPending) return <PageSkeleton />;
+  if (order.isPending) return <PageSkeleton layout="detail" />;
   // A bare `return null` here paints a blank white page, which reads as a
   // crash rather than a missing order.
   if (!detail) {

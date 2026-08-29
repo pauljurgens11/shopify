@@ -27,7 +27,7 @@ import {
 } from '@shopify/polaris';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
@@ -97,15 +97,25 @@ function LocationDialog({
   onSaved,
 }: {
   open: boolean;
-  /** Absent when adding. */
-  location?: Location;
+  /** Null when adding. */
+  location: Location | null;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
-  const [draft, setDraft] = useState<LocationDraft>(location ? draftFrom(location) : emptyDraft());
+  const [draft, setDraft] = useState<LocationDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  // The dialog stays mounted so Polaris can play its open/close transition
+  // (PARITY.md §Motion) — reset the form on open instead of on mount.
+  useEffect(() => {
+    if (open) {
+      setDraft(location ? draftFrom(location) : emptyDraft());
+      setError(null);
+      setSubmitted(false);
+    }
+  }, [open, location]);
 
   const nameError = draft.name.trim() === '' ? 'Name is required' : undefined;
   const patch = (changes: Partial<LocationDraft>) =>
@@ -233,8 +243,12 @@ export default function LocationsSettingsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const [editing, setEditing] = useState<Location | null>(null);
-  const [adding, setAdding] = useState(false);
+  // `location` is sticky on close so the dialog's content doesn't blank out
+  // while Polaris plays the exit transition.
+  const [dialog, setDialog] = useState<{ open: boolean; location: Location | null }>({
+    open: false,
+    location: null,
+  });
   const [deleting, setDeleting] = useState<Location | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -243,8 +257,7 @@ export default function LocationsSettingsPage() {
 
   const refresh = async (message: string) => {
     await queryClient.invalidateQueries({ queryKey: ['locations'] });
-    setAdding(false);
-    setEditing(null);
+    setDialog((current) => ({ ...current, open: false }));
     toast.show(message);
   };
 
@@ -278,7 +291,10 @@ export default function LocationsSettingsPage() {
     <Page
       backAction={{ content: 'Settings', url: `/store/${slug}/settings` }}
       title="Locations"
-      primaryAction={{ content: 'Add location', onAction: () => setAdding(true) }}
+      primaryAction={{
+        content: 'Add location',
+        onAction: () => setDialog({ open: true, location: null }),
+      }}
     >
       <Card padding="0">
         {rows.length === 0 ? (
@@ -293,7 +309,7 @@ export default function LocationsSettingsPage() {
                 Locations are the places you store inventory and fulfill orders from.
               </Text>
               <Box paddingBlockStart="300">
-                <Button variant="primary" onClick={() => setAdding(true)}>
+                <Button variant="primary" onClick={() => setDialog({ open: true, location: null })}>
                   Add location
                 </Button>
               </Box>
@@ -343,7 +359,7 @@ export default function LocationsSettingsPage() {
                   </BlockStack>
 
                   <InlineStack gap="200">
-                    <Button onClick={() => setEditing(location)}>Edit</Button>
+                    <Button onClick={() => setDialog({ open: true, location })}>Edit</Button>
                     {/* Polaris tooltips do not fire on a disabled control, so
                         the reason is wrapped around it rather than on it. */}
                     {blocked ? <Tooltip content={blocked}>{deleteButton}</Tooltip> : deleteButton}
@@ -355,16 +371,12 @@ export default function LocationsSettingsPage() {
         </BlockStack>
       </Card>
 
-      {adding ? <LocationDialog open onClose={() => setAdding(false)} onSaved={refresh} /> : null}
-      {editing ? (
-        <LocationDialog
-          open
-          key={editing.id}
-          location={editing}
-          onClose={() => setEditing(null)}
-          onSaved={refresh}
-        />
-      ) : null}
+      <LocationDialog
+        open={dialog.open}
+        location={dialog.location}
+        onClose={() => setDialog((current) => ({ ...current, open: false }))}
+        onSaved={refresh}
+      />
 
       <Modal
         open={deleting !== null}
