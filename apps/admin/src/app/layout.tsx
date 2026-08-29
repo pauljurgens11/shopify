@@ -7,9 +7,9 @@ import { Providers } from '../components/shell/providers.tsx';
 //
 // `template` is what gives every page the "Products · Merchant" title H3 asks
 // for: a segment that exports `title: 'Products'` gets the suffix for free.
-// Pages under /store/{slug} are client components and cannot export metadata at
-// all, so those titles are set from the nav registry in the shell instead
-// (components/shell/use-document-title.ts) — one place, not thirty.
+// Pages under /store/{slug} are client components and cannot export metadata,
+// so their titles come from a server `layout.tsx` per section directory — one
+// per area, not one per page (see the WS-H DECISIONS entry on page titles).
 export const metadata: Metadata = {
   title: { default: 'Merchant', template: '%s · Merchant' },
   description: 'Merchant admin',

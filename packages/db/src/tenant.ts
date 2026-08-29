@@ -11,9 +11,10 @@
  *
  * Nested writes: `data: { …, variants: { create: [...] } }` is stamped too —
  * the extension walks relation fields (from Prisma's runtime datamodel) and
- * stamps every nested `create`, `createMany.data`, and `connectOrCreate.create`
- * whose target model is tenant-scoped. JSON columns are never touched, because
- * only fields the datamodel says are relations are walked.
+ * stamps every nested `create`, `createMany.data`, `connectOrCreate.create`
+ * and `upsert.create` whose target model is tenant-scoped. JSON columns are
+ * never touched, because only fields the datamodel says are relations are
+ * walked.
  *
  * REMAINING VECTORS (scoped reviews, not the extension, cover these):
  *   - nested `connect: { id }` can reference another shop's row — Prisma offers
@@ -111,6 +112,21 @@ function stampRow(row: Record<string, unknown>, model: string, shopId: string) {
         ? envelope.connectOrCreate.map(stampCoc)
         : stampCoc(envelope.connectOrCreate);
     }
+    if (envelope.upsert !== undefined) {
+      // A nested upsert's `create` half inserts rows exactly like `create`
+      // does. Its `update` half and its `where` touch only rows already
+      // connected to the (scoped) parent, so they need no stamp.
+      const stampUpsert = (up: unknown) =>
+        up && typeof up === 'object'
+          ? {
+              ...(up as Record<string, unknown>),
+              create: stampWriteData(target, (up as Record<string, unknown>).create, shopId),
+            }
+          : up;
+      envelope.upsert = Array.isArray(envelope.upsert)
+        ? envelope.upsert.map(stampUpsert)
+        : stampUpsert(envelope.upsert);
+    }
     out[field] = envelope;
   }
   return out;
@@ -157,6 +173,20 @@ function buildClient(shopId: string) {
           if (!WHERE_OPS.has(operation) && !DATA_OPS.has(operation)) {
             throw new Error(
               `dbForShop has no scoping rule for "${operation}" — add it to WHERE_OPS/DATA_OPS in tenant.ts before using it.`,
+            );
+          }
+          // Shop reads/updates are constrained to `id = shopId`; an INSERT has
+          // no `where` to constrain, so a tenant client minting new Shop rows
+          // would be an unscoped platform write wearing a scoped client.
+          if (
+            model === SHOP_MODEL &&
+            (operation === 'create' ||
+              operation === 'createMany' ||
+              operation === 'createManyAndReturn' ||
+              operation === 'upsert')
+          ) {
+            throw new Error(
+              'dbForShop cannot create Shop rows — creating shops is dbAdmin’s job (signup, SPEC §6).',
             );
           }
 

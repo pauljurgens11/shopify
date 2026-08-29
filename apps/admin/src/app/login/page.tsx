@@ -27,6 +27,12 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [shopSlug, setShopSlug] = useState('');
+  // Email is unique per shop, not globally (SPEC §7): the same address in two
+  // stores gets a 400 asking for `shopSlug`, and the form has to actually offer
+  // that field or the message "choose a store" is a dead end. Revealed once,
+  // stays revealed — mutation errors reset on the next submit.
+  const [askForShop, setAskForShop] = useState(false);
 
   // Only ever an in-app path: an absolute URL here would be an open redirect.
   // `//host` and `/\host` both reach another origin — browsers normalise the
@@ -35,9 +41,15 @@ function LoginForm() {
   const next = nextParam && /^\/(?![/\\])/.test(nextParam) ? nextParam : null;
 
   const submit = () => {
+    const slug = shopSlug.trim().toLowerCase();
     login.mutate(
-      { email, password },
-      { onSuccess: (session) => router.replace(next ?? `/store/${session.shop.slug}`) },
+      { email, password, ...(slug ? { shopSlug: slug } : {}) },
+      {
+        onSuccess: (session) => router.replace(next ?? `/store/${session.shop.slug}`),
+        onError: (error) => {
+          if (error.fieldErrors.shopSlug) setAskForShop(true);
+        },
+      },
     );
   };
 
@@ -74,6 +86,18 @@ function LoginForm() {
             onChange={setPassword}
             error={login.error?.fieldErrors.password}
           />
+
+          {askForShop ? (
+            <TextField
+              label="Store"
+              name="shopSlug"
+              autoComplete="off"
+              helpText="The store name from its URL, e.g. aurora-supply-co."
+              value={shopSlug}
+              onChange={setShopSlug}
+              error={login.error?.fieldErrors.shopSlug}
+            />
+          ) : null}
 
           <Button submit variant="primary" fullWidth loading={login.isPending}>
             Log in

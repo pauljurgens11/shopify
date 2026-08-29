@@ -1,11 +1,22 @@
 /** Staff + customer auth (SPEC §8). Owner: WS-A. */
 
-import { PERMISSION_AREAS, STAFF_ROLES } from '@merchant/config/constants';
+import { PERMISSION_AREAS, RESERVED_SHOP_SLUGS, STAFF_ROLES } from '@merchant/config/constants';
 import { z } from 'zod';
 import { idSchema, timestampsSchema } from './common.ts';
 
 export const staffRoleSchema = z.enum(STAFF_ROLES);
 export const permissionAreaSchema = z.enum(PERMISSION_AREAS);
+
+/**
+ * Staff email INPUT: stored and matched case-folded, the same rule customers
+ * already follow (see the WSC decision). Postgres compares are case-sensitive,
+ * so without this `Paul@x.dev` at signup and `paul@x.dev` at login are two
+ * different people — and there is no password reset to recover with.
+ */
+const emailInput = z
+  .string()
+  .email()
+  .transform((value) => value.toLowerCase());
 
 /** `staff` role only: per-area booleans. owner/admin bypass this map entirely. */
 export const permissionsSchema = z.record(permissionAreaSchema, z.boolean()).default({});
@@ -25,7 +36,7 @@ export const staffUserSchema = z
 export type StaffUser = z.infer<typeof staffUserSchema>;
 
 export const loginInput = z.object({
-  email: z.string().email(),
+  email: emailInput,
   password: z.string().min(1),
   shopSlug: z.string().optional(),
 });
@@ -44,8 +55,12 @@ export const signupInput = z.object({
     .min(3)
     .max(63)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and hyphens only')
+    // `www` never resolves a storefront (lib/host.ts) and prod Caddy owns
+    // `admin.*`/`api.*` — a shop on these slugs would sign up fine and then
+    // simply not exist on the web.
+    .refine((slug) => !RESERVED_SHOP_SLUGS.has(slug), 'That store URL is reserved')
     .optional(),
-  email: z.string().email(),
+  email: emailInput,
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().max(255).optional(),
   lastName: z.string().max(255).optional(),
@@ -65,7 +80,7 @@ export const sessionResponse = z.object({
 export type SessionResponse = z.infer<typeof sessionResponse>;
 
 export const inviteStaffInput = z.object({
-  email: z.string().email(),
+  email: emailInput,
   role: staffRoleSchema,
   permissions: permissionsSchema.optional(),
 });

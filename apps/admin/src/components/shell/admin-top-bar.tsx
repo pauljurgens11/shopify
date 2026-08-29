@@ -14,7 +14,7 @@ import { NotificationIcon } from '@shopify/polaris-icons';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { storeHref } from '../../lib/nav.ts';
-import { type SearchHit, useSearch } from '../../lib/search.ts';
+import { type SearchHit, useDebouncedValue, useSearch } from '../../lib/search.ts';
 import { useLogout } from '../../lib/session.ts';
 
 /**
@@ -78,7 +78,10 @@ export function AdminTopBar({
     setShortcut(/Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K');
   }, []);
 
-  const { data: groups, isFetching } = useSearch(query);
+  // Debounced: a word is one request, not one per keystroke. The raw query
+  // still drives panel visibility, so opening and clearing feel instant.
+  const debouncedQuery = useDebouncedValue(query, 250);
+  const { data: groups, isFetching, isError } = useSearch(debouncedQuery);
 
   const hasQuery = query.trim().length > 0;
 
@@ -172,7 +175,11 @@ export function AdminTopBar({
       ) : (
         <Box padding="400">
           <Text as="p" tone="subdued">
-            {isFetching ? 'Searching\u2026' : `No results for \u201c${query.trim()}\u201d`}
+            {isError
+              ? 'Couldn\u2019t search. Check your connection and try again.'
+              : isFetching || query.trim() !== debouncedQuery.trim()
+                ? 'Searching\u2026'
+                : `No results for \u201c${query.trim()}\u201d`}
           </Text>
         </Box>
       )}

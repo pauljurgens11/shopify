@@ -269,6 +269,70 @@ describe('staff', () => {
     expect(response.statusCode).toBe(403);
   });
 
+  it('refuses to CREATE a second owner too', async () => {
+    // The PUT path always guarded this; the POST path is the one that slipped —
+    // and the state is irreversible, since an owner can never be demoted or
+    // deleted.
+    const response = await asOwner('POST', `${SETTINGS}/staff`, {
+      email: `usurper-${shop.slug}@test.dev`,
+      password: 'a-good-password',
+      role: 'owner',
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('refuses to touch the owner’s permissions', async () => {
+    // Owners bypass the permission map, so the only effect of this write is
+    // destroying the owner's sessions — a repeatable force-logout.
+    const response = await asOwner('PUT', `${SETTINGS}/staff/${shop.ownerId}`, {
+      permissions: {},
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('staff holding `settings` cannot manage staff — the area must not mint roles', async () => {
+    const selfId = await createStaffUser(shop.shopId, {
+      email: `escalate-${shop.slug}@test.dev`,
+      permissions: { settings: true },
+    });
+    const cookie = await sessionCookie(app, {
+      shopId: shop.shopId,
+      staffUserId: selfId,
+      role: 'staff',
+      permissions: { settings: true },
+    });
+    const asStaff = (method: string, url: string, payload?: unknown) =>
+      app.inject({
+        method: method as 'GET',
+        url,
+        headers: { cookie, 'x-requested-with': 'merchant-admin' },
+        ...(payload === undefined ? {} : { payload }),
+      });
+
+    // The one-request escalation: promote yourself to admin, bypass every area.
+    const promote = await asStaff('PUT', `${SETTINGS}/staff/${selfId}`, { role: 'admin' });
+    expect(promote.statusCode).toBe(403);
+
+    // Granting permissions and creating users are the same power in disguise.
+    const grant = await asStaff('PUT', `${SETTINGS}/staff/${selfId}`, {
+      permissions: { settings: true, orders: true },
+    });
+    expect(grant.statusCode).toBe(403);
+
+    const create = await asStaff('POST', `${SETTINGS}/staff`, {
+      email: `minion-${shop.slug}@test.dev`,
+      password: 'a-good-password',
+      role: 'admin',
+    });
+    expect(create.statusCode).toBe(403);
+
+    const remove = await asStaff('DELETE', `${SETTINGS}/staff/${shop.ownerId}`);
+    expect(remove.statusCode).toBe(403);
+
+    // Reading the staff list stays within the settings area.
+    expect((await asStaff('GET', `${SETTINGS}/staff`)).statusCode).toBe(200);
+  });
+
   it('rejects a second staff member on the same email', async () => {
     const payload = {
       email: `dupe-${shop.slug}@test.dev`,

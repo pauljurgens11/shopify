@@ -17,6 +17,7 @@ import type { Checkout, UpdateCheckoutInput } from '@merchant/contracts/checkout
 import { checkoutSchema } from '@merchant/contracts/checkout';
 import type { AddressDto } from '@merchant/contracts/common';
 import type { Discount, DiscountPriorUsage } from '@merchant/contracts/discounts';
+import { appliedDiscountSchema } from '@merchant/contracts/discounts';
 import { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
 import { badRequest, conflict, notFound } from '../../lib/errors.ts';
@@ -182,14 +183,50 @@ export async function priceCheckout(db: TenantClient, row: CheckoutRow): Promise
   const completedOrder = row.completedOrderId
     ? await db.order.findFirst({
         where: { id: row.completedOrderId },
-        select: { orderNumber: true },
+        select: {
+          orderNumber: true,
+          currencyCode: true,
+          subtotal: true,
+          discountTotal: true,
+          shippingTotal: true,
+          taxTotal: true,
+          total: true,
+          discountCodes: true,
+        },
       })
     : null;
+
+  // A completed checkout is a receipt: its money is whatever the order recorded
+  // at the moment of payment, never a fresh repricing. Repricing here made the
+  // thank-you page drift from the charge — a oncePerCustomer code trips
+  // priorUsage on the shopper's own order and vanishes from the totals, and any
+  // later tax/shipping/discount edit would rewrite the receipt the same way.
+  const frozen = completedOrder
+    ? (() => {
+        const cur = completedOrder.currencyCode;
+        const m = (amount: number) => ({ amount, currencyCode: cur });
+        return {
+          ...pricing,
+          totals: {
+            subtotal: m(completedOrder.subtotal),
+            discountTotal: m(completedOrder.discountTotal),
+            shippingTotal: m(completedOrder.shippingTotal),
+            taxTotal: m(completedOrder.taxTotal),
+            total: m(completedOrder.total),
+          },
+          appliedDiscounts: appliedDiscountSchema
+            .array()
+            .catch([])
+            .parse(completedOrder.discountCodes ?? []),
+          rejectedDiscount: null,
+        };
+      })()
+    : pricing;
 
   return {
     row,
     lines,
-    pricing,
+    pricing: frozen,
     settings,
     currencyCode: settings.currencyCode,
     completedOrderNumber: completedOrder?.orderNumber ?? null,

@@ -6,6 +6,7 @@
  * enforces on an explicitly supplied slug: lowercase alphanumerics separated by
  * single hyphens, 3–63 characters.
  */
+import { RESERVED_SHOP_SLUGS } from '@merchant/config/constants';
 import { newSecret } from '@merchant/config/ids';
 
 const MIN = 3;
@@ -22,9 +23,10 @@ export function slugify(input: string): string {
     .slice(0, MAX)
     .replace(/-+$/, '');
 
-  // A name of pure punctuation or non-Latin script leaves nothing usable; a
-  // random slug still gives the merchant a working store.
-  return base.length >= MIN ? base : `store-${newSecret(4)}`;
+  // A name of pure punctuation or non-Latin script leaves nothing usable, and a
+  // reserved name (a shop called "API") would derive a subdomain the platform
+  // itself answers on; a random slug still gives the merchant a working store.
+  return base.length >= MIN && !RESERVED_SHOP_SLUGS.has(base) ? base : `store-${newSecret(4)}`;
 }
 
 /**

@@ -19,6 +19,7 @@ import {
 } from '@merchant/contracts/shops';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { forbidden } from '../../../lib/errors.ts';
 import { requirePermission } from '../../../lib/permissions.ts';
 import {
   createShippingRate,
@@ -113,22 +114,35 @@ export default async function routes(app: FastifyInstance) {
   });
 
   /* ----- staff ----- */
+
+  /**
+   * Staff MUTATIONS need more than the `settings` area: SPEC §8's per-area
+   * model is only real if no single area can mint roles or permissions. A
+   * `staff` user holding `settings` could otherwise create/promote their way
+   * to `admin` in one request and bypass every other area.
+   */
+  const requireStaffManager = async (request: FastifyRequest) => {
+    if (request.staffRole === 'staff') {
+      throw forbidden('Only the store owner or an admin can manage staff.');
+    }
+  };
+
   app.get('/staff', async (request) =>
     staffListResponse.parse({ data: await listStaff(request.db) }),
   );
 
-  app.post('/staff', async (request, reply) => {
+  app.post('/staff', { preHandler: requireStaffManager }, async (request, reply) => {
     const input = createStaffInput.parse(request.body);
     const staff = await createStaff(request.db, shopIdOf(request), input);
     return reply.status(201).send(staff);
   });
 
-  app.put('/staff/:id', async (request) => {
+  app.put('/staff/:id', { preHandler: requireStaffManager }, async (request) => {
     const { id } = idParam.parse(request.params);
     return updateStaff(request.db, id, updateStaffInput.parse(request.body));
   });
 
-  app.delete('/staff/:id', async (request) => {
+  app.delete('/staff/:id', { preHandler: requireStaffManager }, async (request) => {
     const { id } = idParam.parse(request.params);
     await deleteStaff(request.db, id);
     return { id, deleted: true as const };
