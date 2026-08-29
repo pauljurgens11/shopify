@@ -24,7 +24,7 @@ export default function PlanSettingsPage() {
                 {session?.shop.name}
               </Text>
               <Text as="p" tone="subdued">
-                You are on a trial of Merchant.
+                You are on a trial of Shopify.
               </Text>
             </BlockStack>
             <Badge tone="success">Trial</Badge>

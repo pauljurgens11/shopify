@@ -88,7 +88,7 @@ export default function MarketingPage() {
                 Run a promotion
               </Text>
               <Text as="p" tone="subdued" alignment="center">
-                Discount codes are how you promote your store on Merchant. Create one, then share it
+                Discount codes are how you promote your store on Shopify. Create one, then share it
                 wherever your customers already are.
               </Text>
               <Box paddingBlockStart="300">

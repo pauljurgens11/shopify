@@ -36,7 +36,7 @@ function send(
   const headers: Record<string, string> = { host: HOST };
   if (options.token) headers.authorization = `Bearer ${options.token}`;
   else headers.cookie = options.cookie ?? cookie;
-  if (method !== 'GET') headers['x-requested-with'] = 'merchant-admin';
+  if (method !== 'GET') headers['x-requested-with'] = 'shopify-admin';
 
   return app.inject({
     method,

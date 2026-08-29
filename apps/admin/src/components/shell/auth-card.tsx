@@ -9,6 +9,7 @@
  * tokens only — no stylesheet (CLAUDE.md §7).
  */
 import { BlockStack, Box, Card, InlineStack, Text } from '@shopify/polaris';
+import { BrandLogo } from './brand-logo.tsx';
 
 export function AuthCard({
   title,
@@ -30,10 +31,10 @@ export function AuthCard({
         <div style={{ width: '100%', maxWidth: '400px', margin: 'auto' }}>
           <BlockStack gap="400">
             <InlineStack align="center">
-              {/* SPEC §1: the brand is "Merchant". Never the Shopify name or logo. */}
-              <Text as="h1" variant="headingLg">
-                Merchant
-              </Text>
+              {/* SPEC §1: the brand mark, exactly as the real admin's login. */}
+              <h1 style={{ margin: 0 }}>
+                <BrandLogo />
+              </h1>
             </InlineStack>
 
             <Card>

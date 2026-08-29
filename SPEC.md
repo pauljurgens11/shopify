@@ -23,7 +23,7 @@ This means:
 
 **Timeline: 2 days.** Everything in this doc is scoped to be achievable in 2 days by parallel agents. When in doubt: ship the KPI, cut the rest.
 
-**Branding**: The product is named **"Merchant"** in UI chrome where a brand name is unavoidable (login page title, `<title>` tags). Do NOT use the Shopify name or Shopify logo anywhere (trademark). Everything else — layout, colors, components — is Polaris and therefore looks exactly like Shopify.
+**Branding**: The product is named **"Shopify"** in UI chrome where a brand name is unavoidable (login wordmark, top-bar logo, `<title>` tags), and the mark is the Shopify bag (`apps/admin/public/shopify-bag.svg`). The name comes from `BRAND_NAME` in `packages/config/constants`, never a literal. This is an unpublished study clone built to sit pixel-for-pixel beside the real admin; it is not deployed, distributed, or offered as a product, and it must not be. Everything else — layout, colors, components — is Polaris and therefore looks exactly like Shopify.
 
 ---
 

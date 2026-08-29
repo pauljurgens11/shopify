@@ -192,8 +192,11 @@ remove it.
 - No transition fires on first paint.
 - Console free of React warnings on every page.
 
-## Words we never render
+## Brand
 
-`Shopify`, Shopify logos/glyphs, `Powered by …`. Brand string is
-**Merchant**. Product/UI copy is otherwise Shopify's own phrasing wherever
-this file quotes it.
+Brand string is **Shopify** (`BRAND_NAME`), and the logo is the Shopify bag —
+in the top bar, on the login card, and as the favicon. Product/UI copy is
+Shopify's own phrasing wherever this file quotes it.
+
+Still never rendered: `Powered by …`, and any Shopify *storefront* branding on
+a shop's own pages — a storefront wears the merchant's brand, not ours.
