@@ -57,7 +57,7 @@ function LoginForm() {
     <AuthCard
       title="Log in"
       subtitle="Continue to your store"
-      footer={<Link url="/signup">New to Merchant? Get started</Link>}
+      footer={<Link url="/signup">New to Shopify? Get started</Link>}
     >
       <Form onSubmit={submit}>
         <FormLayout>

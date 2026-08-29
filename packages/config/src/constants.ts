@@ -1,5 +1,12 @@
 /** Values SPEC fixes and more than one workstream needs. Additive only. */
 
+/**
+ * The product name, wherever a brand string is unavoidable (SPEC §1).
+ * Page titles, the login wordmark, the webhook user-agent and the transactional
+ * `From` name all read from here, so the brand is one edit, not thirty.
+ */
+export const BRAND_NAME = 'Shopify';
+
 /** SPEC §5 — cursor pagination. */
 export const DEFAULT_PAGE_SIZE = 50;
 export const MAX_PAGE_SIZE = 250;
@@ -8,12 +15,12 @@ export const MAX_PAGE_SIZE = 250;
 export const ORDER_NUMBER_START = 1001;
 
 /** SPEC §8 */
-export const SESSION_COOKIE = '_merchant_session';
+export const SESSION_COOKIE = '_shopify_session';
 /** Storefront customer login (SPEC §8, optional path) — never grants admin access. */
-export const CUSTOMER_SESSION_COOKIE = '_merchant_customer';
-export const CART_COOKIE = '_merchant_cart';
+export const CUSTOMER_SESSION_COOKIE = '_shopify_customer';
+export const CART_COOKIE = '_shopify_cart';
 export const CSRF_HEADER = 'x-requested-with';
-export const CSRF_HEADER_VALUE = 'merchant-admin';
+export const CSRF_HEADER_VALUE = 'shopify-admin';
 
 /** SPEC §13 — webhook topics. Adding one is additive; deleting one is not. */
 export const WEBHOOK_TOPICS = [
@@ -30,11 +37,11 @@ export const WEBHOOK_TOPICS = [
 ] as const;
 export type WebhookTopic = (typeof WEBHOOK_TOPICS)[number];
 
-export const WEBHOOK_HMAC_HEADER = 'x-merchant-hmac-sha256';
-export const WEBHOOK_TOPIC_HEADER = 'x-merchant-topic';
-export const WEBHOOK_SHOP_HEADER = 'x-merchant-shop-id';
+export const WEBHOOK_HMAC_HEADER = 'x-shopify-hmac-sha256';
+export const WEBHOOK_TOPIC_HEADER = 'x-shopify-topic';
+export const WEBHOOK_SHOP_HEADER = 'x-shopify-shop-id';
 /** Stable across retries — receivers de-duplicate on it (SPEC §13 idempotency). */
-export const WEBHOOK_EVENT_HEADER = 'x-merchant-event-id';
+export const WEBHOOK_EVENT_HEADER = 'x-shopify-event-id';
 export const WEBHOOK_MAX_ATTEMPTS = 5;
 /** Merchant-supplied URLs. A hung endpoint must not pin a worker slot. */
 export const WEBHOOK_TIMEOUT_MS = 5_000;

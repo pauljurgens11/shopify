@@ -113,6 +113,14 @@ function orderKind(index: number): OrderKind {
   return 'fulfilled';
 }
 
+/**
+ * Orders pinned to `jane@example.com`, the storefront demo login (issue H5) —
+ * without them her E5 account page demos an empty order history. Fixed indices
+ * like `orderKind`: two delivered mid-history orders and one recent unfulfilled
+ * one, so the account page shows both a history and something "on the way".
+ */
+const JANE_ORDER_INDICES = new Set([15, 26, 36]);
+
 export async function createOrders(
   db: PrismaClient,
   ctx: SeedContext,
@@ -154,7 +162,11 @@ export async function createOrders(
     const createdAt = placedAt[index] as Date;
     const orderId = newId('order');
     const orderNumber = FIRST_ORDER_NUMBER + index;
-    const customer = ctx.rng.pick(customers);
+    // Draw either way so pinning jane leaves every OTHER order's customer —
+    // and everything downstream of the RNG stream — exactly as it was.
+    const drawn = ctx.rng.pick(customers);
+    const jane = customers.find((c) => c.email === 'jane@example.com');
+    const customer = JANE_ORDER_INDICES.has(index) && jane ? jane : drawn;
     const card = ctx.rng.pick(DEMO_CARDS);
 
     /* --- lines ------------------------------------------------------------ */

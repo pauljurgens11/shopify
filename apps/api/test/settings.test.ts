@@ -28,7 +28,7 @@ const asOwner = (method: string, url: string, payload?: unknown) =>
   app.inject({
     method: method as 'GET',
     url,
-    headers: { cookie: ownerCookie, 'x-requested-with': 'merchant-admin' },
+    headers: { cookie: ownerCookie, 'x-requested-with': 'shopify-admin' },
     ...(payload === undefined ? {} : { payload }),
   });
 
@@ -179,7 +179,7 @@ describe('tenancy', () => {
       await app.inject({
         method: 'POST',
         url: `${SETTINGS}/shipping-rates`,
-        headers: { cookie, 'x-requested-with': 'merchant-admin' },
+        headers: { cookie, 'x-requested-with': 'shopify-admin' },
         payload: {
           name: 'Other shop only',
           price: fromDecimal('3.00', 'USD'),
@@ -305,7 +305,7 @@ describe('staff', () => {
       app.inject({
         method: method as 'GET',
         url,
-        headers: { cookie, 'x-requested-with': 'merchant-admin' },
+        headers: { cookie, 'x-requested-with': 'shopify-admin' },
         ...(payload === undefined ? {} : { payload }),
       });
 

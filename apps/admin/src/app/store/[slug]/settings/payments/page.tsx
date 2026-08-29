@@ -10,7 +10,7 @@
  * as a unit (a partial update can leave weights that mean nothing).
  *
  * No payout schedules, no fraud settings, no Shopify branding — this page is
- * "Merchant Pay".
+ * "Shopify Pay".
  */
 import { minorUnitFactor } from '@merchant/config/money';
 import type { ProcessorConfig, ProcessorKey, RoutingRule } from '@merchant/contracts/pay';

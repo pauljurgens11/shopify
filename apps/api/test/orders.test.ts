@@ -327,7 +327,7 @@ describe('timeline', () => {
     const note = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/events`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { message: 'Customer asked to ship to the office.' },
     });
     expect(note.statusCode).toBe(201);
@@ -335,7 +335,7 @@ describe('timeline', () => {
     const cancelled = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/cancel`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'customer' },
     });
     expect(cancelled.statusCode).toBe(200);
@@ -363,7 +363,7 @@ describe('timeline', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: `/admin/api/orders/${order.id}`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { note: 'Gift wrap it.', tags: ['vip'] },
     });
     expect(res.statusCode).toBe(200);
@@ -422,7 +422,7 @@ describe('POST /admin/api/orders/:id/cancel', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/cancel`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'inventory', restock: true },
     });
 
@@ -449,7 +449,7 @@ describe('POST /admin/api/orders/:id/cancel', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/cancel`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'customer' },
     });
 
@@ -466,7 +466,7 @@ describe('POST /admin/api/orders/:id/cancel', () => {
     const once = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/cancel`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'other' },
     });
     expect(once.statusCode).toBe(200);
@@ -474,7 +474,7 @@ describe('POST /admin/api/orders/:id/cancel', () => {
     const twice = await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${order.id}/cancel`,
-      headers: { cookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'other' },
     });
     expect(twice.statusCode).toBe(409);
@@ -560,7 +560,7 @@ describe('GET /admin/api/orders', () => {
     await app.inject({
       method: 'POST',
       url: `/admin/api/orders/${cancelled.id}/cancel`,
-      headers: { cookie: listCookie, 'x-requested-with': 'merchant-admin' },
+      headers: { cookie: listCookie, 'x-requested-with': 'shopify-admin' },
       payload: { reason: 'other' },
     });
 

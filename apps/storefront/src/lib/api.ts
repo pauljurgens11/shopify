@@ -33,7 +33,7 @@ export function storefrontApiUrl(shopSlug: string, path: string): string {
 }
 
 /** Cache policy for a read. Previews must never be served from a shared cache. */
-type Freshness = { revalidate: number } | 'no-store';
+type Freshness = { revalidate: number; tags?: string[] } | 'no-store';
 
 interface RequestOptions {
   /** Forward the shopper's cart cookie — required for anything cart-shaped. */
@@ -64,7 +64,7 @@ export async function apiGet<T>(
     headers: cookie ? { cookie } : {},
     ...(freshness === 'no-store'
       ? { cache: 'no-store' as const }
-      : { next: { revalidate: freshness.revalidate } }),
+      : { next: { revalidate: freshness.revalidate, tags: freshness.tags } }),
   });
 
   if (response.status === 404) return null;

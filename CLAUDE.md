@@ -167,7 +167,10 @@ The tenancy test suite (§14.1) is mandatory and blocking. Do not merge past a r
 - Data via React Query; optimistic updates on toggles.
 - **Polaris is admin-only.** Storefront, checkout, theme sections and the builder preview are **Tailwind** — that design is ours.
 
-Never render the Shopify name or logo. Brand string is "Merchant".
+Brand string is **"Shopify"**, and the mark is the Shopify bag. This is a
+study clone that is never deployed or distributed, so parity beats a
+placeholder wordmark. Read the name from `BRAND_NAME` in
+`packages/config/constants` rather than typing it — see DECISIONS.md.
 
 ---
 

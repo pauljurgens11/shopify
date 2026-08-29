@@ -74,6 +74,11 @@ export async function resetDemoData(db: PrismaClient, shopId: string): Promise<v
   await db.productVariant.deleteMany(where);
   await db.product.deleteMany(where);
 
+  await db.webhookDelivery.deleteMany(where);
+  await db.webhookSubscription.deleteMany(where);
+  await db.app.deleteMany(where);
+  await db.checkout.deleteMany(where);
+
   await db.themeVersion.deleteMany(where);
   await db.builderConversation.deleteMany(where);
 

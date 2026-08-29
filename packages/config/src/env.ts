@@ -66,7 +66,7 @@ const schema = z.object({
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASSWORD: z.string().optional().default(''),
   SMTP_SECURE: booleanish.default('false'),
-  EMAIL_FROM: z.string().default('Merchant <orders@example.com>'),
+  EMAIL_FROM: z.string().default('Shopify <orders@example.com>'),
 
   // --- AI builder (SPEC §12) ---
   // Absent is a SUPPORTED state: the builder falls back to canned presets so the
