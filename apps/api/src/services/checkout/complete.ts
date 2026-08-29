@@ -27,7 +27,7 @@ import type { CompleteCheckoutInput, CompleteCheckoutResponse } from '@merchant/
 import type { CreateOrderInput } from '@merchant/contracts/orders';
 import type { Prisma } from '@merchant/db/client';
 import type { TenantClient } from '@merchant/db/tenant';
-import { charge, PaymentError } from '@merchant/pay/router';
+import { charge, PaymentError, savePaymentMethod } from '@merchant/pay/router';
 import { badRequest, conflict } from '../../lib/errors.ts';
 import { findOrCreateByEmail } from '../customers/customers.ts';
 import { adjustMany } from '../inventory/adjust.ts';
@@ -117,12 +117,51 @@ async function findOrCreateCustomer(
   return id;
 }
 
+/**
+ * "Save this card for future purchases" (SPEC §11). Links the token that was
+ * just charged to the customer, so the admin's charge-saved-card block has
+ * something real to pick.
+ *
+ * **This runs after the money moved, so it must never throw.** The vault row
+ * can be gone and the insert can lose a race; either way the order is already
+ * paid for and a saved card is a convenience. Failing here would hand the
+ * shopper a 500 for a purchase that succeeded.
+ *
+ * Deduped on what the shopper actually sees — brand, last4, expiry — not on the
+ * token: every checkout tokenizes the card afresh, so a repeat buyer who ticks
+ * the box each time would otherwise collect an identical row per order and the
+ * admin's card picker would fill with copies.
+ */
+export async function saveCardForCustomer(
+  db: TenantClient,
+  shopId: string,
+  input: { customerId: string; cardTokenId: string },
+): Promise<void> {
+  try {
+    const card = await db.vaultCard.findUnique({
+      where: { id: input.cardTokenId },
+      select: { brand: true, last4: true, expMonth: true, expYear: true },
+    });
+    if (!card) return;
+
+    const duplicate = await db.paymentMethod.findFirst({
+      where: { customerId: input.customerId, ...card },
+      select: { id: true },
+    });
+    if (duplicate) return;
+
+    await savePaymentMethod(db, shopId, input.customerId, input.cardTokenId);
+  } catch {
+    // Deliberately swallowed — see above.
+  }
+}
+
 export async function completeCheckout(
   db: TenantClient,
   shopId: string,
   token: string,
   input: CompleteCheckoutInput,
-  options: { cartToken?: string } = {},
+  options: { cartToken?: string; sessionCustomerId?: string | null } = {},
 ): Promise<CompleteCheckoutResponse> {
   const existing = await findCheckoutRow(db, token);
 
@@ -299,11 +338,17 @@ export async function completeCheckout(
 
     // Everything past this point has already been paid for: it must never be
     // able to fail the sale.
-    await afterSale(db, {
+    await afterSale(db, shopId, {
       orderId: order.id,
       cartToken: options.cartToken ?? null,
       checkoutId: existing.id,
       reservedAt,
+      // Only a proven session may file a card under an account. The order's
+      // customer is whoever the shopper *typed*, and E5's register claims a
+      // guest row by email — so saving on the typed email alone would hand the
+      // next person to sign up on that address a stranger's card.
+      saveCardFor: input.saveCard && options.sessionCustomerId === customerId ? customerId : null,
+      cardTokenId: input.cardTokenId,
     });
 
     return {
@@ -401,11 +446,15 @@ function declineMessage(errorCode: string | null): string {
  */
 async function afterSale(
   db: TenantClient,
+  shopId: string,
   input: {
     orderId: string;
     cartToken: string | null;
     checkoutId: string;
     reservedAt: Date;
+    /** The customer to save the charged card against, or null to skip. */
+    saveCardFor: string | null;
+    cardTokenId: string;
   },
 ): Promise<void> {
   // Empty the cart rather than clearing only the cookie: the browser may still
@@ -432,6 +481,15 @@ async function afterSale(
     });
   } catch {
     // Cosmetic linkage only.
+  }
+
+  // "Save this card for future purchases" — the whole point of E6, and the only
+  // way a `PaymentMethod` row exists outside the seed. Swallows its own errors.
+  if (input.saveCardFor) {
+    await saveCardForCustomer(db, shopId, {
+      customerId: input.saveCardFor,
+      cardTokenId: input.cardTokenId,
+    });
   }
 
   // `ordersCount` / `totalSpent` are NOT written here: C4 landed and derives

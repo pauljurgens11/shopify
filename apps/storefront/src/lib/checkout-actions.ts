@@ -16,6 +16,7 @@
 import { CART_COOKIE } from '@merchant/config/constants';
 import type { Checkout, CompleteCheckoutResponse } from '@merchant/contracts/checkout';
 import { cookies } from 'next/headers';
+import { customerCookieHeader } from '../app/account/session.ts';
 import { storefrontApiUrl } from './api.ts';
 import { resolveShopSlug } from './tenant.ts';
 
@@ -78,23 +79,32 @@ export interface PayResult {
  * shopper can try another card. `idempotencyKey` is generated per click by the
  * caller: the same key makes a double-submit charge once, a new key is what
  * lets a retry after a decline reach the processor at all.
+ *
+ * The customer session cookie rides along because `saveCard` is only honoured
+ * for a signed-in shopper (E6) — it is httpOnly and belongs to the storefront
+ * origin, so only this server hop can forward it.
  */
 export async function payForCheckout(
   token: string,
   cardTokenId: string,
   idempotencyKey: string,
+  saveCard = false,
 ): Promise<PayResult> {
   const slug = await shopOrThrow();
   const jar = await cookies();
   const cart = jar.get(CART_COOKIE)?.value;
+  const customer = await customerCookieHeader();
+  const cookie = [cart ? `${CART_COOKIE}=${cart}` : null, customer ?? null]
+    .filter(Boolean)
+    .join('; ');
 
   const response = await fetch(storefrontApiUrl(slug, `/checkouts/${token}/complete`), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      ...(cart ? { cookie: `${CART_COOKIE}=${cart}` } : {}),
+      ...(cookie ? { cookie } : {}),
     },
-    body: JSON.stringify({ cardTokenId, idempotencyKey }),
+    body: JSON.stringify({ cardTokenId, idempotencyKey, saveCard }),
     cache: 'no-store',
   });
 

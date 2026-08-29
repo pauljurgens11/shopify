@@ -28,6 +28,7 @@ import {
 } from '../../services/checkout/checkout.ts';
 import { completeCheckout } from '../../services/checkout/complete.ts';
 import { privateResponse } from '../../services/storefront/cache.ts';
+import { currentCustomerId } from '../../services/storefront/customer-sessions.ts';
 
 const tokenParam = z.object({ token: z.string().min(1).max(128) });
 
@@ -84,9 +85,14 @@ export default async function routes(app: FastifyInstance) {
     async (request, reply) => {
       const { token } = tokenParam.parse(request.params);
       const input = completeCheckoutInput.parse(request.body);
+      const shopId = requireShop(request);
 
-      const result = await completeCheckout(request.db, requireShop(request), token, input, {
+      const result = await completeCheckout(request.db, shopId, token, input, {
         cartToken: request.cookies[CART_COOKIE],
+        // Checkout itself stays unauthenticated — the token in the URL is the
+        // credential. A customer session, when there is one, only decides
+        // whether `saveCard` may attach the card to that account (E6).
+        sessionCustomerId: await currentCustomerId(request, shopId),
       });
 
       // The cart has done its job; leaving it would show the shopper items they
