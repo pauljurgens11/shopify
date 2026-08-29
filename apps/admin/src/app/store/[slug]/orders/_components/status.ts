@@ -105,3 +105,8 @@ export function capturedTotal(payments: Payment[], currencyCode: string): MoneyD
   );
   return { amount, currencyCode };
 }
+
+/** "1 item" / "3 items" — Shopify never renders "1 items". */
+export function itemCountLabel(count: number): string {
+  return count === 1 ? '1 item' : `${count} items`;
+}

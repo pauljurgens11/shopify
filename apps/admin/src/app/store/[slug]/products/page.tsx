@@ -15,9 +15,6 @@ import type { Paginated } from '@merchant/contracts/common';
 import type { Product } from '@merchant/contracts/products';
 import {
   Badge,
-  BlockStack,
-  Box,
-  Button,
   Card,
   IndexFilters,
   IndexTable,
@@ -34,7 +31,12 @@ import { ImageIcon } from '@shopify/polaris-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import {
+  IndexFooterHelp,
+  IndexNoMatchState,
+  IndexPromoEmptyState,
+  IndexTableSkeleton,
+} from '../../../../components/shell/index-chrome.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { type ApiError, apiFetch, useApiQuery } from '../../../../lib/api.ts';
 
@@ -148,9 +150,14 @@ export default function ProductsPage() {
       apiFetch(`/admin/api/products/${id}`, { method: 'PUT', body: { status: next } }),
     );
 
-  if (products.isPending) return <PageSkeleton fullWidth primaryAction />;
+  // Chrome first, skeleton only the data region (docs/parity/index-tables.md):
+  // the header, the card, the tabs and the filter row render straight away and
+  // only the table body is grey. `loading` also holds the empty states back —
+  // an index that has not answered yet is not an index with nothing in it.
+  const loading = products.isPending;
 
   const empty =
+    !loading &&
     rows.length === 0 &&
     query.trim() === '' &&
     vendor.trim() === '' &&
@@ -165,24 +172,15 @@ export default function ProductsPage() {
     >
       <Card padding="0">
         {empty ? (
-          // Hand-built rather than Polaris `EmptyState`, which requires an
-          // `image`: the only on-brand illustrations are Shopify's own CDN
-          // assets, and PARITY.md forbids rendering those.
-          <Box padding="800">
-            <BlockStack gap="200" inlineAlign="center">
-              <Text as="h2" variant="headingMd">
-                Add your first product
-              </Text>
-              <Text as="p" tone="subdued" alignment="center">
-                Add products to sell them on your online store.
-              </Text>
-              <Box paddingBlockStart="300">
-                <Button variant="primary" url={`/store/${slug}/products/new`}>
-                  Add product
-                </Button>
-              </Box>
-            </BlockStack>
-          </Box>
+          // Kind B — Products is the one index with the LEFT-aligned promo
+          // block rather than the centred column (docs/parity/index-tables.md).
+          // Shopify's second section ("Find products to sell") is dropshipping,
+          // which we do not have, so it is absent rather than dead (§8).
+          <IndexPromoEmptyState
+            heading="Add your products"
+            body="Start by stocking your store with products your customers will love"
+            action={{ content: 'Add product', url: `/store/${slug}/products/new` }}
+          />
         ) : (
           <>
             <IndexFilters
@@ -296,11 +294,14 @@ export default function ProductsPage() {
                 },
               }}
               emptyState={
-                <Box padding="800">
-                  <Text as="p" tone="subdued" alignment="center">
-                    No products found. Try changing the search or filters.
-                  </Text>
-                </Box>
+                loading ? (
+                  <IndexTableSkeleton media />
+                ) : (
+                  <IndexNoMatchState
+                    heading="No products found"
+                    body="Try changing the search term or removing some filters."
+                  />
+                )
               }
             >
               {rows.map((product, index) => (
@@ -339,6 +340,8 @@ export default function ProductsPage() {
           </>
         )}
       </Card>
+
+      <IndexFooterHelp resource="products" topic="products" />
 
       <Modal
         open={confirmingDelete}

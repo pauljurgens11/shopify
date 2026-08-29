@@ -13,7 +13,13 @@
  * failed payment row again. A TRANSPORT failure keeps the key, so retrying a
  * charge whose response was lost replays it instead of charging twice.
  */
-import { format, fromDecimal, type Money, minorUnitFactor } from '@merchant/config/money';
+import {
+  format,
+  fromDecimal,
+  type Money,
+  minorUnitFactor,
+  toDecimal,
+} from '@merchant/config/money';
 import type { OrderDetail } from '@merchant/contracts/orders';
 import type { Payment, PaymentMethod } from '@merchant/contracts/pay';
 import {
@@ -60,8 +66,7 @@ const brandLabel = (brand: string) => BRAND_LABELS[brand] ?? 'Card';
 
 /** `{amount: 1050}` → `"10.50"` — what the amount field starts out holding. */
 function toAmountString(money: Money): string {
-  const factor = minorUnitFactor(money.currencyCode);
-  return (money.amount / factor).toFixed(factor === 1 ? 0 : 2);
+  return toDecimal(money).toFixed(minorUnitFactor(money.currencyCode) === 1 ? 0 : 2);
 }
 
 export function ChargeSavedCard({

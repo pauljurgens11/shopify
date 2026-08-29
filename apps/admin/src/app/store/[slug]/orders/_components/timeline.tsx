@@ -22,7 +22,7 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function Timeline({

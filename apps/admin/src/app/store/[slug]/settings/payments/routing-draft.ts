@@ -10,7 +10,7 @@
  * before sending, so two rules that match the same charges cannot dodge the
  * server's check by listing brands in a different order.
  */
-import { fromDecimal, type Money, minorUnitFactor } from '@merchant/config/money';
+import { fromDecimal, type Money, minorUnitFactor, toDecimal } from '@merchant/config/money';
 import type { RoutingRule } from '@merchant/contracts/pay';
 
 type CardBrand = NonNullable<RoutingRule['conditions']['cardBrands']>[number];
@@ -53,8 +53,7 @@ export function newRuleDraft(processorConfigId: string): RuleDraft {
 
 /** `{amount: 1050}` → `"10.50"` — the string a money text field edits. */
 function toAmountString(money: Money): string {
-  const factor = minorUnitFactor(money.currencyCode);
-  return (money.amount / factor).toFixed(factor === 1 ? 0 : 2);
+  return toDecimal(money).toFixed(minorUnitFactor(money.currencyCode) === 1 ? 0 : 2);
 }
 
 export function toDrafts(rules: RoutingRule[]): RuleDraft[] {

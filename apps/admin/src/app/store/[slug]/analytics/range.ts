@@ -6,7 +6,7 @@
  * range, a delta computed against zero, or an axis rendering 129900 instead of
  * $1,299.00 — and none of that is visible in a screenshot.
  */
-import { type Money, minorUnitFactor } from '@merchant/config/money';
+import { type Money, toDecimal } from '@merchant/config/money';
 
 export type RangePreset =
   | 'today'
@@ -224,7 +224,7 @@ export function funnelStages(funnel: {
  * slip that renders a $1,299.00 day as a 129,900 spike.
  */
 export function toChartValue(amount: number, currencyCode: string): number {
-  return amount / minorUnitFactor(currencyCode);
+  return toDecimal({ amount, currencyCode });
 }
 
 export function chartSeries(

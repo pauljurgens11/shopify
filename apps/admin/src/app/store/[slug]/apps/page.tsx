@@ -13,6 +13,7 @@ import { BlockStack, Box, Button, Card, IndexTable, Page, Text } from '@shopify/
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { IndexFooterHelp } from '../../../../components/shell/index-chrome.tsx';
 import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
 import { useToast } from '../../../../components/shell/toast-provider.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
@@ -134,6 +135,8 @@ export default function AppsPage() {
           </IndexTable>
         )}
       </Card>
+
+      <IndexFooterHelp resource="apps" topic="apps" />
 
       <CreateAppModal
         open={creating}

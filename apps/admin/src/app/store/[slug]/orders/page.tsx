@@ -14,7 +14,6 @@ import { format } from '@merchant/config/money';
 import type { Paginated } from '@merchant/contracts/common';
 import type { OrderSummary } from '@merchant/contracts/orders';
 import {
-  Box,
   Card,
   ChoiceList,
   IndexFilters,
@@ -26,9 +25,15 @@ import {
 } from '@shopify/polaris';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { PageSkeleton } from '../../../../components/shell/page-skeleton.tsx';
+import {
+  IndexEmptyState,
+  IndexFooterHelp,
+  IndexNoMatchState,
+  IndexTableSkeleton,
+} from '../../../../components/shell/index-chrome.tsx';
 import { useApiQuery } from '../../../../lib/api.ts';
 import { CancelledBadge, FinancialBadge, FulfillmentBadge } from './_components/order-badges.tsx';
+import { itemCountLabel } from './_components/status.ts';
 
 const PAGE_SIZE = 50;
 
@@ -86,16 +91,22 @@ function toChoices(labels: Record<string, string>) {
 const PAYMENT_STATUS_CHOICES = toChoices(PAYMENT_STATUS_LABELS);
 const FULFILLMENT_STATUS_CHOICES = toChoices(FULFILLMENT_STATUS_LABELS);
 
-/** "May 3 at 2:14 pm" — Shopify's order-row date format. */
+/**
+ * "May 3 at 2:14 pm" — Shopify's order-row date format. Locale is pinned:
+ * `undefined` renders the host's locale ("3 May at 14:14" on a en-GB machine)
+ * while the Apps pages pin en-US, so the two disagreed on one screen path.
+ */
 function orderDate(iso: string): string {
   return new Date(iso)
-    .toLocaleString(undefined, {
+    .toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     })
-    .replace(',', ' at');
+    .replace(',', ' at')
+    .replace(' AM', ' am')
+    .replace(' PM', ' pm');
 }
 
 /**
@@ -180,12 +191,14 @@ export default function OrdersPage() {
       : [],
   );
 
-  if (orders.isPending) return <PageSkeleton fullWidth />;
+  // Chrome first, skeleton only the data region (docs/parity/index-tables.md).
+  const loading = orders.isPending;
 
   // The illustrated "no orders yet" state is only honest when nothing is
   // narrowing the list; a filter that matched nothing gets the table's quiet
   // no-match state instead (docs/parity/index-tables.md, empty-state kind C).
   const unfiltered =
+    !loading &&
     selectedTab === 'all' &&
     query.trim() === '' &&
     paymentStatus.length === 0 &&
@@ -196,21 +209,14 @@ export default function OrdersPage() {
     <Page title="Orders" fullWidth>
       <Card padding="0">
         {rows.length === 0 && unfiltered ? (
-          // Hand-built rather than Polaris `EmptyState`, which needs an `image`
-          // — the only on-brand illustrations are Shopify's own CDN assets and
-          // PARITY.md forbids rendering those (same call B5 and A3 made).
-          <Box padding="800">
-            <div style={{ textAlign: 'center' }}>
-              <Text as="h2" variant="headingMd">
-                Your orders will show up here
-              </Text>
-              <Box paddingBlockStart="200">
-                <Text as="p" tone="subdued">
-                  Once a customer checks out, their order appears in this list.
-                </Text>
-              </Box>
-            </div>
-          </Box>
+          // Kind A, with Shopify's own heading. Its captured BODY is
+          // trial-specific ("you need to select a plan") so the parity file
+          // says to take the heading and not that line; there is no primary
+          // action because draft orders are cut (SPEC §2).
+          <IndexEmptyState
+            heading="Your orders will show here"
+            body="Once a customer checks out, their order appears in this list."
+          />
         ) : (
           <>
             <IndexFilters
@@ -319,11 +325,14 @@ export default function OrdersPage() {
                 },
               }}
               emptyState={
-                <div style={{ padding: 'var(--p-space-800)', textAlign: 'center' }}>
-                  <Text as="p" tone="subdued">
-                    No orders found. Try changing the search or filters.
-                  </Text>
-                </div>
+                loading ? (
+                  <IndexTableSkeleton />
+                ) : (
+                  <IndexNoMatchState
+                    heading="No orders found"
+                    body="Try changing the search term or removing some filters."
+                  />
+                )
               }
             >
               {rows.map((order, index) => (
@@ -360,7 +369,9 @@ export default function OrdersPage() {
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text as="span" tone="subdued">
-                      {order.lineItems.reduce((sum, line) => sum + line.quantity, 0)} items
+                      {itemCountLabel(
+                        order.lineItems.reduce((sum, line) => sum + line.quantity, 0),
+                      )}
                     </Text>
                   </IndexTable.Cell>
                 </IndexTable.Row>
@@ -369,6 +380,8 @@ export default function OrdersPage() {
           </>
         )}
       </Card>
+
+      <IndexFooterHelp resource="orders" topic="orders" />
     </Page>
   );
 }

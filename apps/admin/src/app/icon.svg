@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Merchant">
-  <title>Merchant</title>
-  <rect width="32" height="32" rx="7" fill="#1a1a1a"/>
-  <path d="M11 12V10.5a5 5 0 0 1 10 0V12h2.2a1 1 0 0 1 1 .93l.73 10.2A1.8 1.8 0 0 1 23.14 25H8.86a1.8 1.8 0 0 1-1.8-1.87l.73-10.2a1 1 0 0 1 1-.93H11Zm2 0h6v-1.5a3 3 0 1 0-6 0V12Z" fill="#fff"/>
-</svg>

@@ -1,41 +1,36 @@
 'use client';
 
 /**
- * The smart-collection condition builder (PARITY.md → Collection form).
- * Owner: WS-B (B6).
+ * The smart-collection condition builder
+ * (docs/parity/collection-detail.md → Left column 2). Owner: WS-B (B6).
  *
  * Shopify's shape: an any/all radio pair, then a row per condition — column,
- * relation, value — and a live list of what currently matches.
+ * relation, value. It renders INSIDE the `Collection items` card, above the
+ * grid, because the grid below it is the live answer to what the conditions
+ * match — the builder is not its own card.
  *
- * The preview comes from the API (`POST /admin/api/collections/preview`), never
- * from re-running the rules in the browser: the translator is subtle (a negated
- * text rule has to include NULLs, a tag is a whole-array match) and two
- * implementations would drift the first time a relation was added.
+ * The matching products come from the API (`POST /admin/api/collections/preview`)
+ * by way of the grid, never from re-running the rules in the browser: the
+ * translator is subtle (a negated text rule has to include NULLs, a tag is a
+ * whole-array match) and two implementations would drift the first time a
+ * relation was added.
  */
 import type { CollectionRule, CollectionRuleSet } from '@merchant/contracts/collections';
-import type { Paginated } from '@merchant/contracts/common';
-import type { Product } from '@merchant/contracts/products';
 import {
   BlockStack,
   Box,
   Button,
-  Card,
+  InlineError,
   InlineStack,
   RadioButton,
   Select,
-  Spinner,
-  Text,
   TextField,
-  Thumbnail,
 } from '@shopify/polaris';
-import { ImageIcon } from '@shopify/polaris-icons';
-import { useQuery } from '@tanstack/react-query';
+import { XIcon } from '@shopify/polaris-icons';
 import { useState } from 'react';
-import { apiFetch } from '../../../../../lib/api.ts';
 import {
   columnOptions,
   columnSpec,
-  completeRules,
   conditionToInput,
   inputToCondition,
   newRule,
@@ -103,92 +98,30 @@ function RuleValueField({
   );
 }
 
-function MatchingProducts({ ruleSet }: { ruleSet: CollectionRuleSet }) {
-  const rules = completeRules(ruleSet.rules);
-  const key = JSON.stringify({ d: ruleSet.appliedDisjunctively, rules });
-
-  const preview = useQuery<Paginated<Product>>({
-    queryKey: ['collection-preview', key],
-    queryFn: () =>
-      apiFetch<Paginated<Product>>('/admin/api/collections/preview', {
-        method: 'POST',
-        body: { ruleSet: { appliedDisjunctively: ruleSet.appliedDisjunctively, rules }, limit: 10 },
-      }),
-    // An incomplete condition matches nothing worth showing, and the API
-    // refuses an empty rule set outright.
-    enabled: rules.length > 0,
-    retry: false,
-  });
-
-  if (rules.length === 0) {
-    return (
-      <Text as="p" tone="subdued">
-        Add a condition to see which products match.
-      </Text>
-    );
-  }
-
-  if (preview.isPending) {
-    return (
-      <InlineStack gap="200" blockAlign="center">
-        <Spinner size="small" accessibilityLabel="Finding matching products" />
-        <Text as="span" tone="subdued">
-          Finding products…
-        </Text>
-      </InlineStack>
-    );
-  }
-
-  if (preview.error) {
-    return (
-      <Text as="p" tone="critical">
-        {preview.error.message}
-      </Text>
-    );
-  }
-
-  const products = preview.data?.data ?? [];
-  if (products.length === 0) {
-    return (
-      <Text as="p" tone="subdued">
-        No products match these conditions yet.
-      </Text>
-    );
-  }
-
-  return (
-    <BlockStack gap="200">
-      {products.map((product) => (
-        <InlineStack key={product.id} gap="300" blockAlign="center" wrap={false}>
-          <Thumbnail source={product.images[0]?.url ?? ImageIcon} alt="" size="small" />
-          <Text as="span" variant="bodyMd">
-            {product.title}
-          </Text>
-        </InlineStack>
-      ))}
-    </BlockStack>
-  );
-}
-
 export function RulesBuilder({
   ruleSet,
   currencyCode,
+  error,
   onChange,
 }: {
   ruleSet: CollectionRuleSet;
   currencyCode: string;
+  /** Shown once the merchant has tried to save an incomplete rule set. */
+  error?: string;
   onChange: (ruleSet: CollectionRuleSet) => void;
 }) {
   const setRule = (index: number, rule: CollectionRule) =>
     onChange({ ...ruleSet, rules: ruleSet.rules.map((r, i) => (i === index ? rule : r)) });
 
   return (
-    <Card>
-      <BlockStack gap="400">
-        <Text as="h2" variant="headingSm">
-          Conditions
-        </Text>
-
+    <Box
+      background="bg-surface-secondary"
+      borderRadius="200"
+      borderWidth="025"
+      borderColor="border"
+      padding="300"
+    >
+      <BlockStack gap="300">
         <InlineStack gap="400">
           <RadioButton
             label="Products must match all conditions"
@@ -217,7 +150,7 @@ export function RulesBuilder({
               blockAlign="end"
               wrap
             >
-              <Box minWidth="180px">
+              <Box minWidth="150px">
                 <Select
                   label={index === 0 ? 'Condition' : ''}
                   labelHidden={index > 0}
@@ -226,7 +159,7 @@ export function RulesBuilder({
                   onChange={(column) => setRule(index, withColumn(rule, column as RuleColumn))}
                 />
               </Box>
-              <Box minWidth="180px">
+              <Box minWidth="150px">
                 <Select
                   label="Relation"
                   labelHidden
@@ -237,7 +170,7 @@ export function RulesBuilder({
                   }
                 />
               </Box>
-              <Box minWidth="180px">
+              <Box minWidth="150px">
                 <RuleValueField
                   // Remount on a column change, so the text restarts from the
                   // (possibly cleared) condition rather than the old column's.
@@ -250,37 +183,28 @@ export function RulesBuilder({
               </Box>
               <Button
                 variant="tertiary"
-                tone="critical"
+                icon={XIcon}
                 accessibilityLabel={`Remove condition ${index + 1}`}
                 disabled={ruleSet.rules.length === 1}
                 onClick={() =>
                   onChange({ ...ruleSet, rules: ruleSet.rules.filter((_, i) => i !== index) })
                 }
-              >
-                Remove
-              </Button>
+              />
             </InlineStack>
           ))}
         </BlockStack>
+
+        {error ? <InlineError message={error} fieldID="collection-conditions" /> : null}
 
         <InlineStack>
           <Button
             variant="plain"
             onClick={() => onChange({ ...ruleSet, rules: [...ruleSet.rules, newRule()] })}
           >
-            + Add another condition
+            Add another condition
           </Button>
         </InlineStack>
-
-        <Box borderBlockStartWidth="025" borderColor="border" paddingBlockStart="400">
-          <BlockStack gap="300">
-            <Text as="h3" variant="headingXs">
-              Matching products
-            </Text>
-            <MatchingProducts ruleSet={ruleSet} />
-          </BlockStack>
-        </Box>
       </BlockStack>
-    </Card>
+    </Box>
   );
 }
