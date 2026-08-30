@@ -7,6 +7,7 @@
 | **Ended** | 2026-08-28T16:31:39.946Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/modern-ux-ui-animations-28cf61` |
 | **Branch** | `ws-h/issue-h4-motion-parity` |
+| **Pull request** | #76 (MERGED) |
 | **Model** | `claude-fable-5` |
 | **Claude Code** | 2.1.246 |
 | **Archived** | no |

@@ -1,9 +1,9 @@
 # Chat archive
 
-Every Claude Code session behind this repo, exported to Markdown — the whole two-day build,
-from the first spec conversation to the last parity fix.
+Every Claude Code session behind this repo, exported to Markdown — the whole build,
+from the first spec conversation to the last fix on the live demo.
 
-**84 sessions** · 2026-08-28 – 2026-08-29 · 6 archived · main checkout + every agent worktree
+**89 sessions** · 2026-08-28 – 2026-08-30 · 6 archived · main checkout + every agent worktree
 
 ## What's in each file
 
@@ -19,12 +19,14 @@ Secrets are stripped on export (API keys, tokens, connection-string passwords) a
 `[REDACTED …]`. Regenerate with:
 
 ```bash
+python3 scripts/export-chat-sessions-meta.py docs/chat-archive/sessions.json
 python3 scripts/export-chat-archive.py docs/chat-archive docs/chat-archive/sessions.json
 ```
 
 `sessions.json` holds the sidebar titles, PR numbers and archived flags, which live in the
-Claude Code app rather than in the transcripts themselves. Refresh it when sessions are added
-or their PRs land, then re-run the export — existing files are rewritten in place.
+Claude Code app rather than in the transcripts themselves — the first command reads them out
+of the app's session store, the second writes the Markdown. Existing files are rewritten in
+place, so a refresh after new sessions or a landed PR is just those two commands.
 
 ## Sessions
 
@@ -74,14 +76,14 @@ or their PRs land, then re-run the export — existing files are rewritten in pl
 | 40 | [Critical review skill for workstream F](sessions/2026-08-28-critical-review-skill-for-workstream-f.md) | 13 | #83 (MERGED) | `ws-f/review-fixes` |
 | 41 | [Stale processes resource usage](sessions/2026-08-28-stale-processes-resource-usage.md) | 2 | — | `main` |
 | 42 | [Outstanding issues review](sessions/2026-08-28-outstanding-issues-review.md) | 2 | — | `main` |
-| 43 | [Critical review skill for workstream G](sessions/2026-08-28-critical-review-skill-for-workstream-g.md) | 4 | — | `ws-g/review-fixes` |
-| 44 | [E2 and E3 status](sessions/2026-08-28-e2-and-e3-status.md) | 9 | — | `ws-h/index-parity` |
+| 43 | [Critical review skill for workstream G](sessions/2026-08-28-critical-review-skill-for-workstream-g.md) | 4 | #77 (MERGED) | `ws-g/review-fixes` |
+| 44 | [E2 and E3 status](sessions/2026-08-28-e2-and-e3-status.md) | 9 | #81 (MERGED) | `ws-h/index-parity` |
 | 45 | [Task count](sessions/2026-08-28-task-count.md) | 1 | — | `claude/task-count-7bb80a` |
 | 46 | [Repository code and test metrics](sessions/2026-08-28-repository-code-and-test-metrics.md) | 1 | — | `claude/busy-mcclintock-c09cfd` |
-| 47 | [E2E test strategy review](sessions/2026-08-28-e2e-test-strategy-review.md) | 3 | — | `ws-f/ai-queue-shared-producer` |
+| 47 | [E2E test strategy review](sessions/2026-08-28-e2e-test-strategy-review.md) | 3 | #79 (MERGED) | `ws-f/ai-queue-shared-producer` |
 | 48 | [Completed workstreams](sessions/2026-08-28-completed-workstreams.md) | 2 | — | `claude/completed-workstreams-ac5356` |
-| 49 | [Critical review for workstream D](sessions/2026-08-28-critical-review-for-workstream-d.md) | 4 | — | `ws-d/review-fixes` |
-| 50 | [Modern UX/UI animations issue](sessions/2026-08-28-modern-ux-ui-animations-issue.md) | 2 | — | `ws-h/issue-h4-motion-parity` |
+| 49 | [Critical review for workstream D](sessions/2026-08-28-critical-review-for-workstream-d.md) | 4 | #78 (MERGED) | `ws-d/review-fixes` |
+| 50 | [Modern UX/UI animations issue](sessions/2026-08-28-modern-ux-ui-animations-issue.md) | 2 | #76 (MERGED) | `ws-h/issue-h4-motion-parity` |
 | 51 | [Logic testing](sessions/2026-08-28-logic-testing.md) | 2 | — | `main` |
 | 52 | [App functionality and multi-shop capabilities](sessions/2026-08-28-app-functionality-and-multi-shop-capabilities.md) | 3 | — | `main` |
 | 53 | [Issue h4 animations](sessions/2026-08-28-issue-h4-animations.md) | 7 | #87 (MERGED) | `ws-h/ux-motion-parity` |
@@ -115,12 +117,22 @@ or their PRs land, then re-run the export — existing files are rewritten in pl
 | 76 | [Repo review skill execution](sessions/2026-08-29-repo-review-skill-execution.md) | 8 | #111 (MERGED) | `claude/repo-review-skill-d78732` |
 | 77 | [Undone issues](sessions/2026-08-29-undone-issues.md) | 5 | #121 (MERGED) | `ws-e/e9-agent-log` |
 | 78 | [Issue e8](sessions/2026-08-29-issue-e8.md) | 2 | #125 (MERGED) | `ws-e/action-hang-production` |
-| 79 | [Export project chats](sessions/2026-08-29-export-project-chats.md) | 3 | — | `main` |
+| 79 | [Export project chats](sessions/2026-08-29-export-project-chats.md) | 3 | #117 (MERGED) | `main` |
 | 80 | [Local app testing](sessions/2026-08-29-local-app-testing.md) | 3 | — | `claude/local-app-testing-39495f` |
 | 81 | [Project deployment readiness](sessions/2026-08-29-project-deployment-readiness.md) | 3 | #120 (MERGED) | `ws-a/deploy-runbook` |
 | 82 | [B7 demo impact assessment](sessions/2026-08-29-b7-demo-impact-assessment.md) | 1 | — | `main` |
 | 83 | [Stale worktrees cleanup](sessions/2026-08-29-stale-worktrees-cleanup.md) | 3 | — | `main` |
-| 84 | [Deployment readiness check](sessions/2026-08-29-deployment-readiness-check.md) | 14 | #124 (MERGED) | `ws-qa/e2e-fresh-shop-empty-state` |
+| 84 | [Deployment readiness check](sessions/2026-08-29-deployment-readiness-check.md) | 29 | #124 (MERGED) | `ws-f/stock-photo-pool` |
+
+### 2026-08-30
+
+| # | Session | Prompts | PR | Branch / worktree |
+|---:|---|---:|---|---|
+| 85 | [Shop URL in admin views](sessions/2026-08-30-shop-url-in-admin-views.md) | 1 | — | `main` |
+| 86 | [Product creation to e-shop latency](sessions/2026-08-30-product-creation-to-e-shop-latency.md) | 12 | #131 (MERGED) | `ws-e/shipping-rate-defaults` |
+| 87 | [Stale Claude worktrees cleanup](sessions/2026-08-30-stale-claude-worktrees-cleanup.md) | 1 | — | `main` |
+| 88 | [Labubu shop product not appearing in listings](sessions/2026-08-30-labubu-shop-product-not-appearing-in-listings.md) | 5 | #133 (MERGED) | `ws-e/collections-all` |
+| 89 | [Claude chats documentation](sessions/2026-08-30-claude-chats-documentation.md) | 1 | — | `claude/add-chats-docs-1eb8d2` |
 
 🗄️ = archived in the Claude Code sidebar. Archived sessions are included here on purpose —
 they are the earliest planning conversations and the first workstream runs.
