@@ -77,6 +77,21 @@ export const RATE_LIMITS = {
   checkoutPayment: { max: 5, windowMs: 60_000 },
 } as const;
 
+/**
+ * Shopify's built-in "all products" collection, and the handle a theme can
+ * always link to. No row backs it: the storefront resolves it to every live
+ * product, so it works on a shop that has never created a collection. A
+ * merchant who creates a real collection on this handle wins over it.
+ */
+export const ALL_PRODUCTS_HANDLE = 'all';
+
+/**
+ * The default collection every new shop opens with (SPEC §12). Every theme
+ * preset's `featured-collection` section points at this handle, so a shop
+ * without it renders an empty home page — see `installDefaultCollection`.
+ */
+export const DEFAULT_COLLECTION_HANDLE = 'featured';
+
 /** SPEC §10 — storefront cache policy. */
 export const STOREFRONT_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 

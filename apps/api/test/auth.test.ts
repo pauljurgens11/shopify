@@ -6,6 +6,7 @@
  * here covers the auth/tenancy seam that the other seven workstreams build on.
  */
 import { CSRF_HEADER, CSRF_HEADER_VALUE, SESSION_COOKIE } from '@merchant/config/constants';
+import { newId } from '@merchant/config/ids';
 import { dbAdmin } from '@merchant/db/client';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -92,6 +93,58 @@ describe('POST /auth/signup', () => {
     expect(session).toBeDefined();
     expect(session?.httpOnly).toBe(true);
     expect(session?.sameSite?.toLowerCase()).toBe('lax');
+  });
+
+  it('opens the shop on the `featured` collection its theme points at', async () => {
+    // Every preset's featured-collection section and "Shop" link address
+    // `featured`; without the row a brand-new store's home page says "No
+    // products here yet" and its nav 404s (SPEC §12 onboarding).
+    const slug = uniqueSlug('collection');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/signup',
+      payload: {
+        shopName: 'Aurora Collection Co.',
+        shopSlug: slug,
+        email: `owner@${slug}.test`,
+        password: 'correct horse battery',
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const shopId = res.json().shop.id;
+    createdShopIds.push(shopId);
+
+    const collection = await dbAdmin.collection.findFirst({
+      where: { shopId, handle: 'featured' },
+    });
+    expect(collection?.type).toBe('smart');
+
+    // Smart, so it fills itself in: the merchant's first product is in it
+    // without them having to curate anything.
+    const productId = newId('product');
+    await dbAdmin.product.create({
+      data: {
+        id: productId,
+        shopId,
+        title: 'First Product',
+        handle: 'first-product',
+        descriptionHtml: '<p>First</p>',
+        status: 'active',
+        variants: {
+          create: [{ id: newId('variant'), shopId, title: 'Default', price: 2500, position: 0 }],
+        },
+      },
+    });
+
+    const storefront = await app.inject({
+      method: 'GET',
+      url: '/storefront/api/collections/featured/products',
+      headers: { host: `${slug}.lvh.me:3002` },
+    });
+    expect(storefront.statusCode).toBe(200);
+    expect(storefront.json().data.map((p: { handle: string }) => p.handle)).toEqual([
+      'first-product',
+    ]);
   });
 
   it('derives a free slug from the shop name when none is given', async () => {

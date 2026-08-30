@@ -23,7 +23,7 @@ import {
 import { slugCandidates, slugify } from '../../lib/slug.ts';
 import { resolveFromSession } from '../../plugins/tenancy.ts';
 import { defaultShippingRates } from '../../services/settings/shipping.ts';
-import { installInitialTheme } from '../../services/themes/onboarding.ts';
+import { installDefaultCollection, installInitialTheme } from '../../services/themes/onboarding.ts';
 
 /** Prisma rows → the `sessionResponse` contract. Never leaks `passwordHash`. */
 function toSessionResponse(user: StaffUser, shop: Shop) {
@@ -133,9 +133,13 @@ export default async function routes(app: FastifyInstance) {
     const passwordHash = await hashPassword(input.password);
     const created = await createShop(candidates, input, passwordHash);
 
-    // A new store opens on the default preset rather than a blank page (SPEC
-    // §12 onboarding). Never throws — see installInitialTheme. Owner: WS-F.
-    await installInitialTheme(created.shop.id);
+    // A new store opens on the default preset rather than a blank page, and on
+    // the `featured` collection that preset points at (SPEC §12 onboarding).
+    // Neither throws — see installInitialTheme. Owner: WS-F.
+    await Promise.all([
+      installInitialTheme(created.shop.id),
+      installDefaultCollection(created.shop.id),
+    ]);
 
     const sessionId = await createSession({
       shopId: created.shop.id,
