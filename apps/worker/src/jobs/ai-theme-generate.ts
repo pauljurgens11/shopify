@@ -182,6 +182,65 @@ export const STOCK_LIBRARY: { url: string; subject: string }[] = [
   { url: stock('1547949003-9792a18a2601', 1400, 1400), subject: 'leather weekender duffel' },
   { url: stock('1510598969022-c4c6c5d05769', 1400, 1400), subject: 'wool beanie' },
   { url: stock('1575428652377-a2d80e2277fc', 1400, 1400), subject: 'field cap' },
+  // Beyond apparel — every id below was downloaded and checked by eye (subject
+  // matches, no visible brand) before landing, same bar as the seed set.
+  {
+    url: stock('1495474472287-4d71bcdd2085', 1400, 1400),
+    subject: 'latte-art coffee cups, hands toasting',
+  },
+  {
+    url: stock('1447933601403-0c6688de566e', 1400, 1400),
+    subject: 'roasted coffee beans (texture)',
+  },
+  {
+    url: stock('1504674900247-0877df9cc836', 2400, 1200),
+    subject: 'fresh plated dishes, overhead (wide)',
+  },
+  {
+    url: stock('1596462502278-27bfdc403348', 1400, 1400),
+    subject: 'cosmetics flat lay, blush tones',
+  },
+  { url: stock('1515562141207-7a88fb7ce338', 1400, 1400), subject: 'pearl necklace in a gift box' },
+  {
+    url: stock('1524592094714-0f0654e20314', 1400, 1400),
+    subject: 'minimal leather-strap watch in hand',
+  },
+  {
+    url: stock('1505740420928-5e560c06d30e', 1400, 1400),
+    subject: 'wireless headphones on bold yellow',
+  },
+  {
+    url: stock('1513519245088-0e12902e5a38', 2400, 1200),
+    subject: 'gallery wall of framed prints (wide)',
+  },
+  {
+    url: stock('1586023492125-27b2c045efd7', 2400, 1200),
+    subject: 'modern living room, yellow armchair (wide)',
+  },
+  {
+    url: stock('1578500494198-246f612d3b3d', 2400, 1200),
+    subject: 'neutral sofa with dried pampas (wide)',
+  },
+  {
+    url: stock('1497032628192-86f99bcd76bc', 2400, 1200),
+    subject: 'workspace desk flat lay (wide)',
+  },
+  {
+    url: stock('1463320726281-696a485928c7', 2400, 1200),
+    subject: 'open-air book stall, rows of spines (wide)',
+  },
+  { url: stock('1485955900006-10f4d324d411', 1400, 1400), subject: 'succulent in a mint pot' },
+  { url: stock('1493106641515-6b5631de4bb9', 1400, 1400), subject: 'potter’s hands at the wheel' },
+  { url: stock('1602523961358-f9f03dd557db', 1400, 1400), subject: 'lit pillar candles, warm' },
+  {
+    url: stock('1587654780291-39c9404d746b', 2400, 1200),
+    subject: 'colorful toy building bricks (texture, wide)',
+  },
+  {
+    url: stock('1558060370-d644479cb6f7', 2400, 1200),
+    subject: 'vintage tin toy robots and cars (wide)',
+  },
+  { url: stock('1596461404969-9ae70f2830c1', 1400, 1400), subject: 'wooden toy train set' },
 ];
 
 export function buildUserMessage(context: GenerateInput): string {
