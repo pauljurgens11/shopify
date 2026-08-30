@@ -136,6 +136,54 @@ export function buildSystemPrompt(): string {
   ].join('\n');
 }
 
+/**
+ * Curated stock photography, available to EVERY shop — the same pinned,
+ * verified-loading Unsplash photos the seed and presets use (db seed
+ * data/images.ts picked and eyeballed them). This is what keeps a brand-new
+ * shop with no uploads from getting an imageless design: the model may not
+ * invent URLs, so without a pool it has nothing to design with. Subject labels
+ * let it pick photos that match the story it is telling.
+ */
+const stock = (id: string, w: number, h: number) =>
+  `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&q=80&auto=format`;
+
+export const STOCK_LIBRARY: { url: string; subject: string }[] = [
+  {
+    url: stock('1441986300917-64674bd600d8', 2400, 1200),
+    subject: 'warm boutique interior, shelves of goods (wide hero)',
+  },
+  {
+    url: stock('1523381210434-271e8be1f52b', 2400, 1200),
+    subject: 'stacked striped knitwear, soft light (wide)',
+  },
+  {
+    url: stock('1489987707025-afc232f7ea0f', 2400, 1200),
+    subject: 'pastel apparel on a rail (wide)',
+  },
+  {
+    url: stock('1551028719-00167b16eac5', 2400, 1400),
+    subject: 'black leather jacket, moody monochrome (wide hero)',
+  },
+  {
+    url: stock('1445205170230-053b83016050', 2400, 1200),
+    subject: 'traveler with a leather bag, outdoors (wide)',
+  },
+  {
+    url: stock('1520975954732-35dd22299614', 2400, 1200),
+    subject: 'rain shell in bad weather (wide)',
+  },
+  { url: stock('1543076447-215ad9ba6923', 1400, 1400), subject: 'craft workbench flat lay' },
+  { url: stock('1556905055-8f358a7a47b2', 1400, 1400), subject: 'cream merino knit sweater' },
+  { url: stock('1591047139829-d91aecb6caea', 1400, 1400), subject: 'waxed canvas jacket' },
+  { url: stock('1602810318383-e386cc2a3ccf', 1400, 1400), subject: 'crisp oxford shirt' },
+  { url: stock('1542272604-787c3835535d', 1400, 1400), subject: 'stack of raw denim' },
+  { url: stock('1521572163474-6864f9cf17ab', 1400, 1400), subject: 'plain white tee' },
+  { url: stock('1590874103328-eac38a683ce7', 1400, 1400), subject: 'canvas tote bag' },
+  { url: stock('1547949003-9792a18a2601', 1400, 1400), subject: 'leather weekender duffel' },
+  { url: stock('1510598969022-c4c6c5d05769', 1400, 1400), subject: 'wool beanie' },
+  { url: stock('1575428652377-a2d80e2277fc', 1400, 1400), subject: 'field cap' },
+];
+
 export function buildUserMessage(context: GenerateInput): string {
   const list = (entries: CatalogEntry[]) =>
     entries.length === 0
@@ -164,9 +212,13 @@ export function buildUserMessage(context: GenerateInput): string {
     'Products that exist in this shop (use only these handles):',
     list(context.catalog.products),
     '',
-    'Image library — the only image URLs you may introduce (each is this shop’s real',
-    'photography and is known to load; subject is named after the dash):',
-    ...(imageLibrary.length > 0 ? imageLibrary : ['  (none yet — set every image to null)']),
+    'Image library — the only image URLs you may introduce (each is known to load; the',
+    'subject is named after the dash).',
+    'This shop’s own photography (prefer these — they show the actual merchandise):',
+    ...(imageLibrary.length > 0 ? imageLibrary : ['  (none uploaded yet)']),
+    'Stock photography (generic but beautiful — use these when the shop’s own photos are',
+    'missing or don’t fit the story):',
+    ...STOCK_LIBRARY.map((s) => `  - ${s.url} — ${s.subject}`),
     '',
     'The current theme document:',
     '```json',
@@ -266,12 +318,14 @@ function urlsInText(texts: string[]): string[] {
 
 /**
  * What the model may point an `image` setting at: the shop's own photography,
- * anything the current theme already shows, and anything the merchant pasted.
+ * the curated stock pool, anything the current theme already shows, and
+ * anything the merchant pasted.
  */
 export function allowedImageUrls(context: GenerationContext): Set<string> {
   return new Set([
     ...context.catalog.products.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])),
     ...context.catalog.collections.flatMap((c) => (c.imageUrl ? [c.imageUrl] : [])),
+    ...STOCK_LIBRARY.map((s) => s.url),
     ...collectImageUrls(context.currentDoc),
     ...urlsInText([
       context.prompt,
