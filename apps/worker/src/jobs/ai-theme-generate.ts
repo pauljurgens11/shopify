@@ -13,7 +13,7 @@
  * worse theme but a working product.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { QUEUES } from '@merchant/config/constants';
+import { ALL_PRODUCTS_HANDLE, QUEUES } from '@merchant/config/constants';
 import { env } from '@merchant/config/env';
 import { newId } from '@merchant/config/ids';
 import { JOB_NAMES } from '@merchant/config/queue';
@@ -159,6 +159,10 @@ export function buildUserMessage(context: GenerateInput): string {
     `Shop: ${context.shopName}`,
     '',
     'Collections that exist in this shop (use only these handles):',
+    // The virtual "all" collection is not a row, so it is not in the catalog
+    // query — but it is always there, and on a shop that has curated nothing it
+    // is the only collection a section or a link can safely point at.
+    `  - ${ALL_PRODUCTS_HANDLE} — All products (every product in the shop; always exists)`,
     list(context.catalog.collections),
     '',
     'Products that exist in this shop (use only these handles):',
@@ -305,7 +309,13 @@ export async function findProblems(
   }
 
   const problems = validateThemeDoc(parsed.data);
-  const known = await resolveHandles(collectReferencedHandles(parsed.data));
+  const resolved = await resolveHandles(collectReferencedHandles(parsed.data));
+  // `all` is resolved by the storefront rather than by a row (constants.ts), so
+  // no lookup can confirm it. It is always valid.
+  const known = {
+    products: resolved.products,
+    collections: new Set([...resolved.collections, ALL_PRODUCTS_HANDLE]),
+  };
 
   // An image URL from outside the library is a hallucination until proven
   // otherwise, and a hallucinated URL renders a blank block — same failure
@@ -620,7 +630,10 @@ export async function handler(
     const existing = await resolveHandles(referenced);
     const missingHandles = {
       products: referenced.products.filter((h) => !existing.products.has(h)),
-      collections: referenced.collections.filter((h) => !existing.collections.has(h)),
+      collections: referenced.collections.filter(
+        // `all` resolves without a row, so a lookup will never find it.
+        (h) => h !== ALL_PRODUCTS_HANDLE && !existing.collections.has(h),
+      ),
     };
 
     const result = await runThemeGeneration(

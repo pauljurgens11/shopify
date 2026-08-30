@@ -338,6 +338,44 @@ describe('product visibility', () => {
     expect(response.json().collection.productCount).toBe(handles.length);
   });
 
+  it('serves /collections/all without a collection row behind it', async () => {
+    // Every theme links here — the AI builder writes "/collections/all" and so
+    // does every preset's "Shop all" — and a shop that has curated nothing has
+    // no row to resolve. A 404 there is a dead nav item on a working store.
+    const response = await get('/storefront/api/collections/all/products?limit=250');
+    expect(response.statusCode).toBe(200);
+
+    const handles = response.json().data.map((p: { handle: string }) => p.handle);
+    expect(handles).toContain('alpine-merino-crewneck');
+    expect(handles).toContain('backorder-beanie');
+    // Visibility is not relaxed by the virtual membership.
+    expect(handles).not.toContain('quarry-shearling-coat');
+    expect(handles).not.toContain('ferry-cotton-cardigan');
+    expect(response.json().collection.productCount).toBe(handles.length);
+
+    // And it is a tenant read like any other: the neighbour has its own.
+    const theirs = await get('/storefront/api/collections/all/products', { shop: neighbour });
+    expect(theirs.json().data).toHaveLength(1);
+    expect(theirs.json().collection.productCount).toBe(1);
+  });
+
+  it('sorts /collections/all — the "New drops" link is ?sort=created-desc', async () => {
+    const response = await get('/storefront/api/collections/all/products?sort=created-desc');
+    expect(response.statusCode).toBe(200);
+    // Newest first: the beanie was created after the crewneck in the fixture.
+    const handles = response.json().data.map((p: { handle: string }) => p.handle);
+    expect(handles.indexOf('backorder-beanie')).toBeLessThan(
+      handles.indexOf('alpine-merino-crewneck'),
+    );
+  });
+
+  it('still 404s a collection handle nobody created', async () => {
+    // `all` is the one virtual handle; an invented one must stay a 404 rather
+    // than quietly resolving to the whole catalogue.
+    const response = await get('/storefront/api/collections/new-drops/products');
+    expect(response.statusCode).toBe(404);
+  });
+
   it('scopes `?query=` to this tenant', async () => {
     const response = await get('/storefront/api/products?query=Alpine');
     const prices = response

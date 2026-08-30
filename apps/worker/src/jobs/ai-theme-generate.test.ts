@@ -61,6 +61,11 @@ describe('prompt assembly', () => {
     expect(message).toContain('outerwear');
   });
 
+  it('offers `all` as a handle even when the shop has no collections', () => {
+    const message = buildUserMessage({ ...CONTEXT, catalog: { products: [], collections: [] } });
+    expect(message).toContain('all — All products');
+  });
+
   it('includes the current document and the conversation so far', () => {
     const message = buildUserMessage(CONTEXT);
     expect(message).toContain('Make it feel like a Kyoto coffee shop');
@@ -221,6 +226,29 @@ describe('runThemeGeneration', () => {
           products: new Set(referenced.products),
           collections: new Set(referenced.collections),
         }),
+      },
+      generate,
+    );
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts `all`, the collection that exists without a row', async () => {
+    // The storefront resolves /collections/all off no row (constants.ts), so no
+    // handle lookup can confirm it — and a shop that has curated nothing has
+    // nothing else a section or a link may point at.
+    const doc = presetThemeDoc('aurora');
+    const featured = doc.pages.home.find((s) => s.type === 'featured-collection');
+    if (featured?.type === 'featured-collection') featured.settings.collectionHandle = 'all';
+
+    const generate = vi.fn<ThemeGenerator>().mockResolvedValue({ doc, summary: 'Done.' });
+    const result = await runThemeGeneration(
+      {
+        ...CONTEXT,
+        // A brand-new shop: the resolver finds nothing at all.
+        resolveHandles: async () => ({ products: new Set(), collections: new Set() }),
+        catalog: { products: [], collections: [] },
       },
       generate,
     );

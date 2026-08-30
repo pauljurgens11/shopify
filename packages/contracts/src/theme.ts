@@ -60,7 +60,12 @@ const linkSetting = z.object({
   url: z
     .string()
     .max(512)
-    .describe('Storefront-relative path like /collections/new, or an absolute https URL.'),
+    .describe(
+      'Storefront-relative path, or an absolute https URL. Only these paths exist: ' +
+        '/, /collections/all (every product — always valid), /collections/{handle} and ' +
+        '/products/{handle} for a handle you were given, /search, /cart. Never invent a ' +
+        'collection handle here — an unknown one is a 404, not an empty block.',
+    ),
 });
 
 const sectionSettings = {
