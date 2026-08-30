@@ -49,7 +49,9 @@ const imageSetting = z
   .url()
   .nullable()
   .default(null)
-  .describe('Absolute image URL, or null to omit the image.');
+  .describe(
+    'Absolute image URL from the image library you were given, or null to omit the image. Never invent a URL — an unknown URL renders as a broken image.',
+  );
 
 const alignment = z.enum(['left', 'center', 'right']).default('center');
 

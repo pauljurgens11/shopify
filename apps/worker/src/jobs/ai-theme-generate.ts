@@ -34,7 +34,7 @@ import type { JobContext, JobDefinition } from './types.ts';
 /* Prompt assembly                                                             */
 /* -------------------------------------------------------------------------- */
 
-export type CatalogEntry = { handle: string; title: string };
+export type CatalogEntry = { handle: string; title: string; imageUrl?: string | null };
 
 export type ReferencedHandles = { products: string[]; collections: string[] };
 
@@ -101,9 +101,38 @@ export function buildSystemPrompt(): string {
     '5. Colors are hex. Ensure real contrast: body text must be readable on the background.',
     '6. Keep copy specific to this shop. No lorem ipsum, no placeholder names.',
     '7. Section ids must be unique within their page.',
+    '8. For every `image` setting, use ONLY a URL from the image library you are given, a URL',
+    '   already present in the current theme, or one the merchant pasted. NEVER make up an',
+    '   image URL — an invented URL renders as a broken, empty image. When nothing in the',
+    '   library fits, set the image to null and lean on color, typography and layout instead;',
+    '   a deliberate design without an image beats a design with a dead one.',
+    '',
+    'Design craft — what separates a beautiful storefront from a template:',
+    "- Commit to ONE point of view drawn from the shop and the merchant's words, and let it",
+    '  drive every token: heritage/outdoors wants a serif (playfair, fraunces, lora) over warm',
+    '  neutrals; technical/minimal wants space-grotesk or archivo over near-monochrome with',
+    '  radius "none"; friendly/soft wants dm-sans, gentle colors, radius "lg", buttons "soft".',
+    '  Never mix moods, and never default to a generic blue-on-white.',
+    '- Pair heading and body fonts for contrast (expressive heading + quiet legible body).',
+    '  The same font for both is a choice for strict minimalism only.',
+    '- Colors come from the merchandise and the photography, not from a default palette.',
+    '  colorAccent must earn its place: visibly different from colorPrimary, used sparingly.',
+    '- Build the home page as a story, not a list: (optional announcement-bar with a real',
+    '  offer) → hero with the most atmospheric wide image and a headline of six words or',
+    '  fewer → then ALTERNATE full-bleed imagery (image-banner, image-with-text, slideshow)',
+    '  with commerce (featured-collection, product-grid) so the eye gets rhythm. 5–8 sections',
+    '  with variety beat 3 generic ones. Never place two sections of the same type adjacent.',
+    '  Close with newsletter or a quiet rich-text sign-off before the footer.',
+    "- Match each image to its section's message: the hero gets atmosphere, image-with-text",
+    '  gets the product the copy talks about. Write alt text that describes the photo.',
+    '- Copy is voice, not filler: short concrete headlines, no exclamation marks, no phrases',
+    '  like "Shop the best products". Button labels are verb phrases ("Shop the collection").',
+    '- pages.product and pages.collection deserve design too: an image-banner or rich-text',
+    '  above/below the core section carries the theme through instead of leaving bare pages.',
     '',
     'Then write one short sentence for the merchant describing what you changed, in the',
-    '`summary` field — e.g. "Warmed the palette and made the hero full-height."',
+    '`summary` field — name the design idea, e.g. "Went editorial: Fraunces over warm sand,',
+    'full-bleed hero, sharper corners."',
   ].join('\n');
 }
 
@@ -113,6 +142,19 @@ export function buildUserMessage(context: GenerateInput): string {
       ? '  (none yet)'
       : entries.map((e) => `  - ${e.handle} — ${e.title}`).join('\n');
 
+  // The shop's photography — URLs that are KNOWN to load. Without this list the
+  // model has no image inventory at all and invents plausible-looking URLs,
+  // which render as blank blocks (the exact "broken store" findProblems exists
+  // to prevent for handles).
+  const imageLibrary = [
+    ...context.catalog.collections
+      .filter((c) => c.imageUrl)
+      .map((c) => `  - ${c.imageUrl} — ${c.title} (collection)`),
+    ...context.catalog.products
+      .filter((p) => p.imageUrl)
+      .map((p) => `  - ${p.imageUrl} — ${p.title}`),
+  ];
+
   const parts = [
     `Shop: ${context.shopName}`,
     '',
@@ -121,6 +163,10 @@ export function buildUserMessage(context: GenerateInput): string {
     '',
     'Products that exist in this shop (use only these handles):',
     list(context.catalog.products),
+    '',
+    'Image library — the only image URLs you may introduce (each is this shop’s real',
+    'photography and is known to load; subject is named after the dash):',
+    ...(imageLibrary.length > 0 ? imageLibrary : ['  (none yet — set every image to null)']),
     '',
     'The current theme document:',
     '```json',
@@ -190,6 +236,50 @@ export function collectReferencedHandles(doc: ThemeDoc): ReferencedHandles {
   return { products: [...products], collections: [...collections] };
 }
 
+/**
+ * Every image URL a doc carries, wherever it sits (hero/image-banner `image`,
+ * slideshow slides, logo-list logos): a recursive walk over keys named `image`,
+ * so a new section with an image setting is covered without touching this.
+ */
+export function collectImageUrls(value: unknown): string[] {
+  const urls = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      for (const [key, child] of Object.entries(node)) {
+        if (key === 'image' && typeof child === 'string') urls.add(child);
+        else walk(child);
+      }
+    }
+  };
+  walk(value);
+  return [...urls];
+}
+
+/** URLs the merchant themselves supplied (pasted into the chat) are always fair game. */
+function urlsInText(texts: string[]): string[] {
+  return texts.flatMap((t) => t.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? []);
+}
+
+/**
+ * What the model may point an `image` setting at: the shop's own photography,
+ * anything the current theme already shows, and anything the merchant pasted.
+ */
+export function allowedImageUrls(context: GenerationContext): Set<string> {
+  return new Set([
+    ...context.catalog.products.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])),
+    ...context.catalog.collections.flatMap((c) => (c.imageUrl ? [c.imageUrl] : [])),
+    ...collectImageUrls(context.currentDoc),
+    ...urlsInText([
+      context.prompt,
+      ...context.history.filter((m) => m.role === 'user').map((m) => m.content),
+    ]),
+  ]);
+}
+
 /** The truncated prompt catalog, standing in as ground truth for unit tests. */
 function catalogResolver(catalog: GenerationContext['catalog']): HandleResolver {
   return async () => ({
@@ -204,7 +294,11 @@ function catalogResolver(catalog: GenerationContext['catalog']): HandleResolver 
  * than a mediocre theme. Both classes of problem go back to the model together.
  * Handle existence comes from `resolveHandles` so it can be the real database.
  */
-export async function findProblems(doc: unknown, resolveHandles: HandleResolver) {
+export async function findProblems(
+  doc: unknown,
+  resolveHandles: HandleResolver,
+  allowedImages?: Set<string>,
+) {
   const parsed = themeDocSchema.safeParse(doc);
   if (!parsed.success) {
     return parsed.error.issues.slice(0, 10).map((i) => `${i.path.join('.')}: ${i.message}`);
@@ -212,6 +306,19 @@ export async function findProblems(doc: unknown, resolveHandles: HandleResolver)
 
   const problems = validateThemeDoc(parsed.data);
   const known = await resolveHandles(collectReferencedHandles(parsed.data));
+
+  // An image URL from outside the library is a hallucination until proven
+  // otherwise, and a hallucinated URL renders a blank block — same failure
+  // class as an invented handle, so it goes back to the model the same way.
+  if (allowedImages) {
+    for (const url of collectImageUrls(parsed.data)) {
+      if (!allowedImages.has(url)) {
+        problems.push(
+          `image URL "${url}" is not in this shop's image library — use a URL from the list you were given, or null`,
+        );
+      }
+    }
+  }
 
   for (const [page, sections] of Object.entries(parsed.data.pages)) {
     for (const section of sections) {
@@ -263,6 +370,7 @@ export async function runThemeGeneration(
   generate: ThemeGenerator,
 ): Promise<GenerationResult> {
   const resolveHandles = context.resolveHandles ?? catalogResolver(context.catalog);
+  const allowedImages = allowedImageUrls(context);
   let retryFeedback: string | undefined;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -275,7 +383,7 @@ export async function runThemeGeneration(
       return { ok: false, message: THEME_GENERATION_APOLOGY };
     }
 
-    const problems = await findProblems(candidate.doc, resolveHandles);
+    const problems = await findProblems(candidate.doc, resolveHandles, allowedImages);
     if (problems.length === 0) {
       return {
         ok: true,
@@ -350,18 +458,32 @@ export const anthropicGenerator: ThemeGenerator = async (input) => {
 /* Job handler                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** Handles + titles only: the model needs to know what exists, not the catalogue. */
+/**
+ * Handles + titles + one image each: what exists, plus the photography the
+ * model is allowed to design with (its whole legal image inventory).
+ */
 async function loadCatalog(db: ReturnType<typeof dbForShop>) {
   const [products, collections] = await Promise.all([
     db.product.findMany({
       where: { status: 'active' },
-      select: { handle: true, title: true },
+      select: {
+        handle: true,
+        title: true,
+        images: { select: { url: true }, orderBy: { position: 'asc' }, take: 1 },
+      },
       orderBy: { createdAt: 'desc' },
       take: 60,
     }),
-    db.collection.findMany({ select: { handle: true, title: true }, take: 40 }),
+    db.collection.findMany({ select: { handle: true, title: true, imageUrl: true }, take: 40 }),
   ]);
-  return { products, collections };
+  return {
+    products: products.map((p) => ({
+      handle: p.handle,
+      title: p.title,
+      imageUrl: p.images[0]?.url ?? null,
+    })),
+    collections,
+  };
 }
 
 /**
