@@ -7,6 +7,7 @@
 | **Ended** | 2026-08-28T16:36:41.669Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/workstream-g-critical-review-53f715` |
 | **Branch** | `ws-g/review-fixes` |
+| **Pull request** | #77 (MERGED) |
 | **Model** | `claude-fable-5` |
 | **Claude Code** | 2.1.246 |
 | **Archived** | no |

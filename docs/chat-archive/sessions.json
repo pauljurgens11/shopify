@@ -1,5 +1,19 @@
 [
-  ["local_3c7a53d4-57c1-4005-bf81-a1244a155ddb", "Issue e8", 125, "MERGED", false],
+  ["local_b2374845-a37a-44b2-a37c-09747ffecd80", "Claude chats documentation", null, null, false],
+  [
+    "local_ec9572fd-377c-4eb1-a7ce-4a98287e3ae2",
+    "Labubu shop product not appearing in listings",
+    133,
+    "MERGED",
+    false
+  ],
+  [
+    "local_36a4de68-2e3b-4c30-baae-c4d0cfc983c0",
+    "Product creation to e-shop latency",
+    131,
+    "MERGED",
+    false
+  ],
   [
     "local_919d4809-846d-4354-925d-0f3ab032bf1c",
     "Deployment readiness check",
@@ -7,6 +21,16 @@
     "MERGED",
     false
   ],
+  [
+    "local_7cd90cc7-e560-4280-b184-e847eb162abf",
+    "Stale Claude worktrees cleanup",
+    null,
+    null,
+    false
+  ],
+  ["local_81cc3a28-d3b9-4b5a-a7f1-266e080d6725", "Shop URL in admin views", null, null, false],
+  ["local_f5192bcd-4ac2-495b-a2d8-fb199b803581", "Export project chats", 117, "MERGED", false],
+  ["local_3c7a53d4-57c1-4005-bf81-a1244a155ddb", "Issue e8", 125, "MERGED", false],
   [
     "local_182686d2-c9fd-4376-8554-f0cff8c1ab97",
     "Repo review skill execution",
@@ -130,6 +154,46 @@
   ],
   ["local_e891c66d-39a9-480e-8bf7-ad50b3695499", "Outstanding issues review", null, null, false],
   ["local_60d4a9d7-04ef-41ef-a898-c5f4b8b30073", "H2 issue completion", 74, "MERGED", false],
+  [
+    "local_23ce79c1-dd2a-48c5-bd4d-2c47e56ec8d7",
+    "App functionality and multi-shop capabilities",
+    null,
+    null,
+    false
+  ],
+  ["local_4239c7b6-4225-4e0a-a6e2-368793c4b072", "E2 and E3 status", 81, "MERGED", false],
+  ["local_27e2b993-91e0-4e39-a2ff-9a233d0a91ba", "E2E test strategy review", 79, "MERGED", false],
+  [
+    "local_a4904d0f-b178-4da2-88ef-71d2698c8217",
+    "Critical review for workstream D",
+    78,
+    "MERGED",
+    false
+  ],
+  ["local_10ac002a-8e96-4023-b84f-4410f6ebe82e", "Logic testing", null, null, false],
+  [
+    "local_09eb3db9-ff48-4735-8aec-b0412eac69d2",
+    "Critical review skill for workstream G",
+    77,
+    "MERGED",
+    false
+  ],
+  [
+    "local_7b8aafbd-cd6a-4ef0-b822-3287d0c6dfa7",
+    "Modern UX/UI animations issue",
+    76,
+    "MERGED",
+    false
+  ],
+  ["local_7d7dd009-76c8-421c-a4e6-265e9950a9c4", "Completed workstreams", null, null, false],
+  [
+    "local_2bf06707-3e11-40b9-95f0-0866c88b005c",
+    "Repository code and test metrics",
+    null,
+    null,
+    false
+  ],
+  ["local_5e21b7a4-9e4d-490a-af24-162437c12a61", "Task count", null, null, false],
   ["local_887e9306-fd0f-4054-8c1f-33e52788b57d", "e5 issue and dependencies", 75, "MERGED", false],
   [
     "local_b59a06a0-9cb0-4132-b5bf-c9bd65729f08",

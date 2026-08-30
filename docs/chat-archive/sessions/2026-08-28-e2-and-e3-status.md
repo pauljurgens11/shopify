@@ -7,6 +7,7 @@
 | **Ended** | 2026-08-28T17:50:09.363Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/e2-e3-status-220d42` |
 | **Branch** | `ws-h/index-parity` |
+| **Pull request** | #81 (MERGED) |
 | **Model** | `claude-opus-5` |
 | **Claude Code** | 2.1.246 |
 | **Archived** | no |

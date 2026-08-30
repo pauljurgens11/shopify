@@ -200,15 +200,15 @@ for i, e in enumerate(entries, 1):
     with open(os.path.join(OUT, "sessions", e["file"]), "w") as fh:
         fh.write(redact(e["md"]))
 
-# index — grouped by day, so a two-day build reads as two days
+# index — grouped by day, so the build reads day by day
 days = {}
 for e in entries:
     days.setdefault(e["start"][:10], []).append(e)
 
 n_arch = sum(1 for e in entries if e["meta"].get("archived"))
 idx = ["# Chat archive", "",
-    "Every Claude Code session behind this repo, exported to Markdown — the whole two-day build,",
-    "from the first spec conversation to the last parity fix.", "",
+    "Every Claude Code session behind this repo, exported to Markdown — the whole build,",
+    "from the first spec conversation to the last fix on the live demo.", "",
     f"**{len(entries)} sessions** · {entries[0]['start'][:10]} – {entries[-1]['start'][:10]} · "
     f"{n_arch} archived · main checkout + every agent worktree", "",
     "## What's in each file", "",
@@ -220,11 +220,13 @@ idx = ["# Chat archive", "",
     "- sub-agent (sidechain) traffic counted in the header, not inlined, so the main thread stays readable.", "",
     "Secrets are stripped on export (API keys, tokens, connection-string passwords) and appear as",
     "`[REDACTED …]`. Regenerate with:", "", "```bash",
+    "python3 scripts/export-chat-sessions-meta.py docs/chat-archive/sessions.json",
     "python3 scripts/export-chat-archive.py docs/chat-archive docs/chat-archive/sessions.json",
     "```", "",
     "`sessions.json` holds the sidebar titles, PR numbers and archived flags, which live in the",
-    "Claude Code app rather than in the transcripts themselves. Refresh it when sessions are added",
-    "or their PRs land, then re-run the export — existing files are rewritten in place.", "",
+    "Claude Code app rather than in the transcripts themselves — the first command reads them out",
+    "of the app\'s session store, the second writes the Markdown. Existing files are rewritten in",
+    "place, so a refresh after new sessions or a landed PR is just those two commands.", "",
     "## Sessions", ""]
 
 n = 0

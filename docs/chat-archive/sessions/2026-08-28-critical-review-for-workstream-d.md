@@ -7,6 +7,7 @@
 | **Ended** | 2026-08-28T17:09:36.063Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/workstream-d-critical-review-631161` |
 | **Branch** | `ws-d/review-fixes` |
+| **Pull request** | #78 (MERGED) |
 | **Model** | `claude-fable-5` |
 | **Claude Code** | 2.1.246 |
 | **Archived** | no |

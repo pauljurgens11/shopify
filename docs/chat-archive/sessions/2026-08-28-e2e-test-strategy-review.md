@@ -7,6 +7,7 @@
 | **Ended** | 2026-08-28T17:36:46.721Z |
 | **Working dir** | `~/Downloads/projects/shopify/.claude/worktrees/e2e-test-strategy-review-577ed6` |
 | **Branch** | `ws-f/ai-queue-shared-producer` |
+| **Pull request** | #79 (MERGED) |
 | **Model** | `claude-fable-5` |
 | **Claude Code** | 2.1.246 |
 | **Archived** | no |
