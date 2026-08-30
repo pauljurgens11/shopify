@@ -9,7 +9,7 @@
 import { money } from '@merchant/config/money';
 import type { ShippingRate } from '@merchant/contracts/shops';
 import { describe, expect, it } from 'vitest';
-import { eligibleShippingRates } from './shipping.ts';
+import { defaultShippingRates, eligibleShippingRates } from './shipping.ts';
 
 const usd = (amount: number) => money(amount, 'USD');
 
@@ -77,5 +77,40 @@ describe('eligibleShippingRates', () => {
   it('treats a zero subtotal as a real cart, not a missing one', () => {
     // An all-discount cart still has to be shippable.
     expect(namesFor(0)).toEqual(['Standard', 'Small order']);
+  });
+});
+
+/**
+ * The signup default. A brand-new shop with no rate has a checkout nobody can
+ * finish — E4 gates "Pay now" on a selected rate — so the property that matters
+ * is that the seeded rate applies to *every* cart, including an empty one.
+ */
+describe('defaultShippingRates', () => {
+  /** Asserts the "exactly one" half, so each test can talk about the rate. */
+  const soleRate = (currencyCode: string): ShippingRate => {
+    const [first, ...rest] = defaultShippingRates(currencyCode);
+    expect(rest).toEqual([]);
+    if (!first) throw new Error('a new shop was seeded with no shipping rate');
+    return first;
+  };
+
+  it('gives a new shop one rate that no cart can fall outside of', () => {
+    const rate = soleRate('USD');
+
+    expect(rate.minOrderSubtotal).toBeNull();
+    expect(rate.maxOrderSubtotal).toBeNull();
+    expect(eligibleShippingRates([rate], usd(0))).toEqual([rate]);
+    expect(eligibleShippingRates([rate], usd(500_000))).toEqual([rate]);
+  });
+
+  it('prices in the shop currency, so eligibility cannot throw on mixed money', () => {
+    const gbp = soleRate('GBP');
+
+    expect(gbp.price.currencyCode).toBe('GBP');
+    expect(() => eligibleShippingRates([gbp], money(1000, 'GBP'))).not.toThrow();
+  });
+
+  it('mints a fresh id per shop, so two signups cannot collide', () => {
+    expect(soleRate('USD').id).not.toBe(soleRate('USD').id);
   });
 });

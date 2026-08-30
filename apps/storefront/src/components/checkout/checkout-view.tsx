@@ -17,7 +17,7 @@
 import { format } from '@merchant/config/money';
 import type { Checkout } from '@merchant/contracts/checkout';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState, useTransition } from 'react';
+import { useId, useMemo, useRef, useState, useTransition } from 'react';
 import { payForCheckout, updateCheckout } from '../../lib/checkout-actions.ts';
 import { randomId } from '../../lib/random-id.ts';
 import { CardFields, type CardFieldsHandle } from './card-fields.tsx';
@@ -47,9 +47,28 @@ const EMPTY_ADDRESS: AddressFields = {
   zip: '',
 };
 
-/** Enough of an address for E3 to price shipping and for the order to ship. */
+/**
+ * Enough of an address for E3 to price shipping and for the order to ship,
+ * with the message shown when the shopper leaves one empty.
+ *
+ * One list, because the gate and the errors drifting apart is the bug this
+ * replaces: the rate list simply stayed hidden and nothing said which field
+ * was missing. Copy matches Shopify's checkout ("Enter a last name").
+ */
+const REQUIRED_ADDRESS_FIELDS = {
+  firstName: 'Enter a first name',
+  lastName: 'Enter a last name',
+  address1: 'Enter an address',
+  city: 'Enter a city',
+  zip: 'Enter a ZIP / postal code',
+} as const;
+
+type RequiredAddressField = keyof typeof REQUIRED_ADDRESS_FIELDS;
+
+const REQUIRED_ADDRESS_KEYS = Object.keys(REQUIRED_ADDRESS_FIELDS) as RequiredAddressField[];
+
 const addressComplete = (a: AddressFields) =>
-  Boolean(a.firstName && a.lastName && a.address1 && a.city && a.zip && a.countryCode);
+  Boolean(a.countryCode) && REQUIRED_ADDRESS_KEYS.every((field) => Boolean(a[field]));
 
 export function CheckoutView({
   initial,
@@ -153,6 +172,34 @@ export function CheckoutView({
     );
   };
 
+  /**
+   * A field shows its error only after the shopper has left it — flagging
+   * "Enter a city" on a form they have not started is Shopify's own rule, and
+   * the opposite of the silence this replaces.
+   */
+  const [touched, setTouched] = useState<Partial<Record<RequiredAddressField, boolean>>>({});
+
+  const blurAddressField = (field: RequiredAddressField) => {
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+    saveAddress(address);
+  };
+
+  const addressError = (field: RequiredAddressField) =>
+    touched[field] && !address[field] ? REQUIRED_ADDRESS_FIELDS[field] : undefined;
+
+  /**
+   * Why no rates are on screen. An empty `shippingOptions` on a complete
+   * address is a shop with no rates configured, not a shopper who mistyped —
+   * one message for both states read as intermittent and hid the real cause.
+   */
+  const shippingNotice = (): string | null => {
+    if (!addressComplete(address)) return 'Enter your shipping address to see available rates.';
+    if (checkout.shippingOptions.length === 0) {
+      return 'No shipping rates are available for this order. Please contact us for help.';
+    }
+    return null;
+  };
+
   const canPay =
     Boolean(email) && addressComplete(address) && Boolean(checkout.selectedShippingRateId);
 
@@ -249,14 +296,16 @@ export function CheckoutView({
               autoComplete="given-name"
               value={address.firstName}
               onChange={(firstName) => setAddress({ ...address, firstName })}
-              onBlur={() => saveAddress(address)}
+              onBlur={() => blurAddressField('firstName')}
+              error={addressError('firstName')}
             />
             <Input
               label="Last name"
               autoComplete="family-name"
               value={address.lastName}
               onChange={(lastName) => setAddress({ ...address, lastName })}
-              onBlur={() => saveAddress(address)}
+              onBlur={() => blurAddressField('lastName')}
+              error={addressError('lastName')}
             />
           </div>
           <Input
@@ -264,7 +313,8 @@ export function CheckoutView({
             autoComplete="address-line1"
             value={address.address1}
             onChange={(address1) => setAddress({ ...address, address1 })}
-            onBlur={() => saveAddress(address)}
+            onBlur={() => blurAddressField('address1')}
+            error={addressError('address1')}
           />
           <Input
             label="Apartment, suite, etc. (optional)"
@@ -279,7 +329,8 @@ export function CheckoutView({
               autoComplete="address-level2"
               value={address.city}
               onChange={(city) => setAddress({ ...address, city })}
-              onBlur={() => saveAddress(address)}
+              onBlur={() => blurAddressField('city')}
+              error={addressError('city')}
             />
             <Input
               label="State"
@@ -293,7 +344,8 @@ export function CheckoutView({
               autoComplete="postal-code"
               value={address.zip}
               onChange={(zip) => setAddress({ ...address, zip })}
-              onBlur={() => saveAddress(address)}
+              onBlur={() => blurAddressField('zip')}
+              error={addressError('zip')}
             />
           </div>
         </Section>
@@ -301,9 +353,9 @@ export function CheckoutView({
         <Section title="Shipping method">
           {/* Shopify withholds the rate list until it has somewhere to ship to,
               even though E3 can price rates from the subtotal alone (PARITY). */}
-          {!addressComplete(address) || checkout.shippingOptions.length === 0 ? (
+          {shippingNotice() !== null ? (
             <p className="rounded border border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-neutral-500 text-sm">
-              Enter your shipping address to see available rates.
+              {shippingNotice()}
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-neutral-300">
@@ -409,6 +461,7 @@ function Input({
   onBlur,
   type = 'text',
   autoComplete,
+  error,
 }: {
   label: string;
   value: string;
@@ -416,7 +469,10 @@ function Input({
   onBlur?: () => void;
   type?: string;
   autoComplete?: string;
+  /** Shown under the field and announced by `aria-describedby` when set. */
+  error?: string;
 }) {
+  const errorId = useId();
   return (
     <label className="block">
       <span className="sr-only">{label}</span>
@@ -426,10 +482,21 @@ function Input({
         autoComplete={autoComplete}
         placeholder={label}
         aria-label={label}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
-        className="w-full rounded border border-neutral-300 px-3.5 py-3 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-900"
+        className={`w-full rounded border px-3.5 py-3 text-sm outline-none placeholder:text-neutral-400 ${
+          error
+            ? 'border-red-600 focus:border-red-600'
+            : 'border-neutral-300 focus:border-neutral-900'
+        }`}
       />
+      {error ? (
+        <span id={errorId} className="mt-1 block text-red-600 text-xs">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
