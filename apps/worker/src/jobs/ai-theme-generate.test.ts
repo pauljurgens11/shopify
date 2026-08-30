@@ -13,6 +13,7 @@ import {
   buildUserMessage,
   collectReferencedHandles,
   runThemeGeneration,
+  STOCK_LIBRARY,
   type ThemeGenerator,
 } from './ai-theme-generate.ts';
 
@@ -124,6 +125,36 @@ describe('image rules', () => {
 
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[1]?.[0]?.retryFeedback).toContain('photo-not-a-real-id');
+    expect(result.ok).toBe(true);
+  });
+
+  it('offers the stock pool so a shop with no uploads still gets imagery', async () => {
+    const bare = buildUserMessage({ ...CONTEXT, catalog: { products: [], collections: [] } });
+    expect(bare).toContain('Stock photography');
+    expect(bare).toContain('(none uploaded yet)');
+    expect(bare).toContain(STOCK_LIBRARY[0]?.url);
+  });
+
+  it('accepts a stock URL even when the shop has no photography of its own', async () => {
+    const doc = presetThemeDoc('aurora');
+    const hero = doc.pages.home.find((s) => s.type === 'hero');
+    if (hero?.type === 'hero') hero.settings.image = STOCK_LIBRARY[0]?.url ?? null;
+
+    const generate = vi.fn<ThemeGenerator>().mockResolvedValue({ doc, summary: 'Done.' });
+    const result = await runThemeGeneration(
+      {
+        ...CONTEXT,
+        catalog: { products: [], collections: [] },
+        // Every handle "exists" — this test is about the image dimension only.
+        resolveHandles: async (referenced) => ({
+          products: new Set(referenced.products),
+          collections: new Set(referenced.collections),
+        }),
+      },
+      generate,
+    );
+
+    expect(generate).toHaveBeenCalledTimes(1);
     expect(result.ok).toBe(true);
   });
 
