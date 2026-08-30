@@ -22,6 +22,7 @@ import {
 } from '../../lib/sessions.ts';
 import { slugCandidates, slugify } from '../../lib/slug.ts';
 import { resolveFromSession } from '../../plugins/tenancy.ts';
+import { defaultShippingRates } from '../../services/settings/shipping.ts';
 import { installInitialTheme } from '../../services/themes/onboarding.ts';
 
 /** Prisma rows → the `sessionResponse` contract. Never leaks `passwordHash`. */
@@ -84,6 +85,14 @@ async function createShop(
         const shop = await tx.shop.create({
           data: { id: newId('shop'), slug, name: input.shopName, email: input.email },
         });
+        // Inside the transaction, not alongside installInitialTheme: a shop
+        // that exists with no rate has a checkout nobody can finish, so it must
+        // never be a state the database can hold. Priced off the row's own
+        // currency rather than a second copy of the column default.
+        const shopWithRates = await tx.shop.update({
+          where: { id: shop.id },
+          data: { shippingRates: defaultShippingRates(shop.currencyCode) },
+        });
         // Order numbers start at #1001 from the shop's first minute (SPEC §5);
         // the orders service takes a row lock on this row and cannot create it.
         await tx.orderSequence.create({ data: { shopId: shop.id } });
@@ -98,7 +107,7 @@ async function createShop(
             role: 'owner',
           },
         });
-        return { shop, user };
+        return { shop: shopWithRates, user };
       });
     } catch (error) {
       // The only unique constraint reachable here is shops.slug: the shop is

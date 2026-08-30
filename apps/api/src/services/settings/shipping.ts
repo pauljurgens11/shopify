@@ -37,6 +37,31 @@ export function eligibleShippingRates(rates: ShippingRate[], subtotal: MoneyDto)
     .sort((a, b) => a.price.amount - b.price.amount);
 }
 
+/**
+ * The rates a shop is created with.
+ *
+ * Not a nicety: a shop with zero rates has a checkout nobody can finish. E3
+ * prices `shippingOptions` from the subtotal alone, so an empty list means
+ * `selectedShippingRateId` never leaves null and E4's "Pay now" never enables —
+ * the store looks open and silently cannot take an order. Shopify seeds a
+ * general rate at signup for exactly this reason; the merchant renames or
+ * reprices it in Settings → Shipping, but day one already works.
+ *
+ * Unconditional on purpose: a `minOrderSubtotal` here would reintroduce the
+ * same dead end for every cart below it.
+ */
+export function defaultShippingRates(currencyCode: string): ShippingRate[] {
+  return [
+    {
+      id: newId('shippingRate'),
+      name: 'Standard shipping (3–5 business days)',
+      price: { amount: 895, currencyCode },
+      minOrderSubtotal: null,
+      maxOrderSubtotal: null,
+    },
+  ];
+}
+
 /** Tolerates a column written before a field existed, or hand-edited in SQL. */
 function parseRates(value: unknown): ShippingRate[] {
   if (!Array.isArray(value)) return [];
